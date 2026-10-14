@@ -210,7 +210,7 @@ private fun DataTabContent(state: AppState, data: DataTab) {
             FilterBox(IconKind.Sort, "ORDER BY", data.orderBy, columns, { data.orderBy = it }, { state.applyFilters(data) }, "filter-order", Modifier.weight(1f))
         }
         Separator()
-        Grid(grid, onLoadMore = { scope.launch(Dispatchers.IO) { grid.loadMore(PAGE) } }, modifier = Modifier.fillMaxWidth().weight(1f).testTag("data-grid"), editing = ed)
+        Grid(grid, onLoadMore = { scope.launch(Dispatchers.IO) { grid.loadMore(PAGE) } }, modifier = Modifier.fillMaxWidth().weight(1f).testTag("data-grid"), editing = ed, onNotice = { state.status = it })
     }
 }
 

@@ -442,4 +442,17 @@ class AppUiTest {
         state.setTxManual(false)
         assertFalse(state.form.manualTx)
     }
+
+    @Test fun editingAnExistingRowOfAKeylessTableIsRefusedWithAnExplanation() {
+        rule.setContent { App(state) }
+        state.form.database = tempDb()
+        setEditor("create table sinclave(a text, b text); insert into sinclave values ('x', 'y');")
+        runAll()
+        until { !state.running && state.catalog?.complete == true }
+        state.openData(state.catalog!!.objectOf(ksqlc.sql.TableRef("main", "sinclave"))!!)
+        until { state.dataTabs.singleOrNull()?.grid?.rows?.size == 1 }
+        rule.onNodeWithTag("cell:0:0").performMouseInput { doubleClick() }; frames()
+        assertEquals(0, rule.onAllNodesWithTag("cell-editor").fetchSemanticsNodes().size)
+        assertTrue(state.status.contains("clave primaria"), state.status)
+    }
 }

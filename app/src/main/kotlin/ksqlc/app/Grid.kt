@@ -57,7 +57,7 @@ fun cellText(v: Any?): String = v?.toString()?.replace("\r\n", "⏎")?.replace('
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
-fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, editing: TableEditor? = null) {
+fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, editing: TableEditor? = null, onNotice: (String) -> Unit = {}) {
     val c = Ksqlc.colors
     val clipboard = LocalClipboardManager.current
     val hscroll = rememberScrollState()
@@ -89,12 +89,16 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         null -> tab.rows.getOrNull(i)?.getOrNull(j)?.toString().orEmpty()
     }
 
-    fun startEdit(i: Int, j: Int) {
+    fun startEdit(i: Int, j: Int, seed: String? = null) {
         val ed = editing ?: return
         val insertRow = ed.isInsertRow(i, tab)
-        if ((!insertRow && (!ed.canEditRows || i in ed.deleted)) || !ed.isEditable(j, tab)) return
+        when {
+            !insertRow && !ed.canEditRows -> { onNotice(ed.readOnlyReason() ?: "No se pueden editar las filas de esta tabla"); return }
+            !insertRow && i in ed.deleted -> { onNotice("La fila está marcada para borrar: revierte los cambios para editarla"); return }
+            !ed.isEditable(j, tab) -> { onNotice("«${cols[j].name}» es una columna binaria (${cols[j].typeName}): no se puede editar como texto"); return }
+        }
         selected = i to j; editCell = i to j
-        raw(i, j).let { draft = TextFieldValue(it, TextRange(it.length)) }
+        (seed ?: raw(i, j)).let { draft = TextFieldValue(it, TextRange(it.length)) }
     }
     fun finishEdit(save: Boolean) {
         val cell = editCell ?: return
@@ -109,8 +113,15 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
     Box(
         modifier.background(c.editorBg).focusRequester(focus).focusTarget().testTag("grid").onPreviewKeyEvent { e ->
             val sel = selected
-            if (e.type != KeyEventType.KeyDown || editCell != null) return@onPreviewKeyEvent false
+            if (editCell != null) return@onPreviewKeyEvent false
+            val plain = !e.isMetaPressed && !e.isCtrlPressed && !e.isAltPressed
             when {
+                // typing on a selected cell starts editing it with that character (the typed-character event follows the key press)
+                e.type == KeyEventType.Unknown && plain && sel != null && editing != null && e.utf16CodePoint >= 32 && e.utf16CodePoint != 127 -> {
+                    startEdit(sel.first, sel.second, String(Character.toChars(e.utf16CodePoint)))
+                    editCell != null
+                }
+                e.type != KeyEventType.KeyDown -> false
                 (e.isMetaPressed || e.isCtrlPressed) && e.key == Key.C && sel != null -> {
                     textOf(sel.first, sel.second)?.let { clipboard.setText(AnnotatedString(it)) }
                     true
@@ -171,6 +182,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                                     Box(
                                         Modifier.testTag("cell:$i:$j").width(ColumnWidth).fillMaxHeight().background(bg).drawBehind { lines(c.gridLine) }
                                             .combinedClickable(
+                                                enabled = editCell != i to j,      // while editing, clicks belong to the text field
                                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null,
                                                 onClick = { selected = i to j; editing?.cursorRow = i; editing?.selectedRows?.clear(); focus.requestFocus() },
                                                 onDoubleClick = { startEdit(i, j) },
@@ -181,7 +193,8 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                                         if (editCell == i to j) {
                                             val requester = remember { FocusRequester() }
                                             var focused by remember { mutableStateOf(false) }
-                                            LaunchedEffect(Unit) { requester.requestFocus() }
+                                            // ask for the keyboard until the field really has it (the request can arrive before the node is ready)
+                                            LaunchedEffect(Unit) { repeat(6) { if (!focused) { runCatching { requester.requestFocus() }; kotlinx.coroutines.delay(40) } } }
                                             BasicTextField(
                                                 draft, { draft = it }, Modifier.fillMaxWidth().focusRequester(requester).testTag("cell-editor")
                                                     .onFocusChanged { st -> if (st.isFocused) focused = true else if (focused && editCell == i to j) finishEdit(true) }
