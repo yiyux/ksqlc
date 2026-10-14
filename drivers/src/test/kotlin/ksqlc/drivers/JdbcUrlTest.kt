@@ -28,13 +28,21 @@ class JdbcUrlParseTest {
             JdbcUrl.Parts(POSTGRES, "db.local", 6543, "app", true), JdbcUrl.Parts(POSTGRES, "localhost", 5432, "", false),
             JdbcUrl.Parts(MYSQL, "h", 3306, "d", true), JdbcUrl.Parts(MARIADB, "h", 3307, "d", true),
             JdbcUrl.Parts(MSSQL, "h", 1433, "d", true), JdbcUrl.Parts(MSSQL, "h", 1433, "", false),
+            JdbcUrl.Parts(MSSQL, "h", 1433, "d", true, trustCert = true),
             JdbcUrl.Parts(ORACLE, "h", 1521, "svc", false), JdbcUrl.Parts(SQLITE, "", null, "/tmp/x.db", false),
             JdbcUrl.Parts(SQLITE, "", null, "", false),
         )
         for (p in cases) {
-            val url = JdbcUrl.build(p.kind, p.host, p.port, p.database, p.ssl)
+            val url = JdbcUrl.build(p.kind, p.host, p.port, p.database, p.ssl, p.trustCert)
             assertEquals(p, JdbcUrl.parse(url), url)
         }
+    }
+
+    @Test fun sqlServerTrustsTheCertificateOnlyWhenAskedAndEncrypting() {
+        assertEquals("jdbc:sqlserver://h:1433;databaseName=d;encrypt=true;trustServerCertificate=true", JdbcUrl.build(MSSQL, "h", 1433, "d", true, trustCert = true))
+        assertEquals("jdbc:sqlserver://h:1433;databaseName=d;encrypt=true", JdbcUrl.build(MSSQL, "h", 1433, "d", true))
+        assertEquals("jdbc:sqlserver://h:1433;databaseName=d;encrypt=false", JdbcUrl.build(MSSQL, "h", 1433, "d", false, trustCert = true))   // nothing to trust without encryption
+        assertNull(JdbcUrl.parse("jdbc:sqlserver://h:1433;encrypt=false;trustServerCertificate=true"))
     }
 
     @Test fun urlsItCannotRepresentStayManual() {

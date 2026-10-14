@@ -57,4 +57,21 @@ class LexerTest {
     }
 
     @Test fun emptyInput() = assertEquals(emptyList(), tokenize(""))
+
+    @Test fun bracketNamesAreQuotedIdentifiersButSubscriptsAreNot() {
+        assertEquals(listOf("KEYWORD:select", "QUOTED_IDENT:[My col]", "KEYWORD:from", "QUOTED_IDENT:[dbo]", "PUNCT:.", "QUOTED_IDENT:[t]"), lex("select [My col] from [dbo].[t]"))
+        assertEquals(listOf("QUOTED_IDENT:[a]]b]"), lex("[a]]b]"))                                   // ]] stands for ]
+        assertEquals(listOf("KEYWORD:select", "IDENT:a", "PUNCT:[", "NUMBER:1", "PUNCT:]"), lex("select a[1]"))
+        assertEquals(listOf("IDENT:x", "OPERATOR:::", "TYPE:int", "PUNCT:[", "PUNCT:]"), lex("x::int[]"))
+        assertEquals(listOf("PUNCT:(", "PUNCT:)", "PUNCT:[", "NUMBER:1", "PUNCT:]"), lex("()[1]"))
+        assertEquals(listOf("QUOTED_IDENT:[x;y]", "PUNCT:;"), lex("[x;y];"))                       // a ; inside a name does not end the statement
+    }
+
+    @Test fun unterminatedBracketNamesAreReported() {
+        val t = tokenize("select [abc").last()
+        assertEquals(TokenKind.QUOTED_IDENT, t.kind)
+        assertFalse(isTerminated("select [abc", t))
+        val ok = tokenize("select [a]]b]").last()
+        assertTrue(isTerminated("select [a]]b]", ok))
+    }
 }

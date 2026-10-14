@@ -22,7 +22,8 @@ interface Dialect {
             DbKind.POSTGRES -> PostgresDialect
             DbKind.MYSQL, DbKind.MARIADB -> MySqlDialect
             DbKind.SQLITE -> SqliteDialect
-            DbKind.MSSQL, DbKind.ORACLE -> GenericDialect
+            DbKind.MSSQL -> SqlServerDialect
+            DbKind.ORACLE -> GenericDialect
         }
     }
 }

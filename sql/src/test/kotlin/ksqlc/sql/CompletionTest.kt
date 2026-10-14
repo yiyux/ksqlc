@@ -94,4 +94,21 @@ class CompletionTest {
         assertEquals("main.orders.total", sql.substring(ch.start, ch.end))
         assertNull(identifierAt(sql, sql.indexOf("select") + 2))
     }
+
+    @Test fun bracketedTableNamesWorkAsReferencesAndQualifiers() {
+        val sql = "select * from [main].[customers] [c] where [c]."
+        val refs = tableRefs(sql, statementAt(sql, 0)!!)
+        assertEquals("main" to "customers", refs.single().let { it.schema to it.name })
+        assertEquals("c", refs.single().alias)
+        val ctx = completionContext(sql, sql.length)!!
+        assertEquals(listOf("c"), ctx.qualifier)
+        assertEquals(listOf("id", "name"), suggest(ctx, schema, refs).map { it.text }.sorted())
+        assertEquals(listOf("customers", "orders", "v_open"), names("select * from [main].|").sorted())
+    }
+
+    @Test fun diagnosticsUnderstandBracketNames() {
+        assertEquals(emptyList(), diagnose("select [c].[id] from [main].[customers] [c]", schema))
+        assertEquals(listOf("Tabla desconocida: nada"), diagnose("select * from [main].[nada]", schema).map { it.message.replace("main.", "") })
+        assertEquals(listOf("Columna desconocida: c.nope"), diagnose("select [c].[nope] from [customers] [c]", schema).map { it.message })
+    }
 }

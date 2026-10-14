@@ -27,8 +27,9 @@ object JdbcUrl {
      * connection in this process, so the console and the schema tree see the same tables) and
      * host/port/ssl are ignored.
      * For Oracle [database] is the service name.
+     * For SQL Server, [trustCert] (only with [ssl]) accepts the server's certificate without validating it, which a self-signed one needs.
      */
-    fun build(kind: DbKind, host: String, port: Int?, database: String, ssl: Boolean): String {
+    fun build(kind: DbKind, host: String, port: Int?, database: String, ssl: Boolean, trustCert: Boolean = false): String {
         val h = host.ifBlank { "localhost" }
         val p = port ?: defaultPort(kind)
         return when (kind) {
@@ -37,13 +38,13 @@ object JdbcUrl {
             DbKind.MYSQL -> "jdbc:mysql://$h:$p/$database" + if (ssl) "?sslMode=REQUIRED" else ""
             DbKind.MARIADB -> "jdbc:mariadb://$h:$p/$database" + if (ssl) "?sslMode=trust" else ""
             DbKind.MSSQL -> "jdbc:sqlserver://$h:$p" + (if (database.isBlank()) "" else ";databaseName=$database") +
-                ";encrypt=" + ssl
+                ";encrypt=" + ssl + (if (ssl && trustCert) ";trustServerCertificate=true" else "")
             DbKind.ORACLE -> "jdbc:oracle:thin:@//$h:$p/$database"
         }
     }
 
     /** The form fields a URL built by [build] came from. */
-    data class Parts(val kind: DbKind, val host: String, val port: Int?, val database: String, val ssl: Boolean)
+    data class Parts(val kind: DbKind, val host: String, val port: Int?, val database: String, val ssl: Boolean, val trustCert: Boolean = false)
 
     /**
      * Inverse of [build]: recovers the fields of a URL it produced. Returns null for any other URL (extra parameters,
@@ -60,9 +61,9 @@ object JdbcUrl {
             DbKind.POSTGRES -> Regex("""^jdbc:postgresql://([^:/?]+):(\d+)/([^?]*)(\?sslmode=require)?$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[4].isNotEmpty()) }
             DbKind.MYSQL -> Regex("""^jdbc:mysql://([^:/?]+):(\d+)/([^?]*)(\?sslMode=REQUIRED)?$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[4].isNotEmpty()) }
             DbKind.MARIADB -> Regex("""^jdbc:mariadb://([^:/?]+):(\d+)/([^?]*)(\?sslMode=trust)?$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[4].isNotEmpty()) }
-            DbKind.MSSQL -> Regex("""^jdbc:sqlserver://([^:;/]+):(\d+)(?:;databaseName=([^;]*))?;encrypt=(true|false)$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[4] == "true") }
+            DbKind.MSSQL -> Regex("""^jdbc:sqlserver://([^:;/]+):(\d+)(?:;databaseName=([^;]*))?;encrypt=(true|false)(;trustServerCertificate=true)?$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[4] == "true", it.groupValues[5].isNotEmpty()) }
             DbKind.ORACLE -> Regex("""^jdbc:oracle:thin:@//([^:/]+):(\d+)/(.*)$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], false) }
         }
-        return parts?.takeIf { build(it.kind, it.host, it.port, it.database, it.ssl) == url }
+        return parts?.takeIf { build(it.kind, it.host, it.port, it.database, it.ssl, it.trustCert) == url }
     }
 }

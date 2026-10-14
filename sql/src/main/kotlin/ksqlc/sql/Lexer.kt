@@ -36,6 +36,8 @@ fun tokenize(sql: String): List<Token> {
             }
             c == '\'' -> { i = skipQuoted(sql, i, c); add(TokenKind.STRING, start, i) }
             c == '"' || c == '`' -> { i = skipQuoted(sql, i, c); add(TokenKind.QUOTED_IDENT, start, i) }
+            // T-SQL [quoted name]; after a name, ')' or a type a '[' is an array subscript or type suffix instead (a[1], int[])
+            c == '[' && opensBracketName(sql, i, out) -> { i = skipQuoted(sql, i, c); add(TokenKind.QUOTED_IDENT, start, i) }
             c == '$' -> {
                 val tag = dollarTag(sql, i)
                 when {
@@ -74,14 +76,34 @@ fun tokenize(sql: String): List<Token> {
 
 private const val PUNCT_CHARS = "(),;.[]{}"
 
-private fun skipQuoted(sql: String, from: Int, q: Char): Int {
+/**
+ * Does the `[` at [at] start a T-SQL name? After a name or type it may also be an array subscript (`a[1]`, `int[]`), so
+ * there it only counts when what is inside is not empty or a plain number (`from t [alias]`).
+ */
+private fun opensBracketName(sql: String, at: Int, before: List<Token>): Boolean {
+    val prev = before.lastOrNull { it.kind != TokenKind.WHITESPACE && it.kind != TokenKind.COMMENT } ?: return true
+    fun looksLikeName(): Boolean {
+        val close = sql.indexOf(']', at + 1)
+        val inside = if (close < 0) sql.substring(at + 1) else sql.substring(at + 1, close)
+        return inside.isNotEmpty() && !inside.all { it.isDigit() || it == '-' }
+    }
+    return when (prev.kind) {
+        TokenKind.IDENT, TokenKind.QUOTED_IDENT, TokenKind.TYPE -> looksLikeName()
+        TokenKind.NUMBER, TokenKind.PARAM, TokenKind.STRING -> false
+        TokenKind.PUNCT -> sql[prev.start] != ')' && sql[prev.start] != ']'
+        else -> true
+    }
+}
+
+private fun skipQuoted(sql: String, from: Int, open: Char): Int {
+    val q = if (open == '[') ']' else open
     var i = from + 1
     while (i < sql.length) {
         if (sql[i] == q) {
             if (i + 1 < sql.length && sql[i + 1] == q) { i += 2; continue }  // '' escape
             return i + 1
         }
-        if (sql[i] == '\\' && q == '\'' && i + 1 < sql.length) { i += 2; continue }
+        if (sql[i] == '\\' && open == '\'' && i + 1 < sql.length) { i += 2; continue }
         i++
     }
     return sql.length
@@ -147,12 +169,12 @@ fun isTerminated(sql: String, t: Token): Boolean {
     return when {
         t.kind == TokenKind.COMMENT -> !text.startsWith("/*") || (text.length >= 4 && text.endsWith("*/"))
         t.kind == TokenKind.QUOTED_IDENT || (t.kind == TokenKind.STRING && text.startsWith("'")) -> {
-            val q = text[0]
+            val q = if (text[0] == '[') ']' else text[0]
             var i = 1
             var closed = false
             while (i < text.length) {
                 if (text[i] == q) { if (i + 1 < text.length && text[i + 1] == q) { i += 2; continue }; closed = i + 1 == text.length; break }
-                if (q == '\'' && text[i] == '\\' && i + 1 < text.length) { i += 2; continue }
+                if (text[0] == '\'' && text[i] == '\\' && i + 1 < text.length) { i += 2; continue }
                 i++
             }
             closed

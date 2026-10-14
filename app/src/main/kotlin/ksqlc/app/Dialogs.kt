@@ -131,6 +131,10 @@ fun DataSourceDialog(state: AppState) {
                             CompactTextField(draft.database, { draft.database = it }, Modifier.weight(1f), enabled = !draft.customUrl, placeholder = if (network) null else "vacío = memoria compartida", testTag = "ds-db", height = 28.dp)
                         }
                         Field("SSL:") { KCheckbox(draft.ssl, { draft.ssl = it }, label = "Exigir conexión cifrada", enabled = network && !draft.customUrl, modifier = Modifier.testTag("ds-ssl")) }
+                        if (draft.kind == DbKind.MSSQL) Field("") {
+                            // SQL Server servers often use a self-signed certificate, which the driver rejects unless told to trust it
+                            KCheckbox(draft.trustCert, { draft.trustCert = it }, label = "Confiar en el certificado del servidor", enabled = draft.ssl && !draft.customUrl, modifier = Modifier.testTag("ds-trust"))
+                        }
                         Field("URL:") {
                             Column(Modifier.weight(1f)) {
                                 CompactTextField(draft.url, { draft.urlText = it }, Modifier.fillMaxWidth(), readOnly = !draft.customUrl, testTag = "ds-url", height = 28.dp)

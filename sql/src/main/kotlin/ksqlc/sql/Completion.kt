@@ -44,9 +44,9 @@ fun completionContext(sql: String, caret: Int): CompletionContext? {
     while (q > 0 && sql[q - 1] == '.') {
         val identEnd = q - 1
         var s = identEnd
-        if (s > 0 && (sql[s - 1] == '"' || sql[s - 1] == '`')) {
-            val quote = sql[s - 1]; s--
-            s = sql.lastIndexOf(quote, s - 1).takeIf { it >= 0 } ?: break
+        if (s > 0 && (sql[s - 1] == '"' || sql[s - 1] == '`' || sql[s - 1] == ']')) {
+            val open = if (sql[s - 1] == ']') '[' else sql[s - 1]; s--
+            s = sql.lastIndexOf(open, s - 1).takeIf { it >= 0 } ?: break
             qualifier.add(0, unquote(sql.substring(s, identEnd)))
         } else {
             while (s > 0 && (sql[s - 1].isLetterOrDigit() || sql[s - 1] == '_')) s--

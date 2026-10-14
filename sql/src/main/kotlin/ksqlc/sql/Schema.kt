@@ -17,6 +17,9 @@ interface SchemaInfo {
 fun SchemaInfo.find(schema: String?, name: String): TableRef? =
     tables().firstOrNull { it.name.equals(name, true) && (schema == null || it.schema.equals(schema, true)) }
 
-/** Identifier text without its quotes. */
-fun unquote(s: String): String =
-    if (s.length >= 2 && (s[0] == '"' || s[0] == '`') && s.last() == s[0]) s.substring(1, s.length - 1).replace("${s[0]}${s[0]}", s[0].toString()) else s
+/** Identifier text without its quotes: `"a"`, `` `a` `` or T-SQL `[a]` (a doubled closing quote stands for itself). */
+fun unquote(s: String): String = when {
+    s.length >= 2 && (s[0] == '"' || s[0] == '`') && s.last() == s[0] -> s.substring(1, s.length - 1).replace("${s[0]}${s[0]}", s[0].toString())
+    s.length >= 2 && s[0] == '[' && s.last() == ']' -> s.substring(1, s.length - 1).replace("]]", "]")
+    else -> s
+}
