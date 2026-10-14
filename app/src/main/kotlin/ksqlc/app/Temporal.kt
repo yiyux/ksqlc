@@ -68,3 +68,14 @@ fun monthPage(month: java.time.YearMonth): List<LocalDate> {
     val start = first.minusDays((first.dayOfWeek.value - 1).toLong())
     return List(42) { start.plusDays(it.toLong()) }
 }
+
+/** Values the cell menu can fill in for a column of [typeName]: the current moment for date-like columns, a random UUID for text and uuid columns. */
+fun generators(typeName: String, engine: ksqlc.core.DbKind?): List<Pair<String, () -> String>> {
+    val kind = temporalKind(typeName, engine)
+    val t = typeName.uppercase()
+    return when {
+        kind != null -> listOf((if (kind == TemporalKind.DATE) "Fecha de hoy" else "Fecha y hora actual") to { formatMoment(now(), kind) })
+        t == "UUID" || t == "UNIQUEIDENTIFIER" || t.contains("CHAR") || t == "TEXT" -> listOf("Generar UUID" to { java.util.UUID.randomUUID().toString() })
+        else -> emptyList()
+    }
+}

@@ -93,3 +93,15 @@ class ColumnWidthTest {
         kotlin.test.assertEquals(216.dp, columnWidth("timestamptz", null))
     }
 }
+
+class GeneratorsTest {
+    @kotlin.test.Test fun offersOnlyWhatFitsTheColumn() {
+        kotlin.test.assertEquals(listOf("Generar UUID"), generators("uuid", null).map { it.first })
+        kotlin.test.assertEquals(listOf("Generar UUID"), generators("VARCHAR(36)", null).map { it.first })
+        kotlin.test.assertEquals(emptyList(), generators("integer", null).map { it.first })
+        val (label, make) = generators("timestamptz", null).single()
+        kotlin.test.assertEquals("Fecha y hora actual", label)
+        kotlin.test.assertNotNull(parseMoment(make(), TemporalKind.DATETIME_TZ))
+        kotlin.test.assertEquals(36, generators("text", null).single().second().length)
+    }
+}

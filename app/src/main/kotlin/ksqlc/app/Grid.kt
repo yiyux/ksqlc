@@ -47,6 +47,7 @@ import ksqlc.app.ui.*
 
 private val RowNumberWidth = 39.dp
 private val ColumnWidth = 112.dp
+private const val MAX_LOAD_BYTES = 64_000_000L
 
 /** Width of a column: dates and times get room for their full text (`2026-01-31 10:00:00`, plus `+01:00` with a zone) in the monospace font. */
 internal fun columnWidth(typeName: String, engine: ksqlc.core.DbKind?) = when (temporalKind(typeName, engine)) {
@@ -76,6 +77,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
     val focus = remember { FocusRequester() }
     var selected by remember(tab) { mutableStateOf<Pair<Int, Int>?>(null) }
     var editCell by remember(tab) { mutableStateOf<Pair<Int, Int>?>(null) }
+    var bigCell by remember(tab) { mutableStateOf<Pair<Int, Int>?>(null) }
     var draft by remember(tab) { mutableStateOf(TextFieldValue("")) }
     var anchorRow by remember(tab) { mutableStateOf(-1) }
     val cols = tab.result.columns
@@ -103,14 +105,32 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
             is CellValue.Text -> v.text
             is CellValue.Null -> null
             is CellValue.Default -> null
-            null -> tab.rows.getOrNull(i)?.getOrNull(j)?.toString()
+            is CellValue.Bytes -> "<${v.name}: ${v.data.size} bytes>"
+            null -> tab.rows.getOrNull(i)?.getOrNull(j)?.let { if (it is ByteArray) "<${it.size} bytes>" else it.toString() }
         }
+    }
+    /** The bytes a binary cell holds now: what was loaded from a file, else what the database returned. */
+    fun bytesOf(i: Int, j: Int): ByteArray? = when (val v = editing?.valueAt(i, j, tab)) {
+        is CellValue.Bytes -> v.data
+        null -> tab.rows.getOrNull(i)?.getOrNull(j) as? ByteArray
+        else -> null
+    }
+    fun loadBytes(i: Int, j: Int) {
+        val path = chooseFile(false, "Cargar «${cols[j].name}» desde un archivo") ?: return
+        val f = java.io.File(path)
+        if (f.length() > MAX_LOAD_BYTES) { onNotice("El archivo pesa más de ${MAX_LOAD_BYTES / 1_000_000} MB: no se carga en una celda"); return }
+        runCatching { f.readBytes() }.onSuccess { editing?.setCell(i, j, CellValue.Bytes(f.name, it), tab) }.onFailure { onNotice("No se pudo leer el archivo: ${it.message}") }
+    }
+    fun saveBytes(i: Int, j: Int) {
+        val data = bytesOf(i, j) ?: run { onNotice("La celda no tiene contenido binario"); return }
+        val path = chooseFile(true, "Guardar «${cols[j].name}» en un archivo", cols[j].name + ".bin") ?: return
+        runCatching { java.io.File(path).writeBytes(data) }.onSuccess { onNotice("${data.size} bytes guardados en $path") }.onFailure { onNotice("No se pudo guardar: ${it.message}") }
     }
     val widths = cols.map { columnWidth(it.typeName, editing?.engine) }
     fun isDefault(i: Int, j: Int) = editing?.valueAt(i, j, tab) is CellValue.Default
     fun raw(i: Int, j: Int): String = when (val v = editing?.valueAt(i, j, tab)) {
         is CellValue.Text -> v.text
-        is CellValue.Null, is CellValue.Default -> ""
+        is CellValue.Null, is CellValue.Default, is CellValue.Bytes -> ""
         null -> tab.rows.getOrNull(i)?.getOrNull(j)?.toString().orEmpty()
     }
 
@@ -289,8 +309,16 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                                 else ContextMenuArea(items = {
                                     buildList {
                                         add(ContextMenuItem("Editar") { startEdit(i, j) })
+                                        if (editing.isEditable(j, tab)) add(ContextMenuItem("Editar en ventana…") { bigCell = i to j })
+                                        else {
+                                            add(ContextMenuItem("Cargar desde archivo…") { loadBytes(i, j) })
+                                            add(ContextMenuItem("Guardar en archivo…") { saveBytes(i, j) })
+                                        }
                                         add(ContextMenuItem("Poner NULL") { editing.setCell(i, j, CellValue.Null, tab) })
                                         if (isNew) add(ContextMenuItem("Valor por defecto") { editing.setCell(i, j, CellValue.Default, tab) })
+                                        if (editing.isEditable(j, tab)) generators(cols[j].typeName, editing.engine).forEach { (label, make) ->
+                                            add(ContextMenuItem(label) { editing.setCell(i, j, CellValue.Text(make()), tab) })
+                                        }
                                         add(ContextMenuItem("Copiar") { clipboard.setText(AnnotatedString(shown.orEmpty())) })
                                     }
                                 }) { cell() }
@@ -304,6 +332,13 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         val wide = hscroll.maxValue > 0
         if (wide) HorizontalScrollbar(rememberScrollbarAdapter(hscroll), Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(end = 12.dp).testTag("grid-hscroll"), style = scrollbarStyle())
         RowsPill(tab, if (filtersSnapshot.isEmpty()) null else visible.count { it < tab.rows.size }, onLoadMore, Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = if (wide) 18.dp else 10.dp))
+        bigCell?.let { (i, j) ->
+            BigCellEditor(
+                "${cols[j].name} (${cols[j].typeName.lowercase()})", raw(i, j), isJsonType(cols[j].typeName),
+                onSave = { text -> bigCell = null; if (editing != null && text != raw(i, j)) editing.setCell(i, j, CellValue.Text(text), tab) },
+                onCancel = { bigCell = null },
+            )
+        }
     }
 }
 

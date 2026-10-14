@@ -73,6 +73,7 @@ class TableEditor(val obj: DbObject, private val dialect: Dialect, private val k
             is CellValue.Null -> original == null
             is CellValue.Text -> original != null && original.toString() == v.text
             is CellValue.Default -> true
+            is CellValue.Bytes -> false
         }
         if (same) edits.remove(row to col) else edits[row to col] = v
     }

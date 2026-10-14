@@ -19,6 +19,8 @@ sealed interface CellValue {
     data class Text(val text: String) : CellValue
     data object Null : CellValue
     data object Default : CellValue
+    /** Binary content loaded from a file called [name]; compared by identity, so every load counts as a change. */
+    class Bytes(val name: String, val data: ByteArray) : CellValue
 }
 
 /** A value PostgreSQL must receive untyped (uuid, json, enums…): bound with `Types.OTHER`. */
@@ -90,6 +92,7 @@ internal fun literal(v: Any?): String = when (v) {
     null -> "NULL"
     is Boolean -> if (v) "TRUE" else "FALSE"
     is Number -> v.toString()
+    is ByteArray -> "<${v.size} bytes>"
     is UntypedParam -> "'" + v.text.replace("'", "''") + "'"
     else -> "'" + v.toString().replace("'", "''") + "'"
 }
@@ -119,6 +122,7 @@ fun buildDml(
     fun bind(column: String, v: CellValue): Any? = when (v) {
         is CellValue.Null -> null
         is CellValue.Default -> null
+        is CellValue.Bytes -> v.data
         is CellValue.Text -> try { parseParam(v.text, typeOf[column.lowercase()] ?: "", kind) } catch (e: IllegalArgumentException) { throw DmlException(column, e.message ?: "valor no válido") }
     }
 
