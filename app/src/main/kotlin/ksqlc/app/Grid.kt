@@ -59,7 +59,9 @@ fun cellText(v: Any?): String = v?.toString()?.replace("\r\n", "⏎")?.replace('
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
-fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, editing: TableEditor? = null, onNotice: (String) -> Unit = {}) {
+fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, editing: TableEditor? = null, onNotice: (String) -> Unit = {},
+         /** Header arrows. Null = the grid orders the rows it has loaded; given = the owner orders them (e.g. in the query) and reloads. */
+         onSort: ((column: Int, asc: Boolean?) -> Unit)? = null) {
     val c = Ksqlc.colors
     val clipboard = LocalClipboardManager.current
     val hscroll = rememberScrollState()
@@ -74,8 +76,15 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
     val total = tab.rows.size + newRows
     // rows the local column filters let through (rows being added are always shown); `i` below is always the real row index
     val filtersSnapshot = tab.filters.toMap()
-    val visible = remember(tab.rows.size, filtersSnapshot, newRows) {
-        if (filtersSnapshot.isEmpty()) List(total) { it } else (0 until total).filter { it >= tab.rows.size || tab.passes(tab.rows[it]) }
+    val sort = tab.sort
+    val visible = remember(tab.rows.size, filtersSnapshot, newRows, sort, onSort == null) {
+        val shown = if (filtersSnapshot.isEmpty()) List(total) { it } else (0 until total).filter { it >= tab.rows.size || tab.passes(tab.rows[it]) }
+        if (sort == null || onSort != null) shown
+        else {
+            val (col, asc) = sort
+            val (old, added) = shown.partition { it < tab.rows.size }
+            old.sortedWith { a, b -> compareCells(tab.rows[a].getOrNull(col), tab.rows[b].getOrNull(col)).let { if (asc) it else -it } } + added
+        }
     }
     var filterOpen by remember(tab) { mutableStateOf<Int?>(null) }
     // a column counts as numeric (right-aligned) when its first non-null value is a number
@@ -145,16 +154,28 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                 cols.forEachIndexed { j, col ->
                     Tip(col.name, col.typeName.lowercase(), Modifier.width(ColumnWidth).fillMaxHeight()) {
                     Row(
-                        Modifier.fillMaxSize().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) }.padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        Modifier.fillMaxSize().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) }.padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         KIcon(IconKind.Column, tint = c.accentIcon, size = 14.dp)
-                        Text(col.name, Modifier.weight(1f, fill = false), fontSize = 13.sp, color = c.gridText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        val active = j in tab.filters
-                        Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).clickable { filterOpen = if (filterOpen == j) null else j }.testTag("filter-btn:$j"), contentAlignment = Alignment.Center) {
-                            KIcon(IconKind.Filter, tint = if (active) c.accent else c.textMuted, size = 12.dp)
-                            if (filterOpen == j) ColumnFilterPopup(tab, j) { filterOpen = null }
+                        // name and funnel share what the sort arrow leaves; a long name is cut, never the icons
+                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(col.name, Modifier.weight(1f, fill = false), fontSize = 13.sp, color = c.gridText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            val active = j in tab.filters
+                            Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).clickable { filterOpen = if (filterOpen == j) null else j }.testTag("filter-btn:$j"), contentAlignment = Alignment.Center) {
+                                KIcon(IconKind.Filter, tint = if (active) c.accent else c.textMuted, size = 12.dp)
+                                if (filterOpen == j) ColumnFilterPopup(tab, j) { filterOpen = null }
+                            }
                         }
+                        // none -> ascending -> descending -> none
+                        val dir = tab.sort?.takeIf { it.first == j }?.second
+                        Box(
+                            Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).testTag("sort-btn:$j").clickable {
+                                val next = when (dir) { null -> true; true -> false; false -> null }
+                                if (onSort != null) onSort(j, next) else tab.sort = next?.let { j to it }
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) { KIcon(when (dir) { null -> IconKind.Updown; true -> IconKind.ArrowUp; false -> IconKind.ArrowDown }, tint = if (dir == null) c.textMuted else c.accent, size = 12.dp) }
                     }
                     }
                 }
@@ -276,6 +297,15 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         if (wide) HorizontalScrollbar(rememberScrollbarAdapter(hscroll), Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(end = 12.dp).testTag("grid-hscroll"), style = scrollbarStyle())
         RowsPill(tab, if (filtersSnapshot.isEmpty()) null else visible.count { it < tab.rows.size }, onLoadMore, Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = if (wide) 18.dp else 10.dp))
     }
+}
+
+/** Order of two cell values: NULL is the smallest, numbers compare by value, text ignoring case, same-typed comparables by themselves, anything else as text. */
+internal fun compareCells(a: Any?, b: Any?): Int = when {
+    a == null || b == null -> if (a == null && b == null) 0 else if (a == null) -1 else 1
+    a is Number && b is Number -> runCatching { java.math.BigDecimal(a.toString()).compareTo(java.math.BigDecimal(b.toString())) }.getOrElse { a.toDouble().compareTo(b.toDouble()) }
+    a is String && b is String -> a.compareTo(b, ignoreCase = true)
+    a is Comparable<*> && a::class == b::class -> @Suppress("UNCHECKED_CAST") (a as Comparable<Any>).compareTo(b)
+    else -> a.toString().compareTo(b.toString(), ignoreCase = true)
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.lines(color: androidx.compose.ui.graphics.Color) {

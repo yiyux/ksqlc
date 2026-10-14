@@ -16,6 +16,9 @@ class ResultTab(val title: String, val result: StatementResult.Rows) {
     /** Local filters: column index -> the values (as text, null = SQL NULL) its rows may have. Only the loaded rows are filtered. */
     val filters = mutableStateMapOf<Int, Set<String?>>()
 
+    /** The column the rows are ordered by and whether ascending; null = as read. */
+    var sort by mutableStateOf<Pair<Int, Boolean>?>(null)
+
     fun passes(row: List<Any?>) = filters.all { (j, allowed) -> row.getOrNull(j)?.toString() in allowed }
 
     /** The distinct values of column [j] among the loaded rows with how many rows have each, in natural order (NULL last). */
@@ -52,6 +55,8 @@ class DataTab(val obj: ksqlc.core.DbObject, first: ResultTab, val session: ksqlc
     var orderBy by mutableStateOf("")
     var loading by mutableStateOf(false)
         private set
+    /** The order requested with the header arrows; the next [reload] gives it to the grid it builds (a plain reload clears it). */
+    var pendingSort: Pair<Int, Boolean>? = null
     /** Manual transactions: this tab's connection holds changes that are not confirmed yet. */
     var pending by mutableStateOf(false)
         private set
@@ -93,14 +98,14 @@ class DataTab(val obj: ksqlc.core.DbObject, first: ResultTab, val session: ksqlc
         try {
             when (val r = session.runScript(listOf(query()), PAGE).single()) {
                 is StatementResult.Rows -> {
-                    val next = ResultTab(grid.title, r).also { it.loadMore(PAGE) }
+                    val next = ResultTab(grid.title, r).also { it.loadMore(PAGE); it.sort = pendingSort; pendingSort = null }
                     val old = grid
                     grid = next
                     runCatching { old.close() }
                     return null
                 }
-                is StatementResult.Failed -> return r.message
-                else -> return "sin resultado"
+                is StatementResult.Failed -> { pendingSort = null; return r.message }
+                else -> { pendingSort = null; return "sin resultado" }
             }
         } finally { loading = false }
     }

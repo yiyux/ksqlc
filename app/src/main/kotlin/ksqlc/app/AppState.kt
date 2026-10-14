@@ -422,6 +422,17 @@ class AppState(
         }
     }
 
+    /** Header arrows of a table tab: orders on the server by rewriting its ORDER BY ([asc] null = no order) and reloading. */
+    fun sortBy(tab: DataTab, column: Int, asc: Boolean?) {
+        if (tab.loading) return
+        if (tab.editor.hasChanges) { status = "Envía o revierte los cambios pendientes antes de ordenar"; return }
+        val name = tab.grid.result.columns[column].name
+        val quote = explorer?.source?.dialect?.let { d -> d::quote } ?: { it }
+        tab.orderBy = if (asc == null) "" else "${quote(name)} ${if (asc) "asc" else "desc"}"
+        tab.pendingSort = asc?.let { column to it }
+        applyFilters(tab)
+    }
+
     /** Sends a tab's pending edits (see [DataTab.submit]) and reports the outcome in the status bar. */
     fun submitChanges(tab: DataTab) {
         if (tab.loading || !tab.editor.hasChanges) return
