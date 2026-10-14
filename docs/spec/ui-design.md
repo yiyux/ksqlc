@@ -197,3 +197,7 @@ Capturas en `app/build/snapshots/` (`history-*`, `export-*`, `import-*`, `dump-*
 
 ## Tooltips
 Al pasar el ratón sobre el nombre de una columna del grid aparece, tras 400 ms y junto al puntero (16 dp más abajo), una tarjeta «**nombre**: tipo» (tipo en minúsculas, como lo informa el driver): fondo `popupBg`, borde `border`, radio 6 dp, texto de 13 sp. Es un popup flotante; no mueve nada.
+
+
+## Filtro local por columna
+Cada cabecera del grid lleva un embudo de 12 dp a la derecha del nombre (gris; azul `accent` si la columna está filtrada). Abre una tarjeta de 250×340 dp bajo el embudo (radio 8 dp, `popupBg`, borde `border`): título «Filtro local de 'col'», buscador con lupa, casilla de cabecera (marca o desmarca lo listado) con «Valor» y «Cantidad», una fila de 24 dp por valor distinto (orden natural: números por valor, NULL al final) y el pie «Marca una casilla para filtrar las filas». Sin nada marcado no hay filtro; marcar valores deja solo las filas que tienen alguno. Varias columnas se combinan con «y». Solo filtra las filas ya cargadas; las filas nuevas siguen visibles y los números de fila no cambian. La píldora de filas muestra «M de N filas». Recargar la tabla borra los filtros.

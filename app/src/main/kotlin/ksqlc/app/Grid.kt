@@ -72,6 +72,12 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
     val cols = tab.result.columns
     val newRows = editing?.inserts?.size ?: 0
     val total = tab.rows.size + newRows
+    // rows the local column filters let through (rows being added are always shown); `i` below is always the real row index
+    val filtersSnapshot = tab.filters.toMap()
+    val visible = remember(tab.rows.size, filtersSnapshot, newRows) {
+        if (filtersSnapshot.isEmpty()) List(total) { it } else (0 until total).filter { it >= tab.rows.size || tab.passes(tab.rows[it]) }
+    }
+    var filterOpen by remember(tab) { mutableStateOf<Int?>(null) }
     // a column counts as numeric (right-aligned) when its first non-null value is a number
     val numeric = remember(tab, cols) { cols.indices.map { j -> tab.rows.firstNotNullOfOrNull { it.getOrNull(j) } is Number } }
 
@@ -109,7 +115,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         focus.requestFocus()
     }
     LaunchedEffect(newRows) {
-        if (newRows > 0) { list.animateScrollToItem(total - 1); selected = (total - 1) to 0; editing?.cursorRow = total - 1 }
+        if (newRows > 0) { list.animateScrollToItem(visible.lastIndex.coerceAtLeast(0)); selected = (total - 1) to 0; editing?.cursorRow = total - 1 }
     }
 
     Box(
@@ -136,21 +142,27 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         Column(Modifier.fillMaxSize().horizontalScroll(hscroll)) {
             Row(Modifier.height(HeaderHeight).background(c.headerBg)) {
                 Box(Modifier.width(RowNumberWidth).fillMaxHeight().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) })
-                cols.forEach { col ->
+                cols.forEachIndexed { j, col ->
                     Tip(col.name, col.typeName.lowercase(), Modifier.width(ColumnWidth).fillMaxHeight()) {
                     Row(
                         Modifier.fillMaxSize().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) }.padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         KIcon(IconKind.Column, tint = c.accentIcon, size = 14.dp)
-                        Text(col.name, fontSize = 13.sp, color = c.gridText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(col.name, Modifier.weight(1f, fill = false), fontSize = 13.sp, color = c.gridText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val active = j in tab.filters
+                        Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).clickable { filterOpen = if (filterOpen == j) null else j }.testTag("filter-btn:$j"), contentAlignment = Alignment.Center) {
+                            KIcon(IconKind.Filter, tint = if (active) c.accent else c.textMuted, size = 12.dp)
+                            if (filterOpen == j) ColumnFilterPopup(tab, j) { filterOpen = null }
+                        }
                     }
                     }
                 }
             }
             Box(Modifier.weight(1f).width(RowNumberWidth + ColumnWidth * cols.size)) {
                 LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = 44.dp)) {   // room for the floating rows pill
-                    items(total) { i ->
+                    items(visible.size) { pos ->
+                        val i = visible[pos]
                         val isNew = i >= tab.rows.size
                         val isDeleted = editing != null && i in editing.deleted
                         val rowSelected = selected?.first == i || (editing != null && i in editing.selectedRows)
@@ -262,7 +274,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         ListScrollbar(list, Modifier.align(Alignment.CenterEnd).padding(top = HeaderHeight).fillMaxHeight())
         val wide = hscroll.maxValue > 0
         if (wide) HorizontalScrollbar(rememberScrollbarAdapter(hscroll), Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(end = 12.dp).testTag("grid-hscroll"), style = scrollbarStyle())
-        RowsPill(tab, onLoadMore, Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = if (wide) 18.dp else 10.dp))
+        RowsPill(tab, if (filtersSnapshot.isEmpty()) null else visible.count { it < tab.rows.size }, onLoadMore, Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = if (wide) 18.dp else 10.dp))
     }
 }
 
@@ -273,14 +285,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.lines(color: androi
 
 /** Floating "N filas" pill with a load-more button while the cursor has rows left. */
 @Composable
-private fun RowsPill(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier) {
+private fun RowsPill(tab: ResultTab, filtered: Int?, onLoadMore: () -> Unit, modifier: Modifier = Modifier) {
     val c = Ksqlc.colors
     val shape = RoundedCornerShape(8.dp)
     Row(
         modifier.height(32.dp).clip(shape).background(c.windowBg, shape).border(1.dp, c.border, shape).padding(horizontal = 10.dp).testTag("rows-pill").semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("${tab.rows.size} filas${if (tab.exhausted) "" else "+"}", fontSize = 12.sp, color = c.text)
+        Text((if (filtered != null) "$filtered de " else "") + "${tab.rows.size} filas${if (tab.exhausted) "" else "+"}", fontSize = 12.sp, color = c.text)
         if (!tab.exhausted && !tab.result.truncated) {
             VSeparator()
             if (tab.loading) Text("Cargando…", fontSize = 12.sp, color = c.textSecondary)

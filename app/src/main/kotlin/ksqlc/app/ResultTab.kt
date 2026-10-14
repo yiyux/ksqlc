@@ -2,6 +2,7 @@ package ksqlc.app
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ksqlc.core.StatementResult
@@ -11,6 +12,21 @@ class ResultTab(val title: String, val result: StatementResult.Rows) {
     val rows = mutableStateListOf<List<Any?>>()
     var exhausted by mutableStateOf(false)
     var loading by mutableStateOf(false)
+
+    /** Local filters: column index -> the values (as text, null = SQL NULL) its rows may have. Only the loaded rows are filtered. */
+    val filters = mutableStateMapOf<Int, Set<String?>>()
+
+    fun passes(row: List<Any?>) = filters.all { (j, allowed) -> row.getOrNull(j)?.toString() in allowed }
+
+    /** The distinct values of column [j] among the loaded rows with how many rows have each, in natural order (NULL last). */
+    fun distinct(j: Int): List<Pair<String?, Int>> =
+        rows.groupingBy { it.getOrNull(j)?.toString() }.eachCount().toList().sortedWith { a, b ->
+            val x = a.first; val y = b.first
+            when {
+                x == null || y == null -> if (x == null && y == null) 0 else if (x == null) 1 else -1
+                else -> { val nx = x.toBigDecimalOrNull(); val ny = y.toBigDecimalOrNull(); if (nx != null && ny != null) nx.compareTo(ny) else x.compareTo(y, ignoreCase = true) }
+            }
+        }
 
     fun loadMore(pageSize: Int) {
         loading = true
