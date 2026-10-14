@@ -8,7 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ksqlc.core.*
+import ksqlc.drivers.DumpScope
 import ksqlc.drivers.Introspector
+import ksqlc.drivers.JdbcUrl
+import ksqlc.drivers.nativeDumpBlocker
 import ksqlc.drivers.Session
 import ksqlc.drivers.testConnection
 import ksqlc.sql.Diagnostic
@@ -560,6 +563,37 @@ class AppState(
         runCatching { java.nio.file.Files.readString(java.nio.file.Path.of(f)) }
             .onSuccess { setEditorText(it); activeEditor = CONSOLE_TAB; status = "Abierto $f" }
             .onFailure { status = "No se pudo leer $f: ${it.message}" }
+    }
+
+    // --- native dump / restore ---------------------------------------------------------
+    var nativeJob by mutableStateOf<NativeJob?>(null)
+        private set
+
+    /** Why dump/restore is not available for the active connection, or null. */
+    val nativeBlocker: String? get() = nativeDumpBlocker(form.effectiveKind, if (form.customUrl) null else JdbcUrl.parse(form.url))
+
+    /** Opens the dump (or restore) dialog. [o] is the table the menu was opened on, [ns] its schema or database. */
+    fun openNative(restore: Boolean, o: DbObject? = null, ns: Namespace? = o?.ns) {
+        nativeBlocker?.let { status = it; return }
+        val kind = form.effectiveKind
+        val parts = JdbcUrl.parse(form.url) ?: return
+        val schemaName = if (kind == DbKind.MYSQL || kind == DbKind.MARIADB) ns?.catalog else if (kind == DbKind.POSTGRES) ns?.schema else null
+        val scopes = buildList {
+            if (o != null) add("Tabla ${o.name}" to DumpScope(schemaName, o.name))
+            if (schemaName != null) add((if (kind == DbKind.POSTGRES) "Esquema $schemaName" else "Base de datos $schemaName") to DumpScope(schemaName))
+            if (kind != DbKind.MYSQL && kind != DbKind.MARIADB || schemaName == null) add("Base de datos ${parts.database.substringAfterLast('/')}" to DumpScope())
+        }
+        nativeJob = NativeJob(restore, kind, parts, form.user.ifBlank { null }, form.passwordOrNull, scopes, settings.toolPaths, scope,
+            { name, path -> updateSettings { it.copy(toolPaths = it.toolPaths + (name to path)) } }, { log += "[${LocalTime.now().format(clock)}] $it" })
+    }
+
+    fun closeNative() { nativeJob?.let { if (it.running) it.cancel() }; nativeJob = null }
+
+    /** After a restore the schema changed under the explorer. */
+    fun nativeFinished(restore: Boolean) {
+        if (restore) refreshExplorer()
+        status = if (restore) "Restauración terminada" else "Dump terminado"
+        closeNative()
     }
 
     // --- import ------------------------------------------------------------------------

@@ -41,5 +41,6 @@ clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92
 | Historial de consultas | hecho | Registro por conexión en `~/.ksqlc/history`, diálogo con búsqueda (⌥⌘E). |
 | Exportar datos | hecho | CSV, TSV, JSON y SQL INSERT a archivo o portapapeles desde pestañas de tabla, resultados y explorador. |
 | Importar CSV | hecho | Asignación de columnas, vista previa, transacción única, error con fila y columna; «Abrir archivo SQL…» en la consola. |
-| Dump nativo, diff, ER | pendiente | fase 5 |
+| Dump y restauración nativos | hecho | pg_dump/psql/pg_restore, mysqldump/mysql (y variantes MariaDB) y sqlite3, con la contraseña por entorno; SQL Server y Oracle no. |
+| Diff, ER | pendiente | fase 5 |
 

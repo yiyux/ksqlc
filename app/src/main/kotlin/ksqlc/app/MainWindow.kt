@@ -82,6 +82,7 @@ fun MainWindow(state: AppState) {
         HistoryDialog(state)
         ExportDialog(state)
         ImportDialog(state)
+        NativeDialog(state)
         ConfirmDialog(state)
     }
 }

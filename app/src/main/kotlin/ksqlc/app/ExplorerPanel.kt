@@ -181,10 +181,15 @@ private fun LazyListScope.nodeItems(
                 if (o != null) {
                     if (o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem("Exportar datos…") { state.exportObject(o) })
                     if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Importar CSV…") { state.openImport(o) })
+                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Dump con la herramienta del motor…") { state.openNative(false, o) })
                     add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
                     add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
                 }
-                if (node.kind == NodeKind.NAMESPACE) add(ContextMenuItem("Refrescar") { state.refreshExplorer() })
+                if (node.kind == NodeKind.NAMESPACE) {
+                    add(ContextMenuItem("Dump con la herramienta del motor…") { state.openNative(false, null, node.ns) })
+                    add(ContextMenuItem("Restaurar con la herramienta del motor…") { state.openNative(true, null, node.ns) })
+                    add(ContextMenuItem("Refrescar") { state.refreshExplorer() })
+                }
             }
         }) {
             Column(

@@ -18,6 +18,8 @@ data class Settings(
     val explorerWidthDp: Int = 300,
     /** Share of the editor area given to the results panel, 0..1. */
     val resultsRatio: Float = 0.5f,
+    /** Executables the user pointed dump/restore at, by the tool's usual name (e.g. `pg_dump`). */
+    val toolPaths: Map<String, String> = emptyMap(),
 )
 
 /** `settings.json` in [dir]. A missing or unreadable file yields the defaults instead of an error. */
