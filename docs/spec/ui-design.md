@@ -169,3 +169,5 @@ Colores provisionales de las marcas del grid (no observados en DataGrip):
 | `pendingDelete` | `#4A2327` | `#FBDDE0` | fila marcada para borrar (texto tachado) |
 
 Barra de la pestaña de tabla (34 dp): Recargar | `+` `−` Revertir Ver-SQL Enviar | `Tx: Auto ▾` (en manual, Commit y Rollback, y un punto ámbar si hay trabajo sin confirmar) y el recuento «N cambio(s) sin enviar». Los valores por defecto se muestran como `<default>` atenuado, igual que `<null>`.
+
+Selector de fecha (celda de tipo date/time/timestamp en edición): popup de 250 dp bajo la celda (encima si no cabe), radio 8 dp, mismos colores que la lista de autocompletado (`popupBg`, borde `border`). Calendario con semanas desde el lunes, día elegido en `accent`, hoy con contorno; reloj con flechas por hora/minuto/segundo; «Hoy»/«Ahora», «NULL» y «Aceptar» (las fechas sin hora se cierran al elegir el día). El texto de la celda es la única fuente de verdad: el selector lo reescribe y sigue lo que se escriba.

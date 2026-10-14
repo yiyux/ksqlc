@@ -455,4 +455,100 @@ class AppUiTest {
         assertEquals(0, rule.onAllNodesWithTag("cell-editor").fetchSemanticsNodes().size)
         assertTrue(state.status.contains("clave primaria"), state.status)
     }
+
+    private fun openEvents(): DataTab {
+        state.form.database = tempDb()
+        setEditor("create table eventos(id integer primary key, dia date, hora time, cuando datetime, zona timestamptz, nota text); " +
+            "insert into eventos values (1, '2026-01-31', '10:20:30', '2026-01-31 10:20:30', '2026-01-31 10:20:30+01:00', 'x');")
+        runAll()
+        until { !state.running && state.catalog?.complete == true }
+        state.openData(state.catalog!!.objectOf(ksqlc.sql.TableRef("main", "eventos"))!!)
+        until { state.dataTabs.singleOrNull()?.grid?.rows?.size == 1 }
+        return state.dataTabs[0]
+    }
+
+    private fun edited(tab: DataTab, col: Int) = (tab.editor.valueAt(0, col, tab.grid) as? ksqlc.drivers.CellValue.Text)?.text
+
+    @Test fun aDateColumnOpensACalendarThatWritesTheDate() {
+        rule.setContent { App(state) }
+        val tab = openEvents()
+        rule.onNodeWithTag("cell:0:1").performMouseInput { doubleClick() }
+        untilTag("date-picker")
+        rule.onNodeWithTag("month-title").assertTextContains("Enero 2026")
+        rule.onNodeWithTag("h+").assertDoesNotExist()                 // a date has no clock
+        rule.onNodeWithTag("month-next").performClick(); frames()
+        rule.onNodeWithTag("month-title").assertTextContains("Febrero 2026")
+        rule.onNodeWithTag("day:2026-02-10").performClick(); frames()
+        assertEquals("2026-02-10", edited(tab, 1))                     // a date is finished with one click
+        assertEquals(0, rule.onAllNodesWithTag("date-picker").fetchSemanticsNodes().size)
+    }
+
+    @Test fun aTimeColumnOffersOnlyTheClock() {
+        rule.setContent { App(state) }
+        val tab = openEvents()
+        rule.onNodeWithTag("cell:0:2").performMouseInput { doubleClick() }
+        untilTag("date-picker")
+        rule.onNodeWithTag("month-title").assertDoesNotExist()
+        rule.onNodeWithTag("h-value").assertTextContains("10")
+        rule.onNodeWithTag("h+").performClick(); rule.onNodeWithTag("m+").performClick(); rule.onNodeWithTag("s-").performClick(); frames()
+        rule.onNodeWithTag("cell-editor").assertTextContains("11:21:29")
+        rule.onNodeWithTag("date-ok").performClick(); frames()
+        assertEquals("11:21:29", edited(tab, 2))
+    }
+
+    @Test fun aDatetimeColumnHasCalendarAndClockAndKeepsTheOtherPart() {
+        rule.setContent { App(state) }
+        val tab = openEvents()
+        rule.onNodeWithTag("cell:0:3").performMouseInput { doubleClick() }
+        untilTag("date-picker")
+        rule.onNodeWithTag("day:2026-01-15").performClick(); frames()
+        rule.onNodeWithTag("cell-editor").assertTextContains("2026-01-15 10:20:30")      // the time was kept
+        assertEquals(1, rule.onAllNodesWithTag("date-picker").fetchSemanticsNodes().size)   // and it stays open for the clock
+        rule.onNodeWithTag("h+").performClick(); frames()
+        rule.onNodeWithTag("date-ok").performClick(); frames()
+        assertEquals("2026-01-15 11:20:30", edited(tab, 3))
+    }
+
+    @Test fun aTimestampWithZoneKeepsItsOffset() {
+        rule.setContent { App(state) }
+        val tab = openEvents()
+        rule.onNodeWithTag("cell:0:4").performMouseInput { doubleClick() }
+        untilTag("date-picker")
+        rule.onNodeWithTag("offset").assertTextContains("UTC+01:00")
+        rule.onNodeWithTag("day:2026-01-20").performClick(); frames()
+        rule.onNodeWithTag("date-ok").performClick(); frames()
+        assertEquals("2026-01-20 10:20:30+01:00", edited(tab, 4))
+    }
+
+    @Test fun theCalendarFollowsWhatIsTypedAndCanSetNull() {
+        rule.setContent { App(state) }
+        val tab = openEvents()
+        rule.onNodeWithTag("cell:0:1").performMouseInput { doubleClick() }
+        untilTag("date-picker")
+        rule.onNodeWithTag("cell-editor").performTextClearance()
+        rule.onNodeWithTag("cell-editor").performTextInput("2027-07-04"); frames()
+        rule.onNodeWithTag("month-title").assertTextContains("Julio 2027")
+        rule.onNodeWithTag("date-null").performClick(); frames()
+        assertTrue(tab.editor.valueAt(0, 1, tab.grid) is ksqlc.drivers.CellValue.Null)
+    }
+
+    @Test fun textColumnsHaveNoPicker() {
+        rule.setContent { App(state) }
+        openEvents()
+        rule.onNodeWithTag("cell:0:5").performMouseInput { doubleClick() }
+        untilTag("cell-editor")
+        assertEquals(0, rule.onAllNodesWithTag("date-picker").fetchSemanticsNodes().size)
+        assertEquals(0, rule.onAllNodesWithTag("picker-toggle", useUnmergedTree = true).fetchSemanticsNodes().size)
+    }
+
+    @Test fun theCalendarIconHidesAndShowsThePicker() {
+        rule.setContent { App(state) }
+        openEvents()
+        rule.onNodeWithTag("cell:0:1").performMouseInput { doubleClick() }
+        untilTag("date-picker")
+        rule.onNodeWithTag("picker-toggle", useUnmergedTree = true).performClick(); frames()
+        assertEquals(0, rule.onAllNodesWithTag("date-picker").fetchSemanticsNodes().size)
+        rule.onNodeWithTag("picker-toggle", useUnmergedTree = true).performClick(); frames()
+        assertEquals(1, rule.onAllNodesWithTag("date-picker").fetchSemanticsNodes().size)
+    }
 }

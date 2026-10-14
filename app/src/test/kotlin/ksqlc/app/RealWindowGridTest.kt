@@ -53,7 +53,7 @@ class RealWindowGridTest {
     private fun withGrid(block: (Harness, DataTab) -> Unit) {
         assumeFalse("sin pantalla: se omite el test con ventana real", GraphicsEnvironment.isHeadless())
         DriverManager.getConnection(url).use {
-            it.createStatement().apply { execute("create table cfg(actu boolean, vers varchar(30))"); execute("insert into cfg values (1, '1.00.0450')") }
+            it.createStatement().apply { execute("create table cfg(actu boolean, vers varchar(30), cuando datetime)"); execute("insert into cfg values (1, '1.00.0450', '2026-01-31 10:20:30')") }
         }
         val obj = DbObject(Namespace(null, "main"), "cfg", DbObjectKind.TABLE)
         val d = Dialect.of(DbKind.SQLITE)
@@ -61,7 +61,7 @@ class RealWindowGridTest {
         val sql = d.selectAll(obj)
         val rows = session.runScript(listOf(sql)).single() as StatementResult.Rows
         val tab = DataTab(obj, ResultTab("cfg", rows).also { it.loadMore(PAGE) }, session, sql, TableEditor(obj, d, DbKind.SQLITE, emptyList()))
-        tab.editor.addRow(2)
+        tab.editor.addRow(3)
         lateinit var win: ComposeWindow
         SwingUtilities.invokeAndWait {
             win = ComposeWindow()
@@ -108,5 +108,16 @@ class RealWindowGridTest {
     @Test fun escapeCancelsWhatWasTyped() = withGrid { h, tab ->
         h.doubleClick(cellX(1), newRowY); h.type("zzz"); h.press(KeyEvent.VK_ESCAPE, '\u001b')
         assertEquals(null, text(tab, 1))
+    }
+
+    @Test fun clickingTheCalendarKeepsTheKeyboardInTheEditor() = withGrid { h, tab ->
+        h.doubleClick(cellX(2), newRowY)                       // a datetime column: the picker opens under the cell
+        val popupLeft = 39 + 112 * 2
+        val dayX = popupLeft + 8 + 234 / 7 * 3 + 16            // a day in the middle of the first week row
+        val dayY = 26 + 27 * 2 + 8 + 26 + 6 + 14 + 6 + 14 + 28 * 2
+        h.click(dayX, dayY); Thread.sleep(500)
+        h.press(KeyEvent.VK_ENTER, '\n')                      // the editor must still own the keyboard to commit
+        val written = text(tab, 2)
+        assert(written != null && Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}""").matches(written)) { "se esperaba una fecha y hora, hay: $written" }
     }
 }

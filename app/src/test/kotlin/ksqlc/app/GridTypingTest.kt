@@ -82,4 +82,24 @@ class GridTypingTest {
         rule.onNodeWithTag("cell-editor").performTextInput("1.00.0450"); frames()
         rule.onRoot().savePng("grid-editing")
     }
+
+    private fun renderPicker(mode: ksqlc.storage.ThemeMode, type: String, value: String, name: String) {
+        rule.mainClock.autoAdvance = false
+        DriverManager.getConnection(url).use { it.createStatement().execute("create table ev(id integer primary key, v $type)") }
+        val obj = DbObject(Namespace(null, "main"), "ev", DbObjectKind.TABLE)
+        val d = Dialect.of(DbKind.SQLITE)
+        val session = Session(DataSource("t", "t", DbKind.SQLITE, url), null)
+        val sql = d.selectAll(obj)
+        val rows = session.runScript(listOf(sql)).single() as StatementResult.Rows
+        val t = DataTab(obj, ResultTab("ev", rows).also { it.loadMore(PAGE) }, session, sql, TableEditor(obj, d, DbKind.SQLITE, listOf("id")))
+        t.editor.addRow(2)
+        rule.setContent { ksqlc.app.ui.KsqlcTheme(mode) { Grid(t.grid, {}, editing = t.editor, modifier = androidx.compose.ui.Modifier.size(420.dp, 400.dp)) } }
+        frames()
+        rule.onNodeWithTag("cell:0:1").performMouseInput { doubleClick() }; frames()
+        rule.onNodeWithTag("cell-editor").performTextInput(value); frames()
+        rule.onAllNodes(isRoot())[0].savePng(name)
+    }
+
+    @Test fun renderDatetimePickerDark() = renderPicker(ksqlc.storage.ThemeMode.DARK, "datetime", "2026-02-10 14:35:08", "picker-dark")
+    @Test fun renderDatePickerLight() = renderPicker(ksqlc.storage.ThemeMode.LIGHT, "date", "2026-02-10", "picker-light")
 }

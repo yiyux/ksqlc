@@ -7,7 +7,9 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
@@ -191,12 +193,14 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                                         contentAlignment = if (isNumber) Alignment.CenterEnd else Alignment.CenterStart,
                                     ) {
                                         if (editCell == i to j) {
+                                            val kind = temporalKind(cols[j].typeName)
+                                            var pickerOpen by remember { mutableStateOf(true) }
                                             val requester = remember { FocusRequester() }
                                             var focused by remember { mutableStateOf(false) }
                                             // ask for the keyboard until the field really has it (the request can arrive before the node is ready)
                                             LaunchedEffect(Unit) { repeat(6) { if (!focused) { runCatching { requester.requestFocus() }; kotlinx.coroutines.delay(40) } } }
                                             BasicTextField(
-                                                draft, { draft = it }, Modifier.fillMaxWidth().focusRequester(requester).testTag("cell-editor")
+                                                draft, { draft = it }, Modifier.fillMaxWidth().padding(end = if (kind != null) 18.dp else 0.dp).focusRequester(requester).testTag("cell-editor")
                                                     .onFocusChanged { st -> if (st.isFocused) focused = true else if (focused && editCell == i to j) finishEdit(true) }
                                                     .onPreviewKeyEvent { e ->
                                                         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -214,6 +218,18 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                                                     },
                                                 singleLine = true, textStyle = MonoStyle.copy(color = c.gridText), cursorBrush = SolidColor(c.text),
                                             )
+                                            if (kind != null) {
+                                                // the calendar icon shows or hides the picker; picking rewrites the editor text in the column's own format
+                                                Box(Modifier.align(Alignment.CenterEnd).size(18.dp).testTag("picker-toggle").pointerInput(Unit) { detectTapGestures { pickerOpen = !pickerOpen } }, contentAlignment = Alignment.Center) {
+                                                    KIcon(IconKind.Calendar, tint = if (pickerOpen) c.accentIcon else c.textSecondary, size = 14.dp)
+                                                }
+                                                if (pickerOpen) DatePickerPopup(
+                                                    kind, draft.text,
+                                                    onText = { t, done -> draft = TextFieldValue(t, TextRange(t.length)); if (done) finishEdit(true) },
+                                                    onNull = { editCell = null; editing?.setCell(i, j, CellValue.Null, tab); focus.requestFocus() },
+                                                    onAccept = { finishEdit(true) },
+                                                )
+                                            }
                                         } else {
                                             val isDef = isDefault(i, j)
                                             Text(
