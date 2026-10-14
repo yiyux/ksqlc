@@ -83,6 +83,15 @@ class DmlTest {
         assertEquals("3f2c", parseParam("3f2c", "char(36)", DbKind.MYSQL))
     }
 
+    @Test fun sqlServerTypesAreBoundAsTypedValues() {
+        for (t in listOf("datetime2", "smalldatetime", "datetime")) assertEquals(java.sql.Timestamp.valueOf("2026-01-05 10:20:30"), parseParam("2026-01-05 10:20:30", t, DbKind.MSSQL), t)
+        assertIs<java.time.OffsetDateTime>(parseParam("2026-01-05 10:20:30+01:00", "datetimeoffset", DbKind.MSSQL))
+        assertEquals(true, parseParam("1", "bit", DbKind.MSSQL))
+        assertEquals(7L, parseParam("7", "int identity", DbKind.MSSQL))
+        assertEquals(BigDecimal("3.50"), parseParam("3.50", "smallmoney", DbKind.MSSQL))
+        assertEquals("ñandú", parseParam("ñandú", "nvarchar", DbKind.MSSQL))
+    }
+
     @Test fun parseParamEmptyIsNullExceptForText() {
         assertNull(parseParam("", "integer", DbKind.POSTGRES)); assertNull(parseParam("  ", "date", DbKind.MYSQL))
         assertEquals("", parseParam("", "text", DbKind.POSTGRES)); assertEquals("", parseParam("", "VARCHAR(20)", DbKind.MYSQL))

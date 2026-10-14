@@ -34,21 +34,21 @@ class RowEdit(val originalRow: List<Any?>, val changes: Map<String, CellValue>)
 class DmlException(val column: String, message: String) : IllegalArgumentException(message)
 
 private val INTEGER_TYPES = setOf("INT", "INTEGER", "INT2", "INT4", "INT8", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT", "SERIAL", "SMALLSERIAL", "BIGSERIAL", "YEAR")
-private val DECIMAL_TYPES = setOf("NUMERIC", "DECIMAL", "NUMBER", "DEC", "MONEY")
+private val DECIMAL_TYPES = setOf("NUMERIC", "DECIMAL", "NUMBER", "DEC", "MONEY", "SMALLMONEY")
 private val FLOAT_TYPES = setOf("FLOAT", "FLOAT4", "FLOAT8", "DOUBLE", "DOUBLE PRECISION", "REAL")
 private val BOOLEAN_TYPES = setOf("BOOL", "BOOLEAN")
 private val BINARY_WORDS = listOf("BLOB", "BYTEA", "BINARY", "VARBINARY", "IMAGE")
 private val TEXT_WORDS = listOf("CHAR", "TEXT", "CLOB", "STRING", "NAME", "CITEXT")
 
 /** The base type name: upper-case, without sizes, `unsigned` or `[]`. */
-private fun baseType(typeName: String) = typeName.uppercase().substringBefore('(').replace("UNSIGNED", "").replace("[]", "").trim()
+private fun baseType(typeName: String) = typeName.uppercase().substringBefore('(').replace("UNSIGNED", "").replace("IDENTITY", "").replace("[]", "").trim()
 
 /** True for column types the grid cannot edit as text (binary data). */
 fun isBinaryType(typeName: String) = baseType(typeName).let { t -> BINARY_WORDS.any { it in t } }
 
 /**
  * Converts what was typed into the Java value to bind for a column of [typeName]. Empty text is NULL for every
- * non-text type. SQLite keeps dates as the text typed, since it has no date type. Throws [IllegalArgumentException]
+ * non-text type. Dates are always bound as typed values: as text, SQL Server would read them in the login's language (5 January as 1 May). SQLite keeps dates as the text typed, since it has no date type. Throws [IllegalArgumentException]
  * (with a message fit for the user) when the text does not fit the type.
  */
 fun parseParam(text: String, typeName: String, kind: DbKind): Any? {
@@ -65,7 +65,7 @@ fun parseParam(text: String, typeName: String, kind: DbKind): Any? {
         kind == DbKind.SQLITE && (t in DECIMAL_TYPES || t in FLOAT_TYPES || t == "NUMERIC") -> s.toLongOrNull() ?: s.toDoubleOrNull() ?: bad("un número")
         t in DECIMAL_TYPES -> runCatching { BigDecimal(s) }.getOrNull() ?: bad("un número")
         t in FLOAT_TYPES -> s.toDoubleOrNull() ?: bad("un número")
-        t in BOOLEAN_TYPES || (t == "BIT" && (kind == DbKind.MYSQL || kind == DbKind.MARIADB)) -> when (s.lowercase()) {
+        t in BOOLEAN_TYPES || (t == "BIT" && kind != DbKind.POSTGRES) -> when (s.lowercase()) {
             "true", "t", "1", "yes", "y", "si", "sí" -> true
             "false", "f", "0", "no", "n" -> false
             else -> bad("un booleano (true/false)")
@@ -73,10 +73,10 @@ fun parseParam(text: String, typeName: String, kind: DbKind): Any? {
         kind == DbKind.SQLITE && (t == "DATE" || t.startsWith("TIME") || t == "DATETIME") -> s
         t == "DATE" -> runCatching { Date.valueOf(LocalDate.parse(s)) }.getOrNull() ?: bad("una fecha (aaaa-mm-dd)")
         t == "TIME" || t == "TIME WITHOUT TIME ZONE" -> runCatching { Time.valueOf(LocalTime.parse(s).withNano(0)) }.getOrNull() ?: bad("una hora (hh:mm:ss)")
-        t == "TIMESTAMP" || t == "DATETIME" || t == "TIMESTAMP WITHOUT TIME ZONE" ->
+        t == "TIMESTAMP" || t == "DATETIME" || t == "DATETIME2" || t == "SMALLDATETIME" || t == "TIMESTAMP WITHOUT TIME ZONE" ->
             runCatching { Timestamp.valueOf(LocalDateTime.parse(s.replace(' ', 'T'))) }.getOrNull()
                 ?: runCatching { Timestamp.valueOf(LocalDate.parse(s).atStartOfDay()) }.getOrNull() ?: bad("una fecha y hora (aaaa-mm-dd hh:mm:ss)")
-        t == "TIMESTAMPTZ" || t == "TIMESTAMP WITH TIME ZONE" ->
+        t == "TIMESTAMPTZ" || t == "TIMESTAMP WITH TIME ZONE" || t == "DATETIMEOFFSET" ->
             runCatching { OffsetDateTime.parse(s.replace(' ', 'T')) }.getOrNull() ?: bad("una fecha y hora con zona (2026-01-31 10:00:00+01:00)")
         kind == DbKind.POSTGRES -> UntypedParam(text)
         else -> text
