@@ -55,7 +55,10 @@ fun MainWindow(state: AppState) {
 
     Box(Modifier.fillMaxSize().background(c.windowBg).onPreviewKeyEvent { e ->
         // ⌥⌘E opens the history from anywhere
-        if (e.type == KeyEventType.KeyDown && e.key == Key.E && e.isMetaPressed && e.isAltPressed) { state.openHistory(); true } else false
+        if (e.type == KeyEventType.KeyDown && e.key == Key.E && e.isMetaPressed && e.isAltPressed) { state.openHistory(); true }
+        // ⌘8 shows or hides Services
+        else if (e.type == KeyEventType.KeyDown && e.key == Key.Eight && e.isMetaPressed) { state.servicesVisible = !state.servicesVisible; true }
+        else false
     }) {
         Column(Modifier.fillMaxSize()) {
             TopBar(state)
@@ -184,6 +187,15 @@ private fun EditorIsland(state: AppState) {
 private fun AppStatusBar(state: AppState) {
     val c = Ksqlc.colors
     StatusBar(Modifier.height(31.dp)) {
+        // the way back to Services once its panel has been closed
+        Row(
+            Modifier.height(22.dp).clip(RoundedCornerShape(5.dp)).background(if (state.servicesVisible) c.selectionInactive else androidx.compose.ui.graphics.Color.Transparent).clickable { state.servicesVisible = !state.servicesVisible }
+                .padding(horizontal = 6.dp).testTag("services-toggle"),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            KIcon(IconKind.Play, tint = c.textSecondary, size = 12.dp)
+            Text("Services", fontSize = 12.sp, color = c.textSecondary)
+        }
         val problem = state.diagnosticAtCaret
         if (problem != null) Text(problem.message, fontSize = 12.sp, color = if (problem.severity == Severity.ERROR) c.error else c.warning, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("problem"))
         else Text(state.status, fontSize = 12.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("status"))

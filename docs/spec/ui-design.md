@@ -208,3 +208,6 @@ En el extremo derecho de cada cabecera hay un icono de orden de 12 dp: dos chevr
 
 ## Pestañas del editor con desbordamiento
 La fila de pestañas del editor (consola y tablas abiertas) y la de resultados del panel Services (Output y resultados) se desplazan en horizontal. Cuando alguna pestaña no cabe entera aparece al final un chevron («Mostrar pestañas ocultas») con la lista de las que no se ven, cada una con su icono y su botón de cerrar; elegir una la selecciona y la desplaza a la vista. La pestaña activa siempre se mantiene a la vista.
+
+## Mostrar y ocultar Services
+Services se oculta con la ✕ de su cabecera y se vuelve a mostrar con el acceso «Services» del extremo izquierdo de la barra de estado, con ⌘8 o con el botón ▶ de la barra superior. Ejecutar consultas lo muestra de nuevo.

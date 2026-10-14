@@ -313,6 +313,7 @@ class AppState(
             }
             outcome.onSuccess { results ->
                 tabs.clear(); tabs.addAll(results.mapNotNull { it.second })
+                servicesVisible = true      // a run shows its results, even if the panel was hidden
                 selectedTab = if (tabs.isEmpty()) OUTPUT_TAB else 0
                 results.forEach { (r, tab) ->
                     when (r) {
