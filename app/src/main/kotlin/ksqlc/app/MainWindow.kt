@@ -12,9 +12,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import ksqlc.sql.TokenKind
+import ksqlc.sql.tokenize
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -175,6 +186,7 @@ private fun DataTabContent(state: AppState, data: DataTab) {
     val c = Ksqlc.colors
     val scope = rememberCoroutineScope()
     val grid = data.grid
+    val columns = remember(grid) { grid.result.columns.map { it.name.lowercase() }.toSet() }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().height(34.dp).background(c.toolbarBg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             ToolButton(IconKind.Refresh, "Recargar", { state.applyFilters(data) }, enabled = !data.loading)
@@ -182,28 +194,46 @@ private fun DataTabContent(state: AppState, data: DataTab) {
         }
         Separator()
         Row(Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilterBox(IconKind.Filter, "WHERE", data.where, { data.where = it }, { state.applyFilters(data) }, "filter-where", Modifier.weight(1f))
+            FilterBox(IconKind.Filter, "WHERE", data.where, columns, { data.where = it }, { state.applyFilters(data) }, "filter-where", Modifier.weight(1f))
             VSeparator()
-            FilterBox(IconKind.Sort, "ORDER BY", data.orderBy, { data.orderBy = it }, { state.applyFilters(data) }, "filter-order", Modifier.weight(1f))
+            FilterBox(IconKind.Sort, "ORDER BY", data.orderBy, columns, { data.orderBy = it }, { state.applyFilters(data) }, "filter-order", Modifier.weight(1f))
         }
         Separator()
         Grid(grid, onLoadMore = { scope.launch(Dispatchers.IO) { grid.loadMore(PAGE) } }, modifier = Modifier.fillMaxWidth().weight(1f).testTag("data-grid"))
     }
 }
 
-@Composable
-private fun FilterBox(icon: IconKind, hint: String, value: String, onChange: (String) -> Unit, onApply: () -> Unit, tag: String, modifier: Modifier) {
-    val c = Ksqlc.colors
-    Row(modifier.fillMaxHeight().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        KIcon(icon, tint = c.textSecondary, size = 14.dp)
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isEmpty()) Text(hint, fontSize = 13.sp, color = c.textMuted, maxLines = 1)
-            androidx.compose.foundation.text.BasicTextField(
-                value, onChange, Modifier.fillMaxWidth().testTag(tag).onPreviewKeyEvent { e ->
-                    if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && (e.key == androidx.compose.ui.input.key.Key.Enter || e.key == androidx.compose.ui.input.key.Key.NumPadEnter)) { onApply(); true } else false
-                },
-                singleLine = true, textStyle = MonoStyle.copy(color = c.text, fontSize = 13.sp), cursorBrush = androidx.compose.ui.graphics.SolidColor(c.text),
-            )
+/** SQL colours for a filter box; names that are not columns of the table (and not calls) are drawn as errors. */
+fun highlightFilter(text: String, c: KsqlcColors, columns: Set<String>): AnnotatedString {
+    val base = highlight(text, c)
+    val toks = tokenize(text)
+    return buildAnnotatedString {
+        append(base)
+        for ((i, t) in toks.withIndex()) {
+            if (t.kind != TokenKind.IDENT) continue
+            val name = t.text(text)
+            val next = toks.drop(i + 1).firstOrNull { it.kind != TokenKind.WHITESPACE }
+            val prev = toks.take(i).lastOrNull { it.kind != TokenKind.WHITESPACE }
+            if (next != null && text[next.start] == '(' || prev != null && text[prev.start] == '.' || name.lowercase() in columns || name.uppercase().startsWith("CURRENT_")) continue
+            addStyle(SpanStyle(color = c.error), t.start, t.end)
         }
+    }
+}
+
+/** One filter box: icon, the clause keyword (a muted hint while empty, keyword-coloured once there is text), the highlighted input, and ✕ to clear. */
+@Composable
+private fun FilterBox(icon: IconKind, keyword: String, value: String, columns: Set<String>, onChange: (String) -> Unit, onApply: () -> Unit, tag: String, modifier: Modifier) {
+    val c = Ksqlc.colors
+    val transformation = remember(c, columns) { VisualTransformation { t -> TransformedText(highlightFilter(t.text, c, columns), OffsetMapping.Identity) } }
+    Row(modifier.fillMaxHeight().padding(start = 10.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        KIcon(icon, tint = c.textSecondary, size = 14.dp)
+        Text(keyword, style = MonoStyle.copy(fontSize = 13.sp), color = if (value.isEmpty()) c.textMuted else c.synKeyword, maxLines = 1)
+        androidx.compose.foundation.text.BasicTextField(
+            value, onChange, Modifier.weight(1f).testTag(tag).onPreviewKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { onApply(); true } else false
+            },
+            singleLine = true, textStyle = MonoStyle.copy(color = c.synIdent, fontSize = 13.sp), cursorBrush = SolidColor(c.text), visualTransformation = transformation,
+        )
+        if (value.isNotEmpty()) ToolButton(IconKind.Close, "Borrar $keyword", { onChange(""); onApply() }, modifier = Modifier.testTag("$tag-clear"))
     }
 }

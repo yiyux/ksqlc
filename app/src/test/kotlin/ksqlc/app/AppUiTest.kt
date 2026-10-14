@@ -263,5 +263,23 @@ class AppUiTest {
         rule.onNodeWithTag("filter-where").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Enter) }
         until { state.status.startsWith("Error") }
         assertEquals(listOf("Linus", "Grace"), tab.grid.rows.map { it[1] })
+
+        // the ✕ empties a box and re-runs the query without that clause
+        rule.onNodeWithTag("filter-where-clear").performClick()
+        until { tab.where.isEmpty() && tab.grid.rows.map { it[1] } == listOf("Linus", "Grace", "Ada") }
+        rule.onNodeWithTag("filter-order-clear").performClick()
+        until { tab.orderBy.isEmpty() && tab.grid.rows.size == 3 }
+        assertEquals(0, rule.onAllNodesWithTag("filter-where-clear").fetchSemanticsNodes().size)
+    }
+
+    @Test fun filterTextIsColouredAndUnknownColumnsAreErrors() {
+        val a = highlightFilter("nombre like '%x%' and nope = 1 and lower(nombre) = 'a'", ksqlc.app.ui.DarkColors, setOf("nombre"))
+        fun colourAt(i: Int) = a.spanStyles.filter { i in it.start until it.end }.lastOrNull()?.item?.color
+        val text = a.text
+        assertEquals(ksqlc.app.ui.DarkColors.synIdent, colourAt(0))                       // known column
+        assertEquals(ksqlc.app.ui.DarkColors.synKeyword, colourAt(text.indexOf("like")))
+        assertEquals(ksqlc.app.ui.DarkColors.synString, colourAt(text.indexOf("'%x%'") + 1))
+        assertEquals(ksqlc.app.ui.DarkColors.error, colourAt(text.indexOf("nope")))        // not a column
+        assertEquals(ksqlc.app.ui.DarkColors.synIdent, colourAt(text.indexOf("lower")))    // a call, not a column
     }
 }

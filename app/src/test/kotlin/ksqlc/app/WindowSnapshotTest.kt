@@ -71,9 +71,10 @@ class WindowSnapshotTest {
                 val o = model.source.let { (node("ns:.main/Tablas/articulo").obj ?: error("sin objeto")) }
                 state.openData(o)
                 until { state.dataTabs.isNotEmpty() }
-                state.dataTabs[0].where = "stock < 5"; state.dataTabs[0].orderBy = "stock desc, nombre"
+                state.dataTabs[0].where = "nombre like '%gel%' and stock < 5"; state.dataTabs[0].orderBy = "stock desc, nombre"
                 state.applyFilters(state.dataTabs[0])
                 until { state.dataTabs[0].grid.rows.size in 1..29 }
+                state.dataTabs[0].where += " and nope = 1"   // typed but not applied: shows the unknown-column colour
             }
             repeat(4) { mainClock.advanceTimeByFrame() }
             onRoot().savePng(name)
