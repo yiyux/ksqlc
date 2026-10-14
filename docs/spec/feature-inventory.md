@@ -39,5 +39,6 @@ clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92
 | Edición de datos | implementado (fase 4) | En las pestañas de tabla: editar celdas (doble clic / Enter / F2; Esc cancela; Tab pasa a la siguiente), poner NULL o valor por defecto, selector de fecha y hora en las columnas date/time/timestamp (calendario y reloj según el tipo; escribe el formato que pide la columna), añadir y borrar filas, Revertir, Ver SQL (vista previa del DML) y Enviar (parametrizado, todo o nada). Tablas sin clave primaria: solo insertar; vistas: solo lectura. Falta editar resultados de la consola, editores especiales (LOB, JSON) y generar valores (UUID/NOW). |
 | Transacciones | implementado (fase 4) | Auto/Manual por conexión (se guarda con ella): en Manual, consola y pestañas de tabla no confirman solas y tienen Commit/Rollback, con un punto cuando hay trabajo sin confirmar. Se pregunta antes de cerrar pestañas, desconectar, cambiar de conexión o cerrar la ventana con cambios sin enviar o transacciones abiertas. |
 | Historial de consultas | hecho | Registro por conexión en `~/.ksqlc/history`, diálogo con búsqueda (⌥⌘E). |
-| Import/export, diff, ER | pendiente | fase 5 |
+| Exportar datos | hecho | CSV, TSV, JSON y SQL INSERT a archivo o portapapeles desde pestañas de tabla, resultados y explorador. |
+| Importar, dump, diff, ER | pendiente | fase 5 |
 

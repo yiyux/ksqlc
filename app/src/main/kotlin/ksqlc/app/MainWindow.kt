@@ -80,6 +80,7 @@ fun MainWindow(state: AppState) {
         if (state.dataSourceDialog) DataSourceDialog(state)
         DdlDialog(state)
         HistoryDialog(state)
+        ExportDialog(state)
         ConfirmDialog(state)
     }
 }
@@ -205,6 +206,7 @@ private fun DataTabContent(state: AppState, data: DataTab) {
             ToolButton(IconKind.Revert, "Revertir cambios", ed::revert, enabled = ed.hasChanges && !data.loading)
             ToolButton(IconKind.Preview, "Ver SQL de los cambios", { state.previewChanges(data) }, enabled = ed.hasChanges)
             ToolButton(IconKind.Submit, "Enviar cambios", { state.submitChanges(data) }, enabled = ed.hasChanges && !data.loading, tint = if (ed.hasChanges) c.success else null)
+            ToolButton(IconKind.Export, "Exportar datos…", { state.exportData(data) }, Modifier.testTag("export-open"), enabled = !data.loading)
             VSeparator()
             TxControls(state.form.manualTx, data.pending, state::setTxManual, { state.commitTab(data) }, { state.rollbackTab(data) }, "tab")
             if (ed.hasChanges) Text("${ed.changeCount} cambio(s) sin enviar", fontSize = 12.sp, color = c.textSecondary, modifier = Modifier.padding(start = 8.dp).testTag("pending-count"))

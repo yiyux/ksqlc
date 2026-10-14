@@ -526,6 +526,34 @@ class AppState(
         setEditorText(joined)
     }
 
+    // --- export ------------------------------------------------------------------------
+    var exportJob by mutableStateOf<ExportJob?>(null)
+        private set
+
+    private fun openExport(r: ExportRequest) { exportJob = ExportJob(r, scope) { status = it; logLine("exportar ${r.name}", it) } }
+    fun closeExport() { exportJob?.let { if (it.running) it.cancel() }; exportJob = null }
+
+    /** A console result: the rows already loaded plus whatever is left in its cursor (which then cannot load more). */
+    fun exportResult(tab: ResultTab) {
+        val dialect = ksqlc.drivers.dialect.Dialect.of(form.effectiveKind)
+        openExport(ExportRequest(tab.title, "resultado", dialect::quote, "Las filas que faltan por cargar se leen del cursor; después la pestaña no podrá cargar más.") { w, stop, progress ->
+            try { ksqlc.drivers.exportRows(tab.result, tab.rows.toList(), w(tab.result.columns.map { it.name }), stop, progress) }
+            finally { tab.exhausted = true }
+        })
+    }
+
+    /** A table or view: runs [sql] again on its own connection, so the console and open tabs are left alone. */
+    fun exportQuery(o: DbObject, sql: String) {
+        val target = form.toDataSource(); val pw = form.passwordOrNull
+        val dialect = ksqlc.drivers.dialect.Dialect.of(target.kind)
+        openExport(ExportRequest(o.name, dialect.qualified(o), dialect::quote, null) { w, stop, progress ->
+            Session(target, pw, autoCommit = true).use { ksqlc.drivers.exportQuery(it, sql, w, stop, progress) }
+        })
+    }
+
+    fun exportData(tab: DataTab) = exportQuery(tab.obj, tab.query())
+    fun exportObject(o: DbObject) { exportQuery(o, explorer?.source?.dialect?.selectAll(o) ?: return) }
+
     // --- history -----------------------------------------------------------------------
     var historyEntries by mutableStateOf<List<HistoryEntry>?>(null)
         private set

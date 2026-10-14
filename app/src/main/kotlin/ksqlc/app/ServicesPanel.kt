@@ -43,6 +43,7 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier) {
                     state.tabs.forEachIndexed { i, t ->
                         PillTab(t.title, state.selectedTab == i, { state.selectedTab = i }, Modifier.testTag("tab:$i"), icon = IconKind.Table, height = 26.dp, onClose = { state.closeTab(i) })
                     }
+                    state.tabs.getOrNull(state.selectedTab)?.let { t -> ToolButton(IconKind.Export, "Exportar resultado…", { state.exportResult(t) }, Modifier.testTag("export-result")) }
                 }
                 Separator()
                 val tab = state.tabs.getOrNull(state.selectedTab)

@@ -86,7 +86,7 @@ fun parseParam(text: String, typeName: String, kind: DbKind): Any? {
     }
 }
 
-private fun literal(v: Any?): String = when (v) {
+internal fun literal(v: Any?): String = when (v) {
     null -> "NULL"
     is Boolean -> if (v) "TRUE" else "FALSE"
     is Number -> v.toString()

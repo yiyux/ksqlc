@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 /** ksqlc's own glyphs, drawn on a 16x16 grid. Deliberately simple; they are not copies of any other product's icons. */
 enum class IconKind {
     Database, Schema, Folder, Table, View, MatView, Sequence, Routine, Column, Key, Index, ForeignKey,
-    Play, PlayAll, Stop, Refresh, Plus, Minus, Copy, Filter, Gear, ChevronRight, ChevronDown, Close, Contrast, Format, Sort, Revert, Preview, Submit, Check, Rollback, Calendar, History,
+    Play, PlayAll, Stop, Refresh, Plus, Minus, Copy, Filter, Gear, ChevronRight, ChevronDown, Close, Contrast, Format, Sort, Revert, Preview, Submit, Check, Rollback, Calendar, History, Export,
 }
 
 @Composable
@@ -102,6 +102,7 @@ private fun DrawScope.drawGlyph(kind: IconKind, c: Color) {
         IconKind.Submit -> { seg(c, 8f, 11f, 8f, 3f); poly(c, 4.8f, 6.2f, 8f, 3f, 11.2f, 6.2f); seg(c, 3f, 13f, 13f, 13f) }
         IconKind.Calendar -> { box(c, 2.5f, 3.5f, 11f, 10f); seg(c, 2.5f, 6.5f, 13.5f, 6.5f); seg(c, 5.5f, 2f, 5.5f, 5f); seg(c, 10.5f, 2f, 10.5f, 5f) }
         IconKind.History -> { drawCircle(c, 5.5f, Offset(8f, 8f), style = line); poly(c, 8f, 4.8f, 8f, 8f, 10.5f, 9.5f) }
+        IconKind.Export -> { poly(c, 3f, 9.5f, 3f, 13f, 13f, 13f, 13f, 9.5f); seg(c, 8f, 10f, 8f, 2.8f); poly(c, 5.2f, 5.4f, 8f, 2.8f, 10.8f, 5.4f) }
         IconKind.Check -> poly(c, 3f, 8.5f, 6.5f, 12f, 13f, 4.5f)
         IconKind.Rollback -> { drawArc(c, 20f, 250f, false, Offset(3f, 3f), Size(10f, 10f), style = line); poly(c, 2.5f, 2.5f, 3f, 6.2f, 6.8f, 5.6f) }
         IconKind.Sort -> { seg(c, 2.5f, 4.5f, 13.5f, 4.5f); seg(c, 2.5f, 8f, 10f, 8f); seg(c, 2.5f, 11.5f, 6.5f, 11.5f) }
