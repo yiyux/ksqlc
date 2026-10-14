@@ -19,6 +19,13 @@ class ConnectionStoreTest {
         assertFalse(dir.resolve("connections.json").readText().contains("s3cret"))
     }
 
+    @Test fun manualTransactionsSurviveARestartAndOldFilesDefaultToAuto() {
+        store.save(pg.copy(manualTx = true), "")
+        assertTrue(ConnectionStore(dir, secrets).list().single().manualTx)
+        dir.resolve("connections.json").toFile().writeText("""{"version":1,"connections":[{"id":"9","name":"viejo","kind":"SQLITE","url":"jdbc:sqlite:x"}]}""")
+        assertFalse(ConnectionStore(dir, secrets).list().single().manualTx)
+    }
+
     @Test fun saveReplacesById() {
         store.save(pg, "a")
         store.save(pg.copy(name = "renamed"), "b")

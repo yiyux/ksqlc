@@ -2,6 +2,7 @@ plugins { kotlin("jvm") }
 kotlin { jvmToolchain(21) }
 dependencies {
     api(project(":core"))
+    implementation(project(":sql"))
     implementation("com.zaxxer:HikariCP:6.2.1")
     runtimeOnly("org.xerial:sqlite-jdbc:3.47.1.0")
     runtimeOnly("org.postgresql:postgresql:42.7.4")

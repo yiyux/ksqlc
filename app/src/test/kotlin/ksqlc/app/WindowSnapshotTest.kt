@@ -160,4 +160,41 @@ class WindowSnapshotTest {
             onRoot().savePng("explorer-saved-dark")
         } finally { state.dispose() }
     }
+
+    /** A table tab with edited, new and deleted rows pending, and the dialog that previews their SQL. */
+    private fun pending(mode: ThemeMode, name: String) = runDesktopComposeUiTest(1722, 1000) {
+        mainClock.autoAdvance = false
+        val state = AppState(
+            CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            ConnectionStore(Files.createTempDirectory("ksqlc-snap-store"), InMemorySecretStore()),
+            SettingsStore(Files.createTempDirectory("ksqlc-snap-settings")).also { it.save(Settings(themeMode = mode)) },
+        )
+        try {
+            state.form.name = "demo@localhost"; state.form.database = seededDb()
+            setContent { App(state) }
+            fun until(ms: Long = 20_000, cond: () -> Boolean) { val end = System.nanoTime() + ms * 1_000_000; while (!cond()) { check(System.nanoTime() < end) { "timeout (${state.status})" }; Thread.sleep(40); mainClock.advanceTimeByFrame() } }
+            state.onEditorChange(TextFieldValue("select 1"))
+            state.runScript()
+            until { !state.running && state.catalog?.complete == true }
+            state.openData(state.catalog!!.objectOf(ksqlc.sql.TableRef("main", "articulo"))!!)
+            until { state.dataTabs.isNotEmpty() }
+            val tab = state.dataTabs[0]
+            tab.editor.setCell(27, 3, ksqlc.drivers.CellValue.Text("99"), tab.grid)
+            tab.editor.setCell(27, 2, ksqlc.drivers.CellValue.Text("Cubeta renombrada"), tab.grid)
+            tab.editor.setCell(28, 6, ksqlc.drivers.CellValue.Null, tab.grid)
+            tab.editor.selectedRows.add(25); tab.editor.deleteSelected(tab.grid)
+            tab.editor.addRow(tab.grid.result.columns.size)
+            val n = tab.grid.rows.size
+            tab.editor.setCell(n, 2, ksqlc.drivers.CellValue.Text("Artículo nuevo"), tab.grid)
+            tab.editor.setCell(n, 3, ksqlc.drivers.CellValue.Text("10"), tab.grid)
+            repeat(6) { mainClock.advanceTimeByFrame() }
+            onRoot().savePng(name)
+            state.previewChanges(tab)
+            repeat(6) { mainClock.advanceTimeByFrame() }
+            onRoot().savePng("$name-sql")
+        } finally { state.dispose() }
+    }
+
+    @Test fun darkPending() = pending(ThemeMode.DARK, "pending-dark")
+    @Test fun lightPending() = pending(ThemeMode.LIGHT, "pending-light")
 }

@@ -9,6 +9,9 @@ interface Dialect {
     fun qualified(o: DbObject): String
     fun selectAll(o: DbObject): String = "select * from ${qualified(o)}"
 
+    /** An insert that supplies no values at all (every column takes its default). [table] is the qualified name. */
+    fun emptyInsert(table: String): String = "insert into $table default values"
+
     fun namespaces(conn: Connection): List<Namespace>
     fun objects(conn: Connection, ns: Namespace): List<DbObject>
     fun details(conn: Connection, o: DbObject): TableDetails

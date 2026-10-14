@@ -47,6 +47,9 @@ data class KsqlcColors(
     val warning: Color,         // warning squiggle
     val popupBg: Color,         // completion popup
     val popupSelection: Color,
+    val pendingEdit: Color,     // grid: a cell edited but not sent
+    val pendingInsert: Color,   // grid: a new row
+    val pendingDelete: Color,   // grid: a row marked for deletion
     // grid
     val gridLine: Color,
     val rowNumber: Color,
@@ -89,6 +92,7 @@ val DarkColors = KsqlcColors(
     gutterText = Color(0xFF4C5058), gutterTextCurrent = Color(0xFFA1A3AA), currentLine = Color(0xFF1F2024),
     marginGuide = Color(0xFF323438), inlineHint = Color(0xFF676D74),
     occurrence = Color(0xFF2F3A52), warning = Color(0xFFE5B73B), popupBg = Color(0xFF26282C), popupSelection = Color(0xFF2F4A8C),
+    pendingEdit = Color(0xFF243B63), pendingInsert = Color(0xFF1F3A2A), pendingDelete = Color(0xFF4A2327),
     gridLine = Color(0xFF323438), rowNumber = Color(0xFF4C5058), nullText = Color(0xFF7B7E85), gridText = Color(0xFFBCBEC4),
     synKeyword = Color(0xFFCF8E6D), synType = Color(0xFFCF8E6D), synString = Color(0xFF6AAB73), synNumber = Color(0xFF2AACB8),
     synComment = Color(0xFF7A7E85), synIdent = Color(0xFFBCBEC4), synQuoted = Color(0xFFBCBEC4), synParam = Color(0xFFC77DBB),
@@ -106,6 +110,7 @@ val LightColors = KsqlcColors(
     gutterText = Color(0xFFA5A9B4), gutterTextCurrent = Color(0xFF6C6F7D), currentLine = Color(0xFFF5F8FE),
     marginGuide = Color(0xFFEBECF0), inlineHint = Color(0xFF868686),
     occurrence = Color(0xFFE3EBFC), warning = Color(0xFFC68A00), popupBg = Color(0xFFFFFFFF), popupSelection = Color(0xFFD2DEFC),
+    pendingEdit = Color(0xFFD8E5FF), pendingInsert = Color(0xFFDDF2E3), pendingDelete = Color(0xFFFBDDE0),
     gridLine = Color(0xFFEBECF0), rowNumber = Color(0xFFAFB3C1), nullText = Color(0xFF767A85), gridText = Color(0xFF080808),
     synKeyword = Color(0xFF1233AF), synType = Color(0xFF1233AF), synString = Color(0xFF067D17), synNumber = Color(0xFF1750EB),
     synComment = Color(0xFF6B6F7A), synIdent = Color(0xFF080808), synQuoted = Color(0xFF080808), synParam = Color(0xFF871094),

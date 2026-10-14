@@ -29,13 +29,41 @@ class ResultTab(val title: String, val result: StatementResult.Rows) {
  * A table opened from the explorer: its grid, the private session that streams it, and the WHERE / ORDER BY the
  * user typed. [reload] re-runs `baseSql` with them; it blocks, so call it off the UI thread.
  */
-class DataTab(val obj: ksqlc.core.DbObject, first: ResultTab, private val session: ksqlc.drivers.Session, private val baseSql: String) {
+class DataTab(val obj: ksqlc.core.DbObject, first: ResultTab, val session: ksqlc.drivers.Session, private val baseSql: String, val editor: TableEditor) {
     var grid by mutableStateOf(first)
         private set
     var where by mutableStateOf("")
     var orderBy by mutableStateOf("")
     var loading by mutableStateOf(false)
         private set
+    /** Manual transactions: this tab's connection holds changes that are not confirmed yet. */
+    var pending by mutableStateOf(false)
+        private set
+
+    /** Anything the user would lose by closing the tab. */
+    val unsaved: Boolean get() = editor.hasChanges || pending
+
+    /** Sends the pending edits and reloads. Blocking. Returns an error message, or null on success (then [affected] holds the row count). */
+    fun submit(): String? {
+        val statements = try { editor.statements(grid) } catch (e: ksqlc.drivers.DmlException) { return "columna ${e.column}: ${e.message}" }
+        if (statements.isEmpty()) { editor.clear(); return null }
+        loading = true
+        try {
+            val result = session.execute(statements)
+            pending = session.pending
+            result.exceptionOrNull()?.let { return it.message ?: it.toString() }
+            affected = result.getOrDefault(0)
+            editor.clear()
+        } finally { loading = false }
+        return reload()
+    }
+
+    var affected = 0L
+        private set
+
+    fun commit() { session.commit(); pending = false }
+    fun rollback() { session.rollback(); pending = false; editor.revert() }
+    fun syncPending() { pending = session.pending }
 
     fun query() = buildString {
         append(baseSql)

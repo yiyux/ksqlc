@@ -44,7 +44,11 @@ class Holder<T : AutoCloseable>(private val create: (DataSource, String?) -> T) 
 
 fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password)
 
-class DdlView(val title: String, val text: String)
+/** A read-only text dialog: a table's DDL, or the SQL a submit would run ([heading] says which). */
+class DdlView(val title: String, val text: String, val heading: String = "DDL")
+
+/** A yes/no question shown over the window; [onConfirm] runs when the user agrees. */
+class Confirmation(val title: String, val message: String, val confirmLabel: String, val onConfirm: () -> Unit)
 
 /** Which result the bottom panel shows: the log, or one of the result grids. */
 const val OUTPUT_TAB = -1
@@ -214,6 +218,11 @@ class AppState(
 
     /** Makes [c] the active connection and reads its schema, once its password has been fetched from the keychain. */
     fun selectAndConnect(c: DataSource) {
+        confirmDiscard(hasUnsaved, "Hay cambios sin enviar o transacciones sin confirmar.") { switchTo(c) }
+    }
+
+    private fun switchTo(c: DataSource) {
+        consolePending = false
         disconnect()
         form.load(c)
         scope.launch {
@@ -320,6 +329,7 @@ class AppState(
                 }
             }.onFailure { status = "Error: ${it.message}"; logLine("", "ERROR: ${it.message}"); selectedTab = OUTPUT_TAB }
             running = false
+            consolePending = sessions.peek()?.pending == true
         }
     }
 
@@ -373,15 +383,17 @@ class AppState(
             val session = Session(target, pw)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    when (val r = session.runScript(listOf(sql), PAGE).single()) {
+                    val key = if (o.kind == DbObjectKind.TABLE) runCatching { m.source.details(o).primaryKey }.getOrDefault(emptyList()) else emptyList()
+                    val tab = when (val r = session.runScript(listOf(sql), PAGE).single()) {
                         is StatementResult.Rows -> ResultTab(o.name, r).also { it.loadMore(PAGE) }
                         is StatementResult.Failed -> error(r.message)
                         else -> error("sin resultado")
                     }
+                    tab to TableEditor(o, m.source.dialect, target.kind, key)
                 }
-            }.onSuccess { tab ->
-                dataTabs += DataTab(o, tab, session, sql); activeEditor = dataTabs.lastIndex
-                status = "${o.name}: ${tab.rows.size} filas${if (tab.exhausted) "" else "+"}"
+            }.onSuccess { (tab, editor) ->
+                dataTabs += DataTab(o, tab, session, sql, editor); activeEditor = dataTabs.lastIndex
+                status = editor.readOnlyReason() ?: "${o.name}: ${tab.rows.size} filas${if (tab.exhausted) "" else "+"}"
             }.onFailure {
                 status = "No se pudo abrir ${o.name}: ${it.message}"
                 withContext(Dispatchers.IO) { session.close() }
@@ -399,7 +411,89 @@ class AppState(
         }
     }
 
+    /** Sends a tab's pending edits (see [DataTab.submit]) and reports the outcome in the status bar. */
+    fun submitChanges(tab: DataTab) {
+        if (tab.loading || !tab.editor.hasChanges) return
+        status = "Enviando cambios…"
+        scope.launch {
+            val error = withContext(Dispatchers.IO) { runCatching { tab.submit() }.getOrElse { it.message ?: it.toString() } }
+            status = when {
+                error != null -> "Error: $error"
+                form.manualTx -> "${tab.affected} fila(s) modificadas, pendientes de confirmar (Commit)"
+                else -> "${tab.affected} fila(s) modificadas"
+            }
+        }
+    }
+
+    /** Shows the SQL that submitting the pending edits would run. */
+    fun previewChanges(tab: DataTab) {
+        val text = try { tab.editor.statements(tab.grid).joinToString("\n") { it.preview.trimEnd(';') + ";" } }
+        catch (e: ksqlc.drivers.DmlException) { status = "Columna ${e.column}: ${e.message}"; return }
+        ddlView = DdlView(tab.obj.name, text.ifBlank { "-- sin cambios pendientes" }, heading = "SQL pendiente")
+    }
+
+    fun commitTab(tab: DataTab) = scope.launch {
+        runCatching { withContext(Dispatchers.IO) { tab.commit() } }.onSuccess { status = "Commit: ${tab.obj.name}" }.onFailure { status = "Error en el commit: ${it.message}" }
+    }
+
+    fun rollbackTab(tab: DataTab) = scope.launch {
+        runCatching { withContext(Dispatchers.IO) { tab.rollback() } }.onSuccess { status = "Rollback: ${tab.obj.name}" }.onFailure { status = "Error en el rollback: ${it.message}" }
+    }
+
+    // --- transactions -----------------------------------------------------------------
+
+    /** The console's connection holds changes that are not confirmed (manual mode only). */
+    var consolePending by mutableStateOf(false)
+        private set
+
+    fun commitConsole() = scope.launch {
+        runCatching { withContext(Dispatchers.IO) { sessions.peek()?.commit() } }.onSuccess { status = "Commit" }.onFailure { status = "Error en el commit: ${it.message}" }
+        consolePending = sessions.peek()?.pending == true
+    }
+
+    fun rollbackConsole() = scope.launch {
+        runCatching { withContext(Dispatchers.IO) { sessions.peek()?.rollback() } }.onSuccess { status = "Rollback" }.onFailure { status = "Error en el rollback: ${it.message}" }
+        consolePending = sessions.peek()?.pending == true
+    }
+
+    /** Changes that would be lost by closing everything: pending edits or unconfirmed transactions. */
+    val hasUnsaved: Boolean get() = consolePending || dataTabs.any { it.unsaved }
+
+    /**
+     * Switches between confirming every statement and confirming by hand, for the console and every open table tab, and
+     * remembers it with the connection. Not allowed while something is unconfirmed: Commit or Rollback first.
+     */
+    fun setTxManual(manual: Boolean) {
+        if (manual == form.manualTx) return
+        if (!manual && hasUnsaved) { status = "Confirma (Commit) o descarta (Rollback) los cambios antes de pasar a Auto"; return }
+        form.manualTx = manual
+        scope.launch(Dispatchers.IO) { sessions.peek()?.setAutoCommit(!manual); dataTabs.forEach { it.session.setAutoCommit(!manual) } }
+        val id = form.currentId
+        if (id != null && saved.any { it.id == id }) {
+            val pw = form.password.ifEmpty { storedPassword(id).orEmpty() }
+            persist({ store.save(form.toDataSource(), pw) }, "Transacciones: ${if (manual) "manual" else "auto"}")
+        } else status = "Transacciones: ${if (manual) "manual" else "auto"}"
+    }
+
+    /** Runs [action], first asking for confirmation when [unsaved] work would be thrown away. */
+    fun confirmDiscard(unsaved: Boolean, what: String, action: () -> Unit) {
+        if (!unsaved) { action(); return }
+        confirmation = Confirmation("Cambios sin guardar", "$what Si continúas se descartan.", "Descartar") { confirmation = null; action() }
+    }
+
+    var confirmation by mutableStateOf<Confirmation?>(null)
+
+    fun requestDisconnect() = confirmDiscard(hasUnsaved, "Hay cambios sin enviar o transacciones sin confirmar.") { disconnect() }
+
+    /** For the window's close button: [exit] runs at once, or after the user agrees to drop unsaved work. */
+    fun requestExit(exit: () -> Unit) = confirmDiscard(hasUnsaved, "Hay cambios sin enviar o transacciones sin confirmar.", exit)
+
     fun closeDataTab(i: Int) {
+        val tab = dataTabs.getOrNull(i) ?: return
+        confirmDiscard(tab.unsaved, "«${tab.obj.name}» tiene cambios sin enviar o sin confirmar.") { closeDataTabNow(i) }
+    }
+
+    private fun closeDataTabNow(i: Int) {
         if (i !in dataTabs.indices) return
         val t = dataTabs.removeAt(i)
         scope.launch(Dispatchers.IO) { t.close() }

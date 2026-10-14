@@ -11,14 +11,15 @@ import androidx.compose.ui.window.rememberWindowState
 import ksqlc.storage.ConnectionStore
 
 fun main() = application {
+    val scope = rememberCoroutineScope()
+    val state = remember { AppState(scope, ConnectionStore.default()) }
+    DisposableEffect(Unit) { onDispose { state.dispose() } }
     Window(
-        onCloseRequest = ::exitApplication,
+        // closing with unsent edits or an open transaction asks first
+        onCloseRequest = { state.requestExit(::exitApplication) },
         title = "ksqlc",
         state = rememberWindowState(size = DpSize(1250.dp, 800.dp)),
     ) {
-        val scope = rememberCoroutineScope()
-        val state = remember { AppState(scope, ConnectionStore.default()) }
-        DisposableEffect(Unit) { onDispose { state.dispose() } }
         App(state)
     }
 }

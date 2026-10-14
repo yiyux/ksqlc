@@ -1,6 +1,7 @@
 package ksqlc.drivers
 
 import ksqlc.core.*
+import ksqlc.sql.firstKeyword
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
@@ -11,14 +12,65 @@ import java.sql.Statement
  * One live connection, like a console session: transaction state and session settings persist
  * across statements. Statements run one at a time; [cancel] may be called from any thread.
  */
-class Session(private val ds: DataSource, private val password: String?) : AutoCloseable {
+class Session(private val ds: DataSource, private val password: String?, autoCommit: Boolean = !ds.manualTx) : AutoCloseable {
     private var conn: Connection? = null
+    @Volatile var autoCommit: Boolean = autoCommit
+        private set
+    /** In manual mode: something that is not a plain read has run since the last commit or rollback. */
+    @Volatile var pending: Boolean = false
+        private set
     @Volatile private var current: Statement? = null
     @Volatile private var cancelRequested = false
     @Volatile private var activeCursor: JdbcCursor? = null
 
     @Synchronized private fun connection(): Connection =
-        conn?.takeIf { !it.isClosed } ?: DriverManager.getConnection(ds.url, ds.user, password).also { conn = it }
+        conn?.takeIf { !it.isClosed } ?: DriverManager.getConnection(ds.url, ds.user, password).also { it.autoCommit = autoCommit; conn = it }
+
+    /** Switches between confirming every statement and confirming by hand. Resolve [pending] work first: JDBC commits it when going back to auto. */
+    @Synchronized fun setAutoCommit(auto: Boolean) {
+        autoCommit = auto
+        conn?.takeIf { !it.isClosed }?.let { it.autoCommit = auto }
+        if (auto) pending = false
+    }
+
+    @Synchronized fun commit() { if (!autoCommit) conn?.takeIf { !it.isClosed }?.commit(); pending = false }
+    @Synchronized fun rollback() { if (!autoCommit) conn?.takeIf { !it.isClosed }?.rollback(); pending = false }
+
+    /**
+     * Runs [statements] with bound parameters as one unit. In auto mode they are confirmed together at the end (all or nothing);
+     * in manual mode they join the open transaction, and if one fails the earlier ones are kept (a savepoint is rolled back).
+     * Returns the number of affected rows, or a failure whose message names the statement that went wrong.
+     */
+    @Synchronized fun execute(statements: List<DmlStatement>): Result<Long> {
+        val c = try { connection() } catch (e: SQLException) { return Result.failure(e) }
+        var total = 0L
+        var current: String? = null
+        fun run() {
+            for (d in statements) {
+                current = d.preview
+                c.prepareStatement(d.sql).use { ps ->
+                    d.params.forEachIndexed { i, v ->
+                        when (v) {
+                            is UntypedParam -> ps.setObject(i + 1, v.text, java.sql.Types.OTHER)
+                            else -> ps.setObject(i + 1, v)
+                        }
+                    }
+                    total += ps.executeLargeUpdate()
+                }
+            }
+        }
+        fun fail(e: SQLException) = Result.failure<Long>(SQLException("${e.message}\n${current.orEmpty()}", e.sqlState, e.errorCode, e))
+        return if (autoCommit) {
+            c.autoCommit = false
+            try { run(); c.commit(); Result.success(total) }
+            catch (e: SQLException) { runCatching { c.rollback() }; fail(e) }
+            finally { runCatching { c.autoCommit = true } }
+        } else {
+            val sp = c.setSavepoint()
+            try { run(); pending = true; Result.success(total) }
+            catch (e: SQLException) { runCatching { c.rollback(sp) }; fail(e) }
+        }
+    }
 
     fun cancel() {
         cancelRequested = true
@@ -56,6 +108,7 @@ class Session(private val ds: DataSource, private val password: String?) : AutoC
                 return StatementResult.Failed(sql, ms(), "Cancelled", cancelled = true)
             }
             val hasRows = st.execute(sql)
+            if (!autoCommit && !isReadOnly(sql)) pending = true
             if (!hasRows) return StatementResult.Updated(sql, ms(), st.largeUpdateCount.coerceAtLeast(0)).also { st.close() }
             val rs = st.resultSet
             val md = rs.metaData
@@ -115,3 +168,8 @@ private class ListCursor(private val rows: List<List<Any?>>) : RowCursor {
     override fun fetch(n: Int): List<List<Any?>> = if (exhausted) emptyList() else { exhausted = true; rows }
     override fun close() {}
 }
+
+private val READ_ONLY = setOf("SELECT", "SHOW", "EXPLAIN", "DESCRIBE", "DESC", "VALUES", "TABLE", "USE", "SET")
+
+/** Plain reads do not leave work to confirm; anything else (including WITH, which may wrap a write) does. */
+private fun isReadOnly(sql: String) = firstKeyword(sql) in READ_ONLY

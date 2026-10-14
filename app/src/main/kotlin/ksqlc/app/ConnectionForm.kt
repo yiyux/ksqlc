@@ -20,16 +20,17 @@ class ConnectionForm {
     var password by mutableStateOf("")
     var customUrl by mutableStateOf(false)
     var urlText by mutableStateOf("")
+    var manualTx by mutableStateOf(false)
 
     val url: String get() = if (customUrl) urlText else JdbcUrl.build(kind, host, portText.toIntOrNull(), database, ssl)
     val effectiveKind: DbKind get() = if (customUrl) JdbcUrl.kindOf(url) else kind
     val passwordOrNull: String? get() = password.ifBlank { null }
 
-    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null })
+    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx)
 
     fun copyFrom(o: ConnectionForm) {
         currentId = o.currentId; name = o.name; kind = o.kind; host = o.host; portText = o.portText; database = o.database
-        ssl = o.ssl; user = o.user; password = o.password; customUrl = o.customUrl; urlText = o.urlText
+        ssl = o.ssl; user = o.user; password = o.password; customUrl = o.customUrl; urlText = o.urlText; manualTx = o.manualTx
     }
 
     /**
@@ -37,7 +38,7 @@ class ConnectionForm {
      * port and database come back as fields; any other URL opens in manual-URL mode.
      */
     fun load(c: DataSource) {
-        currentId = c.id; name = c.name; user = c.user.orEmpty(); password = ""
+        currentId = c.id; name = c.name; user = c.user.orEmpty(); password = ""; manualTx = c.manualTx
         val p = JdbcUrl.parse(c.url)
         if (p != null) {
             kind = p.kind; host = p.host.ifBlank { "localhost" }; portText = (p.port ?: JdbcUrl.defaultPort(p.kind))?.toString().orEmpty()

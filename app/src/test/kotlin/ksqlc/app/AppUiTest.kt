@@ -19,6 +19,7 @@ import org.junit.Rule
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Drives the real window headlessly. Uses temp stores and an in-memory secret store, never the user's own. */
@@ -310,5 +311,135 @@ class AppUiTest {
             rule.onNodeWithTag("ds-node:mi base").performClick(); frames()   // collapses the connected one
             assertEquals(0, rule.onAllNodesWithTag("tree:ns:.main").fetchSemanticsNodes().size)
         } finally { st.dispose() }
+    }
+
+    /** Opens `customers` (Ada, Grace, Linus) in a table tab of [st]; returns the tab. */
+    private fun openCustomers(st: AppState, manual: Boolean = false): DataTab {
+        st.form.database = tempDb()
+        st.onEditorChange(androidx.compose.ui.text.input.TextFieldValue("create table customers(id integer primary key, name text, age integer); insert into customers values (1, 'Ada', 36), (2, 'Grace', 85), (3, 'Linus', 54);"))
+        st.runScript()
+        until { !st.running && st.catalog?.complete == true }
+        st.openData(st.catalog!!.objectOf(ksqlc.sql.TableRef("main", "customers"))!!)
+        until { st.dataTabs.singleOrNull()?.grid?.rows?.size == 3 }
+        val tab = st.dataTabs[0]
+        if (manual) { st.setTxManual(true); until { !tab.session.autoCommit } }   // the data is created in auto mode, then the connection goes manual
+        return tab
+    }
+
+    private fun editCell(i: Int, j: Int, text: String) {
+        rule.onNodeWithTag("cell:$i:$j").performMouseInput { doubleClick() }
+        untilTag("cell-editor")
+        rule.onNodeWithTag("cell-editor").performTextClearance()
+        rule.onNodeWithTag("cell-editor").performTextInput(text)
+        rule.onNodeWithTag("cell-editor").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Enter) }
+        frames()
+    }
+
+    private fun dbNames(db: String) = java.sql.DriverManager.getConnection("jdbc:sqlite:$db").use { c ->
+        c.createStatement().executeQuery("select name from customers order by id").let { rs -> buildList { while (rs.next()) add(rs.getString(1)) } }
+    }
+
+    @Test fun editingACellMarksItPreviewsTheSqlAndSendsIt() {
+        rule.setContent { App(state) }
+        val tab = openCustomers(state)
+        editCell(1, 1, "Grace H.")
+        assertEquals(1, tab.editor.edits.size)
+        rule.onNodeWithTag("pending-count").assertTextContains("1 cambio", substring = true)
+        rule.onNodeWithTag("cell:1:1").assertTextContains("Grace H.")
+
+        rule.onNodeWithContentDescription("Ver SQL de los cambios").performClick()
+        untilTag("sql-dialog")
+        rule.onNode(hasText("update", substring = true, ignoreCase = true) and hasAnyAncestor(hasTestTag("sql-dialog"))).assertExists()
+        rule.onNode(hasText("'Grace H.'", substring = true) and hasAnyAncestor(hasTestTag("sql-dialog"))).assertExists()
+        rule.onNodeWithContentDescription("Cerrar").performClick(); frames()
+
+        rule.onNodeWithContentDescription("Enviar cambios").performClick()
+        until { !tab.editor.hasChanges && tab.grid.rows[1][1] == "Grace H." }
+        assertEquals(listOf("Ada", "Grace H.", "Linus"), dbNames(state.form.database))
+    }
+
+    @Test fun revertDropsEditsAndEscapeCancelsAnEdit() {
+        rule.setContent { App(state) }
+        val tab = openCustomers(state)
+        editCell(0, 1, "Changed")
+        assertTrue(tab.editor.hasChanges)
+        rule.onNodeWithContentDescription("Revertir cambios").performClick(); frames()
+        assertFalse(tab.editor.hasChanges)
+
+        rule.onNodeWithTag("cell:0:1").performMouseInput { doubleClick() }
+        untilTag("cell-editor")
+        rule.onNodeWithTag("cell-editor").performTextInput("zzz")
+        rule.onNodeWithTag("cell-editor").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Escape) }; frames()
+        assertFalse(tab.editor.hasChanges)
+        assertEquals(0, rule.onAllNodesWithTag("cell-editor").fetchSemanticsNodes().size)
+    }
+
+    @Test fun addingAndDeletingRowsFromTheToolbar() {
+        rule.setContent { App(state) }
+        val tab = openCustomers(state)
+        rule.onNodeWithContentDescription("Añadir fila").performClick(); frames()
+        assertEquals(1, tab.editor.inserts.size)
+        editCell(3, 1, "Alan")
+        editCell(3, 0, "4")
+        rule.onNodeWithTag("rownum:0").performMouseInput { click() }          // select Ada's row
+        rule.onNodeWithContentDescription("Borrar filas seleccionadas").performClick(); frames()
+        assertTrue(0 in tab.editor.deleted)
+        rule.onNodeWithContentDescription("Enviar cambios").performClick()
+        until { !tab.editor.hasChanges && tab.grid.rows.size == 3 }
+        assertEquals(listOf("Grace", "Linus", "Alan"), dbNames(state.form.database))
+    }
+
+    @Test fun manualTransactionsHoldTheSendUntilCommitAndRollbackDiscardsIt() {
+        rule.setContent { App(state) }
+        val tab = openCustomers(state, manual = true)
+        rule.onNodeWithTag("tx-mode:tab").assertTextContains("Manual", substring = true)
+        rule.onNodeWithTag("commit:tab").assertExists()
+
+        editCell(0, 1, "Pending")
+        rule.onNodeWithContentDescription("Enviar cambios").performClick()
+        until { tab.pending }
+        rule.onNodeWithTag("tx-pending:tab", useUnmergedTree = true).assertExists()
+        assertEquals(listOf("Ada", "Grace", "Linus"), dbNames(state.form.database))     // not confirmed yet
+        rule.onNodeWithTag("commit:tab").performClick()
+        until { !tab.pending }
+        assertEquals(listOf("Pending", "Grace", "Linus"), dbNames(state.form.database))
+
+        editCell(1, 1, "Oops")
+        rule.onNodeWithContentDescription("Enviar cambios").performClick()
+        until { tab.pending }
+        rule.onNodeWithTag("rollback:tab").performClick()
+        until { !tab.pending }
+        assertEquals(listOf("Pending", "Grace", "Linus"), dbNames(state.form.database))
+    }
+
+    @Test fun closingATabWithPendingEditsAsksFirst() {
+        rule.setContent { App(state) }
+        val tab = openCustomers(state)
+        editCell(0, 1, "Unsent")
+        rule.onNodeWithContentDescription("Cerrar customers").performClick()
+        untilTag("confirm-dialog")
+        assertEquals(1, state.dataTabs.size)
+        rule.onNodeWithTag("confirm-cancel").performClick(); frames()
+        assertEquals(1, state.dataTabs.size); assertTrue(tab.editor.hasChanges)
+
+        rule.onNodeWithContentDescription("Cerrar customers").performClick()
+        untilTag("confirm-ok")
+        rule.onNodeWithTag("confirm-ok").performClick(); frames()
+        assertTrue(state.dataTabs.isEmpty())
+    }
+
+    @Test fun switchingToAutoIsRefusedWhileWorkIsUnconfirmed() {
+        rule.setContent { App(state) }
+        val tab = openCustomers(state, manual = true)
+        editCell(0, 1, "Held")
+        rule.onNodeWithContentDescription("Enviar cambios").performClick()
+        until { tab.pending }
+        state.setTxManual(false)
+        assertTrue(state.form.manualTx)
+        assertTrue(state.status.contains("Commit"))
+        state.commitTab(tab); until { !tab.pending }
+        state.setTxManual(true)   // no-op (already manual)
+        state.setTxManual(false)
+        assertFalse(state.form.manualTx)
     }
 }

@@ -184,9 +184,9 @@ fun DdlDialog(state: AppState) {
     val c = Ksqlc.colors
     val clipboard = LocalClipboardManager.current
     fun close() { state.ddlView = null }
-    ModalOverlay(::close, Modifier.testTag("ddl-dialog"), width = 700.dp, height = 460.dp) {
+    ModalOverlay(::close, Modifier.testTag(if (view.heading == "DDL") "ddl-dialog" else "sql-dialog"), width = 700.dp, height = 460.dp) {
         Column(Modifier.fillMaxSize()) {
-            PanelHeader("DDL — ${view.title}") { ToolButton(IconKind.Close, "Cerrar", ::close) }
+            PanelHeader("${view.heading} — ${view.title}") { ToolButton(IconKind.Close, "Cerrar", ::close) }
             Separator()
             Box(Modifier.weight(1f).fillMaxWidth().background(c.editorBg).verticalScroll(rememberScrollState()).padding(12.dp)) {
                 SelectionContainer { Text(view.text, style = MonoStyle.copy(fontSize = 12.sp, lineHeight = 18.sp), color = c.gridText) }
@@ -197,6 +197,24 @@ fun DdlDialog(state: AppState) {
                 TextAction("Abrir en consola", { state.appendToEditor(view.text); close() })
                 Spacer(Modifier.weight(1f))
                 TextAction("Cerrar", ::close, primary = true)
+            }
+        }
+    }
+}
+
+/** A small yes/no question over the window (tags `confirm-dialog`, `confirm-ok`, `confirm-cancel`). */
+@Composable
+fun ConfirmDialog(state: AppState) {
+    val q = state.confirmation ?: return
+    val c = Ksqlc.colors
+    ModalOverlay({ state.confirmation = null }, Modifier.testTag("confirm-dialog"), width = 420.dp, height = 170.dp) {
+        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(q.title, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text)
+            Text(q.message, fontSize = 13.sp, color = c.textSecondary)
+            Spacer(Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                TextAction("Cancelar", { state.confirmation = null }, Modifier.testTag("confirm-cancel"))
+                TextAction(q.confirmLabel, q.onConfirm, Modifier.testTag("confirm-ok"), primary = true)
             }
         }
     }

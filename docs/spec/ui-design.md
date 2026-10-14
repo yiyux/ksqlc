@@ -157,3 +157,15 @@ Colores provisionales (no observados en DataGrip; ajustar cuando se midan):
 | `popupSelection` | `#2F4A8C` | `#D2DEFC` | fila elegida de la lista |
 
 Lista de autocompletado: 340 dp de ancho, filas de 24 dp, hasta 12 visibles, radio 6 dp, borde 1 dp, bajo el cursor. Errores en rojo (`error`), avisos en ámbar; el mensaje del problema bajo el cursor sustituye al texto de la barra de estado.
+
+
+## Edición de datos (fase 4)
+Colores provisionales de las marcas del grid (no observados en DataGrip):
+
+| Token | Oscuro | Claro | Uso |
+|---|---|---|---|
+| `pendingEdit` | `#243B63` | `#D8E5FF` | celda editada sin enviar |
+| `pendingInsert` | `#1F3A2A` | `#DDF2E3` | fila nueva (su número de fila es `+`) |
+| `pendingDelete` | `#4A2327` | `#FBDDE0` | fila marcada para borrar (texto tachado) |
+
+Barra de la pestaña de tabla (34 dp): Recargar | `+` `−` Revertir Ver-SQL Enviar | `Tx: Auto ▾` (en manual, Commit y Rollback, y un punto ámbar si hay trabajo sin confirmar) y el recuento «N cambio(s) sin enviar». Los valores por defecto se muestran como `<default>` atenuado, igual que `<null>`.

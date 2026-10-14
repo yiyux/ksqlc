@@ -8,6 +8,7 @@ object MySqlDialect : MetaDialect() {
     override val hiddenNamespaces = setOf("mysql", "sys", "performance_schema", "information_schema")
 
     override fun quote(ident: String) = "`" + ident.replace("`", "``") + "`"
+    override fun emptyInsert(table: String) = "insert into $table () values ()"
 
     override fun namespaces(conn: Connection): List<Namespace> =
         conn.metaData.catalogs.list { Namespace(it.getString("TABLE_CAT"), null) }

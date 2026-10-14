@@ -92,7 +92,7 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
             VSeparator()
             ToolButton(IconKind.Refresh, "Refrescar", state::refreshExplorer, enabled = model != null)
             ToolButton(IconKind.Filter, "Filtrar", { showFilter = !showFilter; if (!showFilter) filter = "" }, enabled = model != null, selected = showFilter)
-            ToolButton(IconKind.Stop, "Desconectar", state::disconnect, enabled = model != null)
+            ToolButton(IconKind.Stop, "Desconectar", state::requestDisconnect, enabled = model != null)
         }
         Separator()
         if (showFilter && model != null) {

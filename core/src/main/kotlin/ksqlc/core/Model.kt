@@ -12,6 +12,8 @@ data class DataSource(
     val kind: DbKind,
     val url: String,
     val user: String? = null,
+    /** Transactions are confirmed by hand (Commit/Rollback) instead of after every statement. */
+    val manualTx: Boolean = false,
 )
 
 data class Column(val name: String, val typeName: String, val nullable: Boolean = true)
