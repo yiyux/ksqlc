@@ -171,3 +171,25 @@ Colores provisionales de las marcas del grid (no observados en DataGrip):
 Barra de la pestaña de tabla (34 dp): Recargar | `+` `−` Revertir Ver-SQL Enviar | `Tx: Auto ▾` (en manual, Commit y Rollback, y un punto ámbar si hay trabajo sin confirmar) y el recuento «N cambio(s) sin enviar». Los valores por defecto se muestran como `<default>` atenuado, igual que `<null>`.
 
 Selector de fecha (celda de tipo date/time/timestamp en edición): popup de 250 dp bajo la celda (encima si no cabe), radio 8 dp, mismos colores que la lista de autocompletado (`popupBg`, borde `border`). Calendario con semanas desde el lunes, día elegido en `accent`, hoy con contorno; reloj con flechas por hora/minuto/segundo; «Hoy»/«Ahora», «NULL» y «Aceptar» (las fechas sin hora se cierran al elegir el día). El texto de la celda es la única fuente de verdad: el selector lo reescribe y sigue lo que se escriba.
+
+
+## Historial, transferencia de datos y comparación (fase 5)
+Todos son diálogos sobre la ventana (`ModalOverlay`, como el de DDL); ninguno abre una ventana del sistema salvo el selector de archivos nativo (`FileDialog`, botón «…»).
+
+| Diálogo | Tamaño | Contenido |
+|---|---|---|
+| Historial (⌥⌘E, botón de reloj de la consola) | 980×600 | búsqueda y lista (hora, SQL; en rojo si falló) a la izquierda, SQL completo y duración a la derecha; Insertar en consola, Copiar, Vaciar historial (con confirmación) |
+| Exportar | 600×330 | formato (CSV, TSV, JSON, SQL INSERT), destino (archivo o portapapeles, tope de 10 000 filas), cabecera, progreso y cancelación |
+| Importar CSV | 780×600 | archivo, separador, «primera fila es cabecera», vista previa de 6 filas y un desplegable por columna del archivo hacia columna de la tabla o «(omitir)» |
+| Dump / Restaurar | 640×440 / 360 | ámbito (tabla, esquema, base), ruta de la herramienta (detectada, editable, recordada), archivo, opciones; la salida va a Output |
+| Comparar esquemas | 1180×760 | origen izquierdo fijo y derecho elegible (cualquier data source guardado), lista de objetos con `−` `+` `≠` `=`, DDL en dos columnas con números de línea y ajuste de línea |
+
+Colores provisionales de la comparación (no observados en DataGrip):
+
+| Token | Oscuro | Claro | Uso |
+|---|---|---|---|
+| `diffAdded` | `#1F3A2A` | `#DDF2E3` | línea solo en el lado derecho |
+| `diffRemoved` | `#4A2327` | `#FBDDE0` | línea solo en el lado izquierdo |
+| `diffChanged` | `#3A3A24` | `#FCF3CC` | línea distinta en los dos lados |
+
+Capturas en `app/build/snapshots/` (`history-*`, `export-*`, `import-*`, `dump-*`, `diff-*`).

@@ -565,6 +565,22 @@ class AppState(
             .onFailure { status = "No se pudo leer $f: ${it.message}" }
     }
 
+    // --- schema diff -------------------------------------------------------------------
+    var diffJob by mutableStateOf<DiffJob?>(null)
+        private set
+
+    /** Opens the schema comparison; [ns] and [objectName] say where it was opened from. The left side is the active connection. */
+    fun openDiff(ns: Namespace?, objectName: String? = null) {
+        val src = explorer?.source ?: run { status = "Conéctate primero"; return }
+        val active = form.toDataSource()
+        val others = saved.filter { it.id != active.id }
+        val sources = listOf(active) + others
+        diffJob?.close()
+        diffJob = DiffJob(form.name, src, active.id, sources, { storedPassword(it.id) ?: if (it.id == active.id) form.passwordOrNull else null }, scope, ns, objectName)
+    }
+
+    fun closeDiff() { diffJob?.close(); diffJob = null }
+
     // --- native dump / restore ---------------------------------------------------------
     var nativeJob by mutableStateOf<NativeJob?>(null)
         private set
@@ -581,7 +597,7 @@ class AppState(
         val scopes = buildList {
             if (o != null) add("Tabla ${o.name}" to DumpScope(schemaName, o.name))
             if (schemaName != null) add((if (kind == DbKind.POSTGRES) "Esquema $schemaName" else "Base de datos $schemaName") to DumpScope(schemaName))
-            if (kind != DbKind.MYSQL && kind != DbKind.MARIADB || schemaName == null) add("Base de datos ${parts.database.substringAfterLast('/')}" to DumpScope())
+            if (kind != DbKind.MYSQL && kind != DbKind.MARIADB || schemaName == null) add((if (kind == DbKind.SQLITE) "Toda la base de datos" else "Base de datos ${parts.database}") to DumpScope())
         }
         nativeJob = NativeJob(restore, kind, parts, form.user.ifBlank { null }, form.passwordOrNull, scopes, settings.toolPaths, scope,
             { name, path -> updateSettings { it.copy(toolPaths = it.toolPaths + (name to path)) } }, { log += "[${LocalTime.now().format(clock)}] $it" })
@@ -647,5 +663,5 @@ class AppState(
         scope.launch { withContext(Dispatchers.IO) { runCatching { history?.clear(id) } }; historyEntries = emptyList() }
     }
 
-    fun dispose() { dataTabs.forEach { it.close() }; sessions.close(); introspectors.close() }
+    fun dispose() { diffJob?.close(); dataTabs.forEach { it.close() }; sessions.close(); introspectors.close() }
 }

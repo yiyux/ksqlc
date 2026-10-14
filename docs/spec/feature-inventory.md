@@ -42,5 +42,6 @@ clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92
 | Exportar datos | hecho | CSV, TSV, JSON y SQL INSERT a archivo o portapapeles desde pestañas de tabla, resultados y explorador. |
 | Importar CSV | hecho | Asignación de columnas, vista previa, transacción única, error con fila y columna; «Abrir archivo SQL…» en la consola. |
 | Dump y restauración nativos | hecho | pg_dump/psql/pg_restore, mysqldump/mysql (y variantes MariaDB) y sqlite3, con la contraseña por entorno; SQL Server y Oracle no. |
-| Diff, ER | pendiente | fase 5 |
+| Comparar esquemas | hecho | DDL de dos esquemas (de la conexión activa o de cualquier data source guardado), emparejado por tipo y nombre, normalizado sin el nombre del esquema. |
+| Diagramas ER, diff de contenido | pendiente | fuera de la fase 5 |
 
