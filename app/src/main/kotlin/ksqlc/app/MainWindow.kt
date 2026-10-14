@@ -81,6 +81,7 @@ fun MainWindow(state: AppState) {
         DdlDialog(state)
         HistoryDialog(state)
         ExportDialog(state)
+        ImportDialog(state)
         ConfirmDialog(state)
     }
 }
@@ -142,6 +143,7 @@ private fun EditorIsland(state: AppState) {
             ToolButton(IconKind.Stop, "Cancelar", state::cancel, enabled = state.running, tint = c.error)
             VSeparator()
             ToolButton(IconKind.Format, "Formatear SQL (⌘⌥L)", state::format)
+            ToolButton(IconKind.Folder, "Abrir archivo SQL…", state::openSqlFile)
             ToolButton(IconKind.History, "Historial (⌥⌘E)", state::openHistory, Modifier.testTag("history-open"))
             VSeparator()
             TxControls(state.form.manualTx, state.consolePending, state::setTxManual, state::commitConsole, state::rollbackConsole, "console")

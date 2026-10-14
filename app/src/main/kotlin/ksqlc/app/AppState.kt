@@ -554,6 +554,37 @@ class AppState(
     fun exportData(tab: DataTab) = exportQuery(tab.obj, tab.query())
     fun exportObject(o: DbObject) { exportQuery(o, explorer?.source?.dialect?.selectAll(o) ?: return) }
 
+    /** Loads a .sql file into the console (run it with "Ejecutar script"). */
+    fun openSqlFile() {
+        val f = chooseFile(false, "Abrir archivo SQL") ?: return
+        runCatching { java.nio.file.Files.readString(java.nio.file.Path.of(f)) }
+            .onSuccess { setEditorText(it); activeEditor = CONSOLE_TAB; status = "Abierto $f" }
+            .onFailure { status = "No se pudo leer $f: ${it.message}" }
+    }
+
+    // --- import ------------------------------------------------------------------------
+    var importJob by mutableStateOf<ImportJob?>(null)
+        private set
+
+    /** Opens the CSV import dialog for table [o]; reads its columns first. */
+    fun openImport(o: DbObject) {
+        val src = explorer?.source ?: return
+        val target = form.toDataSource(); val pw = form.passwordOrNull
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { src.details(o).columns } }
+                .onSuccess { importJob = ImportJob(o, it, target, pw, scope) { msg -> status = msg; logLine("importar ${o.name}", msg) } }
+                .onFailure { status = "No se pudieron leer las columnas de ${o.name}: ${it.message}" }
+        }
+    }
+
+    fun closeImport() { importJob = null }
+
+    /** After an import, tabs showing that table pick up the new rows (unless they have unsent edits). */
+    fun importFinished(o: DbObject) {
+        closeImport()
+        dataTabs.firstOrNull { it.obj == o && !it.editor.hasChanges }?.let(::applyFilters)
+    }
+
     // --- history -----------------------------------------------------------------------
     var historyEntries by mutableStateOf<List<HistoryEntry>?>(null)
         private set

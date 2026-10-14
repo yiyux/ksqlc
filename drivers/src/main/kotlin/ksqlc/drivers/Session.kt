@@ -42,33 +42,59 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
      * Returns the number of affected rows, or a failure whose message names the statement that went wrong.
      */
     @Synchronized fun execute(statements: List<DmlStatement>): Result<Long> {
-        val c = try { connection() } catch (e: SQLException) { return Result.failure(e) }
-        var total = 0L
         var current: String? = null
-        fun run() {
+        return transact({ current }) { c ->
+            var total = 0L
             for (d in statements) {
                 current = d.preview
-                c.prepareStatement(d.sql).use { ps ->
-                    d.params.forEachIndexed { i, v ->
-                        when (v) {
-                            is UntypedParam -> ps.setObject(i + 1, v.text, java.sql.Types.OTHER)
-                            else -> ps.setObject(i + 1, v)
-                        }
-                    }
-                    total += ps.executeLargeUpdate()
+                c.prepareStatement(d.sql).use { ps -> bindParams(ps, d.params); total += ps.executeLargeUpdate() }
+            }
+            total
+        }
+    }
+
+    /**
+     * Runs the one statement [sql] once per row of [rows] (its parameters), [batchSize] at a time, with the same
+     * transaction rules as [execute]: nothing is kept if any row fails. [rows] may throw (e.g. a value that does not
+     * fit its column); that fails the run the same way. Returns the number of rows sent.
+     */
+    @Synchronized fun executeBatch(sql: String, rows: Iterator<List<Any?>>, batchSize: Int = 500, onProgress: (Long) -> Unit = {}): Result<Long> =
+        transact({ sql }) { c ->
+            var sent = 0L
+            c.prepareStatement(sql).use { ps ->
+                var inBatch = 0
+                for (row in rows) {
+                    bindParams(ps, row); ps.addBatch(); sent++
+                    if (++inBatch == batchSize) { ps.executeBatch(); inBatch = 0; onProgress(sent) }
                 }
+                if (inBatch > 0) ps.executeBatch()
+            }
+            onProgress(sent)
+            sent
+        }
+
+    private fun bindParams(ps: java.sql.PreparedStatement, params: List<Any?>) {
+        params.forEachIndexed { i, v ->
+            when (v) {
+                is UntypedParam -> ps.setObject(i + 1, v.text, java.sql.Types.OTHER)
+                else -> ps.setObject(i + 1, v)
             }
         }
-        fun fail(e: SQLException) = Result.failure<Long>(SQLException("${e.message}\n${current.orEmpty()}", e.sqlState, e.errorCode, e))
+    }
+
+    /** Auto mode: [body] and a commit, or a rollback. Manual mode: [body] joins the open transaction behind a savepoint that is undone on failure. */
+    private fun transact(describe: () -> String?, body: (Connection) -> Long): Result<Long> {
+        val c = try { connection() } catch (e: SQLException) { return Result.failure(e) }
+        fun fail(e: Exception) = Result.failure<Long>(if (e is SQLException) SQLException("${e.message}\n${describe().orEmpty()}", e.sqlState, e.errorCode, e) else e)
         return if (autoCommit) {
             c.autoCommit = false
-            try { run(); c.commit(); Result.success(total) }
-            catch (e: SQLException) { runCatching { c.rollback() }; fail(e) }
+            try { val n = body(c); c.commit(); Result.success(n) }
+            catch (e: Exception) { runCatching { c.rollback() }; fail(e) }
             finally { runCatching { c.autoCommit = true } }
         } else {
             val sp = c.setSavepoint()
-            try { run(); pending = true; Result.success(total) }
-            catch (e: SQLException) { runCatching { c.rollback(sp) }; fail(e) }
+            try { val n = body(c); pending = true; Result.success(n) }
+            catch (e: Exception) { runCatching { c.rollback(sp) }; fail(e) }
         }
     }
 

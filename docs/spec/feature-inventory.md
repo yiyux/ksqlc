@@ -40,5 +40,6 @@ clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92
 | Transacciones | implementado (fase 4) | Auto/Manual por conexión (se guarda con ella): en Manual, consola y pestañas de tabla no confirman solas y tienen Commit/Rollback, con un punto cuando hay trabajo sin confirmar. Se pregunta antes de cerrar pestañas, desconectar, cambiar de conexión o cerrar la ventana con cambios sin enviar o transacciones abiertas. |
 | Historial de consultas | hecho | Registro por conexión en `~/.ksqlc/history`, diálogo con búsqueda (⌥⌘E). |
 | Exportar datos | hecho | CSV, TSV, JSON y SQL INSERT a archivo o portapapeles desde pestañas de tabla, resultados y explorador. |
-| Importar, dump, diff, ER | pendiente | fase 5 |
+| Importar CSV | hecho | Asignación de columnas, vista previa, transacción única, error con fila y columna; «Abrir archivo SQL…» en la consola. |
+| Dump nativo, diff, ER | pendiente | fase 5 |
 

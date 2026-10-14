@@ -180,6 +180,7 @@ private fun LazyListScope.nodeItems(
                 if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem("Abrir datos") { state.openData(o) })
                 if (o != null) {
                     if (o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem("Exportar datos…") { state.exportObject(o) })
+                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Importar CSV…") { state.openImport(o) })
                     add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
                     add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
                 }
