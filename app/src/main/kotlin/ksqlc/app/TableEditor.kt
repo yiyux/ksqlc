@@ -36,6 +36,9 @@ class StateSet {
  * Rows are matched to the database by [primaryKey]; without one (or on a view) existing rows cannot be edited.
  */
 class TableEditor(val obj: DbObject, private val dialect: Dialect, private val kind: DbKind, val primaryKey: List<String>) {
+    /** The engine this table lives in (it decides, for example, whether a DATE column has a time of day). */
+    val engine: DbKind get() = kind
+
     val canInsert = obj.kind == DbObjectKind.TABLE
     val canEditRows = canInsert && primaryKey.isNotEmpty()
 

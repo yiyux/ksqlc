@@ -261,19 +261,22 @@ class AppState(
 
     // --- running SQL -------------------------------------------------------------------
 
+    /** Oracle scripts keep PL/SQL blocks whole (they end at a `/` line) instead of cutting them at every `;`. */
+    private val slashBlocks: Boolean get() = form.effectiveKind == DbKind.ORACLE
+
     fun runSelectionOrCurrent() {
         val text = editor.text
         val sel = editor.selection
         if (!sel.collapsed) {
             val part = text.substring(sel.min, sel.max)
-            run(splitStatements(part).map { it.text(part) })
+            run(splitStatements(part, slashBlocks).map { it.text(part) })
         } else {
-            val r = statementAt(text, sel.start)
+            val r = statementAt(text, sel.start, slashBlocks)
             run(listOfNotNull(r?.text(text)), range = r)
         }
     }
 
-    fun runScript() = run(splitStatements(editor.text).map { it.text(editor.text) })
+    fun runScript() = run(splitStatements(editor.text, slashBlocks).map { it.text(editor.text) })
 
     fun cancel() { sessions.peek()?.cancel() }
 

@@ -35,16 +35,16 @@ class DmlException(val column: String, message: String) : IllegalArgumentExcepti
 
 private val INTEGER_TYPES = setOf("INT", "INTEGER", "INT2", "INT4", "INT8", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT", "SERIAL", "SMALLSERIAL", "BIGSERIAL", "YEAR")
 private val DECIMAL_TYPES = setOf("NUMERIC", "DECIMAL", "NUMBER", "DEC", "MONEY", "SMALLMONEY")
-private val FLOAT_TYPES = setOf("FLOAT", "FLOAT4", "FLOAT8", "DOUBLE", "DOUBLE PRECISION", "REAL")
+private val FLOAT_TYPES = setOf("FLOAT", "FLOAT4", "FLOAT8", "DOUBLE", "DOUBLE PRECISION", "REAL", "BINARY_FLOAT", "BINARY_DOUBLE")
 private val BOOLEAN_TYPES = setOf("BOOL", "BOOLEAN")
-private val BINARY_WORDS = listOf("BLOB", "BYTEA", "BINARY", "VARBINARY", "IMAGE")
-private val TEXT_WORDS = listOf("CHAR", "TEXT", "CLOB", "STRING", "NAME", "CITEXT")
+private val BINARY_WORDS = listOf("BLOB", "BYTEA", "BINARY", "VARBINARY", "IMAGE", "RAW", "BFILE")
+private val TEXT_WORDS = listOf("CHAR", "TEXT", "CLOB", "STRING", "NAME", "CITEXT", "LONG", "ROWID", "INTERVAL")
 
 /** The base type name: upper-case, without sizes, `unsigned` or `[]`. */
-private fun baseType(typeName: String) = typeName.uppercase().substringBefore('(').replace("UNSIGNED", "").replace("IDENTITY", "").replace("[]", "").trim()
+private fun baseType(typeName: String) = typeName.uppercase().replace(Regex("""\(.*?\)"""), "").replace("UNSIGNED", "").replace("IDENTITY", "").replace("[]", "").trim()
 
 /** True for column types the grid cannot edit as text (binary data). */
-fun isBinaryType(typeName: String) = baseType(typeName).let { t -> BINARY_WORDS.any { it in t } }
+fun isBinaryType(typeName: String) = baseType(typeName).let { t -> !t.startsWith("BINARY_") && BINARY_WORDS.any { it in t } }   // Oracle's BINARY_FLOAT/BINARY_DOUBLE are numbers
 
 /**
  * Converts what was typed into the Java value to bind for a column of [typeName]. Empty text is NULL for every
@@ -71,9 +71,12 @@ fun parseParam(text: String, typeName: String, kind: DbKind): Any? {
             else -> bad("un booleano (true/false)")
         }
         kind == DbKind.SQLITE && (t == "DATE" || t.startsWith("TIME") || t == "DATETIME") -> s
+        kind == DbKind.ORACLE && t == "DATE" -> // an Oracle DATE carries a time of day
+            runCatching { Timestamp.valueOf(LocalDateTime.parse(s.replace(' ', 'T'))) }.getOrNull()
+                ?: runCatching { Timestamp.valueOf(LocalDate.parse(s).atStartOfDay()) }.getOrNull() ?: bad("una fecha (aaaa-mm-dd hh:mm:ss)")
         t == "DATE" -> runCatching { Date.valueOf(LocalDate.parse(s)) }.getOrNull() ?: bad("una fecha (aaaa-mm-dd)")
         t == "TIME" || t == "TIME WITHOUT TIME ZONE" -> runCatching { Time.valueOf(LocalTime.parse(s).withNano(0)) }.getOrNull() ?: bad("una hora (hh:mm:ss)")
-        t == "TIMESTAMP" || t == "DATETIME" || t == "DATETIME2" || t == "SMALLDATETIME" || t == "TIMESTAMP WITHOUT TIME ZONE" ->
+        t == "TIMESTAMP" || t == "DATETIME" || t == "DATETIME2" || t == "SMALLDATETIME" || t == "TIMESTAMP WITHOUT TIME ZONE" || t == "TIMESTAMPLTZ" || t == "TIMESTAMP WITH LOCAL TIME ZONE" ->
             runCatching { Timestamp.valueOf(LocalDateTime.parse(s.replace(' ', 'T'))) }.getOrNull()
                 ?: runCatching { Timestamp.valueOf(LocalDate.parse(s).atStartOfDay()) }.getOrNull() ?: bad("una fecha y hora (aaaa-mm-dd hh:mm:ss)")
         t == "TIMESTAMPTZ" || t == "TIMESTAMP WITH TIME ZONE" || t == "DATETIMEOFFSET" ->
@@ -130,7 +133,7 @@ fun buildDml(
     }
     for (row in inserts) {
         val given = row.filterValues { it !is CellValue.Default }
-        out += if (given.isEmpty()) DmlStatement(dialect.emptyInsert(table), emptyList(), dialect.emptyInsert(table))
+        out += if (given.isEmpty()) dialect.emptyInsert(table, dialect.quote(columns.first().name)).let { DmlStatement(it, emptyList(), it) }
         else stmt("insert into $table (${given.keys.joinToString(", ") { dialect.quote(it) }}) values (${given.keys.joinToString(", ") { "?" }})", given.map { (c, v) -> bind(c, v) })
     }
     return out

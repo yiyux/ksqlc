@@ -193,7 +193,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                                         contentAlignment = if (isNumber) Alignment.CenterEnd else Alignment.CenterStart,
                                     ) {
                                         if (editCell == i to j) {
-                                            val kind = temporalKind(cols[j].typeName)
+                                            val kind = temporalKind(cols[j].typeName, editing?.engine)
                                             var pickerOpen by remember { mutableStateOf(true) }
                                             val requester = remember { FocusRequester() }
                                             var focused by remember { mutableStateOf(false) }

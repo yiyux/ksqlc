@@ -13,10 +13,10 @@ enum class TemporalKind(val hasDate: Boolean, val hasTime: Boolean, val hasOffse
 }
 
 /** The picker kind for a column of [typeName] (as the JDBC driver reports it), or null for columns that are not dates or times. */
-fun temporalKind(typeName: String): TemporalKind? = when (typeName.uppercase().substringBefore('(').trim()) {
-    "DATE" -> TemporalKind.DATE
+fun temporalKind(typeName: String, engine: ksqlc.core.DbKind? = null): TemporalKind? = when (typeName.uppercase().replace(Regex("""\(.*?\)"""), "").replace(Regex("\\s+"), " ").trim()) {
+    "DATE" -> if (engine == ksqlc.core.DbKind.ORACLE) TemporalKind.DATETIME else TemporalKind.DATE      // an Oracle DATE has a time of day
     "TIME", "TIME WITHOUT TIME ZONE" -> TemporalKind.TIME
-    "TIMESTAMP", "DATETIME", "DATETIME2", "SMALLDATETIME", "TIMESTAMP WITHOUT TIME ZONE" -> TemporalKind.DATETIME
+    "TIMESTAMP", "DATETIME", "DATETIME2", "SMALLDATETIME", "TIMESTAMP WITHOUT TIME ZONE", "TIMESTAMPLTZ", "TIMESTAMP WITH LOCAL TIME ZONE" -> TemporalKind.DATETIME
     "TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE", "DATETIMEOFFSET" -> TemporalKind.DATETIME_TZ
     else -> null
 }

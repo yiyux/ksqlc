@@ -113,7 +113,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
             val rs = st.resultSet
             val md = rs.metaData
             val cols = (1..md.columnCount).map { Column(md.getColumnLabel(it), md.getColumnTypeName(it)) }
-            val cursor = JdbcCursor(st, rs, cols.size)
+            val cursor = JdbcCursor(st, rs, (1..md.columnCount).map { md.getColumnType(it) })
             activeCursor = cursor
             return StatementResult.Rows(sql, ms(), cols, cursor)
         } catch (e: SQLException) {
@@ -138,7 +138,9 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
     }
 }
 
-private class JdbcCursor(private val st: Statement, private val rs: ResultSet, private val width: Int) : RowCursor {
+private class JdbcCursor(private val st: Statement, private val rs: ResultSet, private val types: List<Int>) : RowCursor {
+    private val width = types.size
+
     override var exhausted = false
         private set
 
@@ -148,7 +150,7 @@ private class JdbcCursor(private val st: Statement, private val rs: ResultSet, p
         try {
             while (rows.size < n) {
                 if (!rs.next()) { exhausted = true; break }
-                rows += List(width) { rs.getObject(it + 1) }
+                rows += List(width) { value(it + 1, types[it]) }
             }
         } catch (e: SQLException) {
             exhausted = true
@@ -158,8 +160,19 @@ private class JdbcCursor(private val st: Statement, private val rs: ResultSet, p
         return rows
     }
 
+    /** A cell as a plain Java value: drivers' own classes (Oracle's TIMESTAMPTZ, CLOB…) become standard ones the grid can show and edit. */
+    private fun value(i: Int, type: Int): Any? = when (type) {
+        java.sql.Types.CLOB, java.sql.Types.NCLOB, java.sql.Types.ROWID -> rs.getString(i)
+        java.sql.Types.TIMESTAMP_WITH_TIMEZONE, ORACLE_TIMESTAMPTZ -> rs.getObject(i, java.time.OffsetDateTime::class.java)
+        ORACLE_TIMESTAMPLTZ -> rs.getTimestamp(i)
+        else -> rs.getObject(i).let { v -> if (v != null && v.javaClass.name.startsWith("oracle.")) rs.getString(i) else v }
+    }
+
     override fun close() { runCatching { rs.close() }; runCatching { st.close() } }
 }
+
+private const val ORACLE_TIMESTAMPTZ = -101
+private const val ORACLE_TIMESTAMPLTZ = -102
 
 /** Rows already read from an earlier result of a script; handed out once. */
 private class ListCursor(private val rows: List<List<Any?>>) : RowCursor {

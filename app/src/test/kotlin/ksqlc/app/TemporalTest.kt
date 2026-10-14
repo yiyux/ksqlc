@@ -15,6 +15,16 @@ class TemporalTest {
         for (t in listOf("text", "int4", "varchar(10)", "bytea", "")) assertNull(temporalKind(t), t)
     }
 
+    @Test fun anOracleDateHasATimeOfDay() {
+        assertEquals(TemporalKind.DATETIME, temporalKind("DATE", ksqlc.core.DbKind.ORACLE))
+        assertEquals(TemporalKind.DATE, temporalKind("DATE", ksqlc.core.DbKind.POSTGRES)); assertEquals(TemporalKind.DATE, temporalKind("DATE"))
+        assertEquals(TemporalKind.DATETIME_TZ, temporalKind("TIMESTAMP(6) WITH TIME ZONE", ksqlc.core.DbKind.ORACLE))
+        assertEquals(TemporalKind.DATETIME_TZ, temporalKind("TIMESTAMPTZ", ksqlc.core.DbKind.ORACLE))
+        assertEquals(TemporalKind.DATETIME, temporalKind("TIMESTAMP(6) WITH LOCAL TIME ZONE", ksqlc.core.DbKind.ORACLE))
+        assertEquals(TemporalKind.DATETIME, temporalKind("TIMESTAMPLTZ", ksqlc.core.DbKind.ORACLE))
+        assertNull(temporalKind("NUMBER", ksqlc.core.DbKind.ORACLE)); assertNull(temporalKind("VARCHAR2(20)", ksqlc.core.DbKind.ORACLE))
+    }
+
     @Test fun kindsDecideWhatThePickerOffers() {
         assertTrue(TemporalKind.DATE.hasDate && !TemporalKind.DATE.hasTime)
         assertTrue(!TemporalKind.TIME.hasDate && TemporalKind.TIME.hasTime)

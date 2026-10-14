@@ -65,4 +65,31 @@ class StatementsTest {
         assertEquals(s.indexOf("select"), r.codeStart(s))
         assertEquals(0, splitStatements("select 1").single().codeStart("select 1"))
     }
+
+    private fun texts(sql: String, slash: Boolean) = splitStatements(sql, slash).map { it.text(sql) }
+
+    @Test fun plsqlBlocksEndAtASlashLineWhenAsked() {
+        val sql = "select 1 from dual;\nbegin\n  insert into t values (1);\n  commit;\nend;\n/\nselect 2 from dual;"
+        assertEquals(listOf("select 1 from dual", "begin\n  insert into t values (1);\n  commit;\nend;", "select 2 from dual"), texts(sql, true))
+        assertEquals(5, texts(sql, false).size)       // without the flag every ';' splits, as in other engines
+    }
+
+    @Test fun createProcedureAndFunctionAreBlocksButCreateTableIsNot() {
+        val sql = "create or replace procedure p as begin null; end;\n/\ncreate table t(a int);\ncreate function f return number is begin return 1; end;\n/"
+        assertEquals(listOf("create or replace procedure p as begin null; end;", "create table t(a int)", "create function f return number is begin return 1; end;"), texts(sql, true))
+        assertEquals(listOf("declare x number; begin x := 1; end;"), texts("declare x number; begin x := 1; end;\n/", true))
+    }
+
+    @Test fun aSlashThatIsNotAloneOnItsLineDoesNotEndABlock() {
+        val sql = "begin\n  x := 4 / 2;\n  y := a /\n b;\nend;\n/"
+        assertEquals(listOf("begin\n  x := 4 / 2;\n  y := a /\n b;\nend;"), texts(sql, true))
+    }
+
+    @Test fun anUnterminatedLastBlockRunsToTheEnd() = assertEquals(listOf("begin null; end;"), texts("begin null; end;", true))
+
+    @Test fun statementAtFindsTheWholeBlock() {
+        val sql = "select 1 from dual;\nbegin\n  null;\nend;\n/\n"
+        val r = statementAt(sql, sql.indexOf("null"), slashBlocks = true)!!
+        assertEquals("begin\n  null;\nend;", r.text(sql))
+    }
 }

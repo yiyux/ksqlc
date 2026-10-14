@@ -9,8 +9,11 @@ interface Dialect {
     fun qualified(o: DbObject): String
     fun selectAll(o: DbObject): String = "select * from ${qualified(o)}"
 
-    /** An insert that supplies no values at all (every column takes its default). [table] is the qualified name. */
-    fun emptyInsert(table: String): String = "insert into $table default values"
+    /**
+     * An insert that supplies no values at all (every column takes its default). [table] is the qualified name and
+     * [firstColumn] the quoted name of one of its columns, for engines that need at least one to say `default`.
+     */
+    fun emptyInsert(table: String, firstColumn: String): String = "insert into $table default values"
 
     fun namespaces(conn: Connection): List<Namespace>
     fun objects(conn: Connection, ns: Namespace): List<DbObject>
@@ -23,7 +26,7 @@ interface Dialect {
             DbKind.MYSQL, DbKind.MARIADB -> MySqlDialect
             DbKind.SQLITE -> SqliteDialect
             DbKind.MSSQL -> SqlServerDialect
-            DbKind.ORACLE -> GenericDialect
+            DbKind.ORACLE -> OracleDialect
         }
     }
 }

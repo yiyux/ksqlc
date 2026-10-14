@@ -34,6 +34,7 @@ class DmlTest {
     @Test fun insertWithoutAnyValueUsesTheDialectsEmptyInsert() {
         val all = mapOf("id" to CellValue.Default, "name" to CellValue.Default)
         assertTrue(build(inserts = listOf(all))[0].sql.endsWith("default values"))
+        assertTrue(build(Dialect.of(DbKind.ORACLE), DbKind.ORACLE, inserts = listOf(all))[0].sql.endsWith("(\"id\") values (default)"))
         assertTrue(build(mysql, DbKind.MYSQL, inserts = listOf(all))[0].sql.endsWith("() values ()"))
     }
 
@@ -90,6 +91,18 @@ class DmlTest {
         assertEquals(7L, parseParam("7", "int identity", DbKind.MSSQL))
         assertEquals(BigDecimal("3.50"), parseParam("3.50", "smallmoney", DbKind.MSSQL))
         assertEquals("ñandú", parseParam("ñandú", "nvarchar", DbKind.MSSQL))
+    }
+
+    @Test fun oracleTypesAreBoundAsTypedValues() {
+        assertEquals(java.sql.Timestamp.valueOf("2026-01-05 10:20:30"), parseParam("2026-01-05 10:20:30", "DATE", DbKind.ORACLE))     // DATE has a time of day
+        assertEquals(java.sql.Timestamp.valueOf("2026-01-05 00:00:00"), parseParam("2026-01-05", "DATE", DbKind.ORACLE))
+        assertEquals(java.sql.Timestamp.valueOf("2026-01-05 10:20:30"), parseParam("2026-01-05 10:20:30", "TIMESTAMP(6)", DbKind.ORACLE))
+        assertEquals(java.sql.Timestamp.valueOf("2026-01-05 10:20:30"), parseParam("2026-01-05 10:20:30", "TIMESTAMP(6) WITH LOCAL TIME ZONE", DbKind.ORACLE))
+        assertIs<java.time.OffsetDateTime>(parseParam("2026-01-05 10:20:30+01:00", "TIMESTAMP(6) WITH TIME ZONE", DbKind.ORACLE))
+        assertEquals(BigDecimal("12.5"), parseParam("12.5", "NUMBER", DbKind.ORACLE))
+        assertEquals(1.5, parseParam("1.5", "BINARY_DOUBLE", DbKind.ORACLE))
+        assertEquals("ñandú", parseParam("ñandú", "NVARCHAR2", DbKind.ORACLE)); assertEquals("x", parseParam("x", "CLOB", DbKind.ORACLE))
+        assertFailsWith<IllegalArgumentException> { parseParam("ab", "RAW", DbKind.ORACLE) }
     }
 
     @Test fun parseParamEmptyIsNullExceptForText() {

@@ -15,8 +15,11 @@ data class StatementRange(val start: Int, val end: Int, val next: Int) {
  * Splits [sql] on top-level semicolons. Semicolons inside strings, quoted identifiers,
  * comments and $tag$...$tag$ bodies do not split (see [tokenize]).
  * Ranges are trimmed of surrounding whitespace; empty and comment-only statements are dropped.
+ *
+ * With [slashBlocks] (Oracle) a PL/SQL block (`begin`, `declare`, or `create [or replace] procedure|function|package|trigger|type`)
+ * is not split at its inner semicolons: it ends at a line holding only `/`, which is not part of the statement.
  */
-fun splitStatements(sql: String): List<StatementRange> {
+fun splitStatements(sql: String, slashBlocks: Boolean = false): List<StatementRange> {
     val out = mutableListOf<StatementRange>()
     var start = 0
     var hasCode = false
@@ -34,22 +37,46 @@ fun splitStatements(sql: String): List<StatementRange> {
         hasCode = false
     }
 
-    for (t in tokenize(sql)) {
+    val all = tokenize(sql)
+    var block = false
+    for ((idx, t) in all.withIndex()) {
+        val code = t.kind != TokenKind.WHITESPACE && t.kind != TokenKind.COMMENT
+        if (slashBlocks && code && !hasCode) block = startsPlsqlBlock(sql, all, idx)
         when {
+            block && t.kind == TokenKind.OPERATOR && sql[t.start] == '/' && t.end - t.start == 1 && aloneOnItsLine(sql, t) -> { flush(t.start); block = false }
+            block -> if (code) hasCode = true
             t.kind == TokenKind.PUNCT && sql[t.start] == ';' -> flush(t.start)
-            t.kind != TokenKind.WHITESPACE && t.kind != TokenKind.COMMENT -> hasCode = true
+            code -> hasCode = true
         }
     }
     flush(null)
     return out
 }
 
+private val BLOCK_OBJECTS = setOf("PROCEDURE", "FUNCTION", "PACKAGE", "TRIGGER", "TYPE")
+
+/** Does the statement whose first code token is at [from] open a PL/SQL block? */
+private fun startsPlsqlBlock(sql: String, tokens: List<Token>, from: Int): Boolean {
+    val words = tokens.drop(from).filter { it.kind != TokenKind.WHITESPACE && it.kind != TokenKind.COMMENT }.take(6).map { it.text(sql).uppercase() }
+    return when (words.firstOrNull()) {
+        "BEGIN", "DECLARE" -> true
+        "CREATE" -> words.drop(1).filterNot { it in setOf("OR", "REPLACE", "EDITIONABLE", "NONEDITIONABLE") }.firstOrNull() in BLOCK_OBJECTS
+        else -> false
+    }
+}
+
+private fun aloneOnItsLine(sql: String, t: Token): Boolean {
+    val before = sql.lastIndexOf('\n', t.start - 1).let { sql.substring(it + 1, t.start) }
+    val after = sql.indexOf('\n', t.end).let { if (it < 0) sql.substring(t.end) else sql.substring(t.end, it) }
+    return before.isBlank() && after.isBlank()
+}
+
 /**
  * The statement the caret belongs to: the one containing [offset] (its ';' counts as inside),
  * otherwise the closest one before it, otherwise the first one after.
  */
-fun statementAt(sql: String, offset: Int): StatementRange? {
-    val all = splitStatements(sql)
+fun statementAt(sql: String, offset: Int, slashBlocks: Boolean = false): StatementRange? {
+    val all = splitStatements(sql, slashBlocks)
     all.firstOrNull { offset >= it.start && offset <= it.next }?.let { return it }
     return all.lastOrNull { it.next <= offset } ?: all.firstOrNull()
 }
