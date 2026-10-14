@@ -34,12 +34,13 @@ class ExportUiTest {
     private fun until(timeoutMs: Long = 20_000, cond: () -> Boolean) {
         val end = System.nanoTime() + timeoutMs * 1_000_000
         while (!cond()) {
-            check(System.nanoTime() < end) { "timeout esperando la condición (status='${state.status}')" }
+            check(System.nanoTime() < end) { "timeout esperando la condición (status='${state.status}' export=${state.exportJob?.let { "running=${it.running} progress=${it.progress} err=${it.error} path=${it.path}" }})" }
             Thread.sleep(50)
             rule.mainClock.advanceTimeByFrame()
         }
         repeat(2) { rule.mainClock.advanceTimeByFrame() }
     }
+    private fun exists(tag: String) = rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
     private fun untilTag(tag: String) = until { rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
     private fun setEditor(sql: String) = state.onEditorChange(TextFieldValue(sql, TextRange(sql.length)))
 
@@ -58,8 +59,12 @@ class ExportUiTest {
         rule.onNodeWithTag("export-open").performClick()
         untilTag("export-dialog")
         val csv = Files.createTempFile("ksqlc-export", ".csv")
-        rule.onNodeWithTag("export-path").performTextInput(csv.toString())
-        rule.onNodeWithTag("export-run").performClick()
+        until { state.exportJob!!.sample != null }
+        assertEquals("2,\"Grace, \"\"G\"\"\"\n", state.exportJob!!.previewText())   // no header by default
+        rule.onNodeWithTag("export-header").performClick()
+        rule.onNodeWithTag("export-path").performTextReplacement(csv.toString())
+        until { state.exportJob!!.previewText().startsWith("id,name\n") }
+        rule.onNodeWithTag("export-file").performClick()
         until { rule.onAllNodesWithTag("export-dialog").fetchSemanticsNodes().isEmpty() }
         assertEquals("id,name\n2,\"Grace, \"\"G\"\"\"\n", Files.readString(csv))
         assertTrue("1 filas exportadas" in state.status, state.status)
@@ -71,11 +76,21 @@ class ExportUiTest {
         until { !state.running && state.tabs.size == 1 }
         rule.onNodeWithTag("export-result").performClick()
         untilTag("export-dialog")
+        until { state.exportJob!!.sample != null }
+        rule.onNodeWithTag("export-format").performClick()
+        until { exists("export-format:2") }
         rule.onNodeWithTag("export-format:2").performClick()
+        until { !exists("export-format:2") }
+        rule.mainClock.advanceTimeBy(800)
+        // the file name follows the format until the user types one
+        assertTrue(state.exportJob!!.path.endsWith("Resultado_1.json"), state.exportJob!!.path)
         val json = Files.createTempFile("ksqlc-export", ".json")
-        rule.onNodeWithTag("export-path").performTextInput(json.toString())
-        rule.onNodeWithTag("export-run").performClick()
-        until { rule.onAllNodesWithTag("export-dialog").fetchSemanticsNodes().isEmpty() }
+        rule.onNodeWithTag("export-path").performTextReplacement(json.toString())
+        until { state.exportJob!!.path == json.toString() }
+        rule.mainClock.advanceTimeBy(800)
+        rule.onNodeWithTag("export-file").assertIsEnabled().performClick()
+        until { state.exportJob == null || state.exportJob!!.error != null }
+        assertEquals(null, state.exportJob?.error)
         assertEquals("[\n  {\"id\": 1, \"name\": \"Ada\"},\n  {\"id\": 2, \"name\": \"Grace, \\\"G\\\"\"}\n]\n", Files.readString(json))
     }
 
@@ -87,7 +102,8 @@ class ExportUiTest {
         until { !state.running && state.tabs.size == 1 }
         rule.onNodeWithTag("export-result").performClick()
         untilTag("export-dialog")
-        rule.onNodeWithTag("export-run").performClick()
+        rule.onNodeWithTag("export-path").performTextReplacement("")
+        rule.onNodeWithTag("export-file").performClick()
         untilTag("export-error")
     }
 }

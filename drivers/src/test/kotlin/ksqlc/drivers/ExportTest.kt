@@ -27,6 +27,18 @@ class ExportTest {
         assertEquals("3\tO'Neil\t1.50", lines.last { it.isNotEmpty() })
     }
 
+    @Test fun rowHeaderAndTransposeForDelimitedFormats() {
+        val data = listOf(listOf<Any?>(1, "Ada"), listOf<Any?>(2, null))
+        val cols = listOf("id", "name")
+        assertEquals("1,1,Ada\n2,2,\n", renderExport(ExportFormat.CSV, cols, data, withHeader = false, rowHeader = true))
+        assertEquals(",id,name\n1,1,Ada\n2,2,\n", renderExport(ExportFormat.CSV, cols, data, withHeader = true, rowHeader = true))
+        assertEquals("1,2\nAda,\n", renderExport(ExportFormat.CSV, cols, data, withHeader = false, transpose = true))
+        assertEquals("id,1,2\nname,Ada,\n", renderExport(ExportFormat.CSV, cols, data, withHeader = true, transpose = true))
+        assertEquals(",1,2\nid,1,2\nname,Ada,\n", renderExport(ExportFormat.CSV, cols, data, withHeader = true, transpose = true, rowHeader = true))
+        // JSON ignores both
+        assertEquals(renderExport(ExportFormat.JSON, cols, data), renderExport(ExportFormat.JSON, cols, data, transpose = true, rowHeader = true))
+    }
+
     @Test fun jsonKeepsNumbersAndNulls() {
         val json = write(ExportFormat.JSON)
         assertTrue("""{"id": 1, "name": "Ada", "note": "dice \"hola\", y adiós"}""" in json, json)

@@ -20,13 +20,19 @@ class RowWriter(
     private val table: String = "export",
     private val quote: (String) -> String = { "\"" + it.replace("\"", "\"\"") + "\"" },
     private val withHeader: Boolean = true,
+    private val transpose: Boolean = false,
+    private val rowHeader: Boolean = false,
 ) {
     var count = 0L
         private set
 
+    // shortcut: transposed output keeps every row in memory until finish(); fine for the sizes people transpose, stream-transpose if that ever matters.
+    private val buffered = ArrayList<List<Any?>>()
+    private val delimited get() = format == ExportFormat.CSV || format == ExportFormat.TSV
+
     fun header() {
         when (format) {
-            ExportFormat.CSV, ExportFormat.TSV -> if (withHeader) line(columns)
+            ExportFormat.CSV, ExportFormat.TSV -> if (withHeader && !transpose) line((if (rowHeader) listOf("") else emptyList()) + columns)
             ExportFormat.JSON -> out.append("[")
             ExportFormat.SQL_INSERT -> {}
         }
@@ -34,7 +40,8 @@ class RowWriter(
 
     fun row(values: List<Any?>) {
         when (format) {
-            ExportFormat.CSV, ExportFormat.TSV -> line(values.map(::text))
+            ExportFormat.CSV, ExportFormat.TSV ->
+                if (transpose) buffered += values else line((if (rowHeader) listOf((count + 1).toString()) else emptyList()) + values.map(::text))
             ExportFormat.JSON -> {
                 out.append(if (count == 0L) "\n  {" else ",\n  {")
                 columns.forEachIndexed { i, c -> out.append(if (i == 0) "" else ", ").append(jsonString(c)).append(": ").append(jsonValue(values[i])) }
@@ -48,6 +55,11 @@ class RowWriter(
     }
 
     fun finish() {
+        if (delimited && transpose) {
+            // one line per column; "row header" becomes the line of row numbers, "column header" the first field of each line
+            if (rowHeader) line((if (withHeader) listOf("") else emptyList()) + buffered.indices.map { (it + 1).toString() })
+            columns.forEachIndexed { c, name -> line((if (withHeader) listOf(name) else emptyList()) + buffered.map { text(it[c]) }) }
+        }
         if (format == ExportFormat.JSON) out.append(if (count == 0L) "]\n" else "\n]\n")
     }
 
@@ -133,3 +145,11 @@ fun exportQuery(
         else -> error("la consulta no devuelve filas")
     }
 }
+
+/** The text [RowWriter] would produce for [rows], for showing a preview. */
+fun renderExport(
+    format: ExportFormat, columns: List<String>, rows: List<List<Any?>>, table: String = "export", quote: (String) -> String = { "\"" + it + "\"" },
+    withHeader: Boolean = true, transpose: Boolean = false, rowHeader: Boolean = false,
+): String = StringBuilder().also { sb ->
+    RowWriter(format, columns, sb, table, quote, withHeader, transpose, rowHeader).apply { header(); rows.forEach(::row); finish() }
+}.toString()

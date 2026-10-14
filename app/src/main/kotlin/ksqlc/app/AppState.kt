@@ -539,8 +539,12 @@ class AppState(
     /** A console result: the rows already loaded plus whatever is left in its cursor (which then cannot load more). */
     fun exportResult(tab: ResultTab) {
         val dialect = ksqlc.drivers.dialect.Dialect.of(form.effectiveKind)
-        openExport(ExportRequest(tab.title, "resultado", dialect::quote, "Las filas que faltan por cargar se leen del cursor; después la pestaña no podrá cargar más.") { w, stop, progress ->
-            try { ksqlc.drivers.exportRows(tab.result, tab.rows.toList(), w(tab.result.columns.map { it.name }), stop, progress) }
+        val names = tab.result.columns.map { it.name }
+        openExport(ExportRequest(
+            tab.title, "${form.name} · ${tab.title}", "resultado", dialect::quote, "Las filas que faltan por cargar se leen del cursor; después la pestaña no podrá cargar más.",
+            sample = { ExportSample(names, tab.rows.take(PREVIEW_ROWS_EXPORT)) },
+        ) { w, stop, progress ->
+            try { ksqlc.drivers.exportRows(tab.result, tab.rows.toList(), w(names), stop, progress) }
             finally { tab.exhausted = true }
         })
     }
@@ -549,7 +553,19 @@ class AppState(
     fun exportQuery(o: DbObject, sql: String) {
         val target = form.toDataSource(); val pw = form.passwordOrNull
         val dialect = ksqlc.drivers.dialect.Dialect.of(target.kind)
-        openExport(ExportRequest(o.name, dialect.qualified(o), dialect::quote, null) { w, stop, progress ->
+        val db = form.database.substringAfterLast('/').ifBlank { form.name }
+        openExport(ExportRequest(
+            o.name, listOfNotNull(db, o.ns.label.ifBlank { null }, o.name).joinToString("."), dialect.qualified(o), dialect::quote, null,
+            sample = {
+                Session(target, pw, autoCommit = true).use { s ->
+                    when (val r = s.runScript(listOf(sql), keepRows = 0).single()) {
+                        is StatementResult.Rows -> try { ExportSample(r.columns.map { it.name }, r.cursor.fetch(PREVIEW_ROWS_EXPORT)) } finally { r.cursor.close() }
+                        is StatementResult.Failed -> error(r.message)
+                        else -> error("la consulta no devuelve filas")
+                    }
+                }
+            },
+        ) { w, stop, progress ->
             Session(target, pw, autoCommit = true).use { ksqlc.drivers.exportQuery(it, sql, w, stop, progress) }
         })
     }

@@ -60,7 +60,9 @@ class Phase5SnapshotTest {
 
     @Test fun export() = both("export") { s, t ->
         s.exportResult(s.tabs.first()); waitFor(t) { s.exportJob != null }
-        s.exportJob!!.path = "~/Descargas/cliente.csv"
+        waitFor(t) { s.exportJob!!.sample != null }
+        s.exportJob!!.editPath("~/Descargas/cliente.csv")
+        s.exportJob!!.header = true
     }
 
     @Test fun import() = both("import") { s, t ->

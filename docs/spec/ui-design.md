@@ -179,7 +179,7 @@ Todos son diálogos sobre la ventana (`ModalOverlay`, como el de DDL); ninguno a
 | Diálogo | Tamaño | Contenido |
 |---|---|---|
 | Historial (⌥⌘E, botón de reloj de la consola) | 980×600 | búsqueda y lista (hora, SQL; en rojo si falló) a la izquierda, SQL completo y duración a la derecha; Insertar en consola, Copiar, Vaciar historial (con confirmación) |
-| Exportar | 600×330 | formato (CSV, TSV, JSON, SQL INSERT), destino (archivo o portapapeles, tope de 10 000 filas), cabecera, progreso y cancelación |
+| Exportar datos | 860×590 | dos columnas: a la izquierda origen (solo lectura), extractor (CSV, TSV, JSON, SQL INSERT), «Transponer», «Añadir cabecera de columnas», «Añadir cabecera de filas» (solo CSV/TSV) y archivo de salida con botón de carpeta; a la derecha vista previa con números de línea. Pie: Cancelar, Copiar al portapapeles (tope de 10 000 filas), Exportar a archivo. Sin cabeceras por defecto |
 | Importar CSV | 780×600 | archivo, separador, «primera fila es cabecera», vista previa de 6 filas y un desplegable por columna del archivo hacia columna de la tabla o «(omitir)» |
 | Dump / Restaurar | 640×440 / 360 | ámbito (tabla, esquema, base), ruta de la herramienta (detectada, editable, recordada), archivo, opciones; la salida va a Output |
 | Comparar esquemas | 1180×760 | origen izquierdo fijo y derecho elegible (cualquier data source guardado), lista de objetos con `−` `+` `≠` `=`, DDL en dos columnas con números de línea y ajuste de línea |
