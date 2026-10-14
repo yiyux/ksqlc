@@ -1,0 +1,39 @@
+# DataGrip 2026.2.6 (262.10968.148) — inventario funcional
+
+Fuente: metadatos del bundle (`product-info.json`, nombres de módulos en
+`plugins/DatabaseTools/lib/modules`, ids de `<action>` en `META-INF/plugin.xml` de
+`database-plugin.jar`). Solo nombres/estructura; no se decompiló ni copió código ni recursos.
+Clean-room: ksqlc implementa estas capacidades con código propio.
+
+## Dialectos (módulos `intellij.database.dialects.*`)
+Núcleo ksqlc: postgres, mysql/maria, sqlite, mssql, oracle.
+Futuro: h2, derby, hsql, db2, sybase, vertica, redshift, snowflake, greenplum, cockroach,
+clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92.
+
+## Áreas funcionales (por prefijo de acción) → fase ksqlc
+| Área | Capacidades observadas (ids) | Fase |
+|---|---|---|
+| Data sources | AddDataSourceFromTemplate/Path/Url, AddDriver, Properties, ImportDataSources, MoveToGroup, CreateNewFolder, AssignColor | 1 |
+| Database Explorer | Refresh/ForceRefresh, Filter, FullTextSearch, introspection levels 1-3, AddSchemas/HideSchemas, ScrollFromEditor, CopyAction, Drop | 2 |
+| DDL / alteraciones | CopyDdl, OpenDdlInConsole, Ddl.AlterObject, Alterations.* (Truncate, DropPK/FK, Comment, Grants, Enable/DisableConstraints, RefreshMatView, Recompile), SqlGenerator | 2 |
+| Consola SQL | Jdbc.OpenConsole.*, Execute (+Selection), Cancel, ExplainPlan/Analyse (+Raw), Debug, ToggleParameters/EditParameter, BrowseHistory, Notebook mode, Sessions (Close/Rename), DbmsOutput | 1,5 |
+| Editor SQL | SelectCurrentStatement, ChangeDialect, IntroduceAlias, ExtractNamedQuery, ExtractFunction, GotoDatabaseObject | 3 |
+| Grid de resultados | Edit/Submit/PreviewDml, Filter criteria, Ordering, SetNull/Default/NOW, InsertRandomUUID, LoadFullCell, SaveLobAs, ShowQuery/CopyQuery, ExportToClipboard, SelectRow/Column, MaximizeEditingCell, RenameTab, SkipGenerated/ComputedColumns | 1,4 |
+| Transacciones | Transaction.Commit/Rollback, SubmitAndCommit, RevertAndRollback (modo manual/auto) | 4 |
+| Import/Export | ShowDumpDialog, ImportTable, ImportFromSql, Dump/Restore.Native, CopyTable, DumpToSqlDataSource | 5 |
+| Diff | ShowDiff, ShowContentDiff | 5 |
+| Diagramas | ShowUmlDiagram (módulo diagrams) | 5 |
+| Historial | DataSource.History.*, Console.Jdbc.BrowseHistory, ShowSQLLog | 5 |
+| Rutinas | ExecuteRoutine, DebugRoutine | 5 |
+| SSH | módulo `database.ssh` (túnel) | 5 |
+
+## Estado de implementación (ksqlc)
+| Área | Estado | Notas |
+|---|---|---|
+| Data sources | parcial | Formulario host/puerto/BD/SSL, URL manual, guardado con Keychain. Faltan carpetas, colores, plantillas, importar. |
+| Consola SQL | implementado (fase 1) | Sentencia actual / selección / script, cancelación, pestañas de resultados, paginación. Faltan parámetros, notebook, explain. |
+| Database Explorer | implementado (fase 2) | Árbol perezoso namespace → grupo → objeto → columnas/índices/FK, refresco (manual y tras DDL), filtro, abrir datos con doble clic. Faltan niveles de introspección, mostrar esquemas de sistema, búsqueda de texto completo. |
+| DDL | implementado (fase 2) | Ver/copiar/abrir en consola. Nativo en MySQL/MariaDB (`SHOW CREATE`), SQLite (`sqlite_master`), PostgreSQL (vistas/rutinas nativas, tablas generadas). Genérico en SQL Server/Oracle. |
+| Alteraciones (Drop/Truncate/…) | pendiente | |
+| Editor inteligente, edición de datos, import/export, diff, ER, historial | pendiente | fases 3–5 |
+

@@ -1,0 +1,319 @@
+package ksqlc.app
+
+import androidx.compose.runtime.*
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import ksqlc.core.*
+import ksqlc.drivers.Introspector
+import ksqlc.drivers.Session
+import ksqlc.drivers.testConnection
+import ksqlc.sql.StatementRange
+import ksqlc.sql.changesSchema
+import ksqlc.sql.splitStatements
+import ksqlc.sql.statementAt
+import ksqlc.storage.ConnectionStore
+import ksqlc.storage.Settings
+import ksqlc.storage.SettingsStore
+import ksqlc.storage.ThemeMode
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.UUID
+
+const val PAGE = 500
+private val clock = DateTimeFormatter.ofPattern("HH:mm:ss")
+
+/** A live resource tied to the credentials it was opened with; reopened when they change. */
+class Holder<T : AutoCloseable>(private val create: (DataSource, String?) -> T) {
+    private var value: T? = null
+    private var key: List<String?>? = null
+
+    @Synchronized fun get(ds: DataSource, password: String?): T {
+        val k = keyOf(ds, password)
+        if (value == null || key != k) { value?.close(); value = create(ds, password); key = k }
+        return value!!
+    }
+    @Synchronized fun peek(): T? = value
+    @Synchronized fun close() { value?.close(); value = null; key = null }
+}
+
+fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password)
+
+class DdlView(val title: String, val text: String)
+
+/** Which result the bottom panel shows: the log, or one of the result grids. */
+const val OUTPUT_TAB = -1
+
+/** [AppState.activeEditor] value for the console; 0.. selects a data tab. */
+const val CONSOLE_TAB = -1
+
+class AppState(
+    private val scope: CoroutineScope,
+    private val store: ConnectionStore,
+    private val settingsStore: SettingsStore = SettingsStore.default(),
+) {
+    val form = ConnectionForm()
+    var saved by mutableStateOf(runCatching { store.list() }.getOrDefault(emptyList()))
+        private set
+
+    // --- window state, persisted -----------------------------------------------------------
+    var settings by mutableStateOf(settingsStore.load())
+        private set
+
+    fun updateSettings(change: (Settings) -> Settings) {
+        settings = change(settings)
+        runCatching { settingsStore.save(settings) }
+    }
+
+    fun cycleTheme() = updateSettings {
+        it.copy(themeMode = when (it.themeMode) { ThemeMode.SYSTEM -> ThemeMode.LIGHT; ThemeMode.LIGHT -> ThemeMode.DARK; ThemeMode.DARK -> ThemeMode.SYSTEM })
+    }
+
+    // --- console -----------------------------------------------------------------------
+    var editor by mutableStateOf(TextFieldValue("select 1 as one, 'hola' as txt;\nselect 2 as two;"))
+        private set
+    var caretLine by mutableStateOf(1)
+    var caretColumn by mutableStateOf(1)
+    var lastRun by mutableStateOf<RunMarker?>(null)
+        private set
+
+    /** Editing invalidates the outline/timing of the statement that last ran, since its position may have moved. */
+    fun onEditorChange(v: TextFieldValue) {
+        if (v.text != editor.text) lastRun = null
+        editor = v
+    }
+
+    fun setEditorText(text: String) { editor = TextFieldValue(text, TextRange(text.length)); lastRun = null }
+
+    // --- results -----------------------------------------------------------------------
+    val tabs = mutableStateListOf<ResultTab>()
+    var selectedTab by mutableStateOf(OUTPUT_TAB)
+    val log = mutableStateListOf<String>()
+    var lastMillis by mutableStateOf<Long?>(null)
+        private set
+    var status by mutableStateOf("Listo")
+    var running by mutableStateOf(false)
+        private set
+
+    /** Table data opened from the explorer; shown as editor tabs next to the console. */
+    val dataTabs = mutableStateListOf<DataTab>()
+    var activeEditor by mutableStateOf(CONSOLE_TAB)
+
+    fun closeTab(i: Int) {
+        if (i !in tabs.indices) return
+        val t = tabs.removeAt(i)
+        scope.launch(Dispatchers.IO) { t.close() }
+        selectedTab = when { tabs.isEmpty() -> OUTPUT_TAB; selectedTab > i -> selectedTab - 1; else -> selectedTab.coerceAtMost(tabs.lastIndex) }
+    }
+
+    // --- panels and dialogs ------------------------------------------------------------
+    var dataSourceDialog by mutableStateOf(false)
+    var ddlView by mutableStateOf<DdlView?>(null)
+    var servicesVisible by mutableStateOf(true)
+
+    var explorer by mutableStateOf<TreeModel?>(null)
+        private set
+    var connecting by mutableStateOf(false)
+        private set
+
+    private val sessions = Holder<Session>(::Session)
+    private val introspectors = Holder<Introspector>(::Introspector)
+    private var explorerKey: List<String?>? = null
+
+    // --- saved connections -------------------------------------------------------------
+
+    /** Makes [c] the active connection (the toolbar selector and the data source dialog use this). */
+    fun select(c: DataSource) {
+        disconnect()
+        form.load(c)
+        // The keychain can prompt, so keep it off the UI thread.
+        scope.launch { form.password = withContext(Dispatchers.IO) { store.password(c.id) }.orEmpty() }
+    }
+
+    /** Saves [draft] (new or existing), makes it the active connection and reads its schema. */
+    fun applyDraft(draft: ConnectionForm) {
+        val id = draft.currentId ?: UUID.randomUUID().toString().also { draft.currentId = it }
+        val changed = form.toDataSource().url != draft.toDataSource().url || form.user != draft.user || form.password != draft.password
+        persist({ store.save(draft.toDataSource().copy(id = id), draft.password) }, "Conexión \"${draft.name}\" guardada")
+        form.copyFrom(draft)
+        if (changed || explorer == null) { disconnect(); connect() }
+    }
+
+    fun deleteConnection(id: String) {
+        persist({ store.delete(id) }, "Conexión eliminada")
+        if (form.currentId == id) form.currentId = null
+    }
+
+    fun storedPassword(id: String): String? = runCatching { store.password(id) }.getOrNull()
+
+    private fun persist(block: () -> Unit, ok: String) {
+        runCatching(block)
+            .onSuccess { saved = store.list(); status = ok }
+            .onFailure { status = "No se pudo guardar: ${it.message}" }
+    }
+
+    /** Tries to open [draft]'s connection; [onResult] receives the product name or the error, on the UI thread. */
+    fun testConnection(draft: ConnectionForm, onResult: (Result<String>) -> Unit) {
+        val ds = draft.toDataSource(); val pw = draft.passwordOrNull
+        scope.launch { onResult(runCatching { withContext(Dispatchers.IO) { testConnection(ds, pw) } }) }
+    }
+
+    // --- running SQL -------------------------------------------------------------------
+
+    fun runSelectionOrCurrent() {
+        val text = editor.text
+        val sel = editor.selection
+        if (!sel.collapsed) {
+            val part = text.substring(sel.min, sel.max)
+            run(splitStatements(part).map { it.text(part) })
+        } else {
+            val r = statementAt(text, sel.start)
+            run(listOfNotNull(r?.text(text)), range = r)
+        }
+    }
+
+    fun runScript() = run(splitStatements(editor.text).map { it.text(editor.text) })
+
+    fun cancel() { sessions.peek()?.cancel() }
+
+    private fun logLine(sql: String, msg: String) {
+        log += "[${LocalTime.now().format(clock)}] ${sql.replace(Regex("\\s+"), " ").take(60)} — $msg"
+    }
+
+    /**
+     * Runs [statements] on the console session. [title] names the result tab (used when opening a table);
+     * [range] is where a single statement sits in the editor, so it can be outlined once it has run.
+     */
+    fun run(statements: List<String>, title: String? = null, range: StatementRange? = null) {
+        if (statements.isEmpty()) { status = "Nada que ejecutar"; return }
+        if (running) return
+        running = true; status = "Ejecutando…"
+        val target = form.toDataSource(); val pw = form.passwordOrNull
+        val textAtStart = editor.text
+        scope.launch {
+            val old = tabs.toList()
+            val outcome = runCatching {
+                withContext(Dispatchers.IO) {
+                    old.forEach { it.close() }
+                    sessions.get(target, pw).runScript(statements, PAGE).mapIndexed { i, r ->
+                        r to (r as? StatementResult.Rows)?.let { ResultTab(title ?: "Resultado ${i + 1}", it).also { t -> t.loadMore(PAGE) } }
+                    }
+                }
+            }
+            outcome.onSuccess { results ->
+                tabs.clear(); tabs.addAll(results.mapNotNull { it.second })
+                selectedTab = if (tabs.isEmpty()) OUTPUT_TAB else 0
+                results.forEach { (r, tab) ->
+                    when (r) {
+                        is StatementResult.Rows -> logLine(r.sql, "${tab!!.rows.size} filas${if (tab.exhausted) "" else "+"} en ${r.millis} ms")
+                        is StatementResult.Updated -> logLine(r.sql, "${r.count} filas afectadas en ${r.millis} ms")
+                        is StatementResult.Failed -> logLine(r.sql, if (r.cancelled) "cancelada" else "ERROR: ${r.message}")
+                    }
+                }
+                val last = results.lastOrNull()?.first
+                lastMillis = last?.millis
+                status = when {
+                    last is StatementResult.Failed && last.cancelled -> "Cancelada"
+                    last is StatementResult.Failed -> "Error en la sentencia ${results.size} de ${statements.size}"
+                    else -> "${results.size} sentencia(s) ejecutada(s)"
+                }
+                if (last is StatementResult.Failed && !last.cancelled) selectedTab = OUTPUT_TAB
+                if (range != null && results.size == 1 && last != null && editor.text == textAtStart) {
+                    lastRun = RunMarker(range.codeStart(textAtStart), range.end, ok = last !is StatementResult.Failed, millis = last.millis)
+                }
+                val ddlRan = results.any { (r, _) -> r !is StatementResult.Failed && changesSchema(r.sql) }
+                when {
+                    explorerKey != keyOf(target, pw) -> connect(announce = false)   // first run, or the connection changed
+                    ddlRan -> refreshExplorer()
+                }
+            }.onFailure { status = "Error: ${it.message}"; logLine("", "ERROR: ${it.message}"); selectedTab = OUTPUT_TAB }
+            running = false
+        }
+    }
+
+    // --- schema explorer ---------------------------------------------------------------
+
+    /** Reads the schema. [announce] = false keeps the status line for the caller (used after running SQL). */
+    fun connect(announce: Boolean = true) {
+        if (connecting) return
+        connecting = true
+        val ds = form.toDataSource(); val pw = form.passwordOrNull
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw)).also { it.load() } } }
+                .onSuccess { explorer = it; explorerKey = keyOf(ds, pw); if (announce) status = "Esquema cargado: ${ds.name}" }
+                .onFailure {
+                    explorer = null; explorerKey = null
+                    status = "No se pudo leer el esquema: ${it.message}"
+                    scope.launch(Dispatchers.IO) { introspectors.close() }
+                }
+            connecting = false
+        }
+    }
+
+    fun disconnect() {
+        explorer = null; explorerKey = null
+        scope.launch(Dispatchers.IO) { sessions.close(); introspectors.close() }
+        status = "Desconectado"
+    }
+
+    fun refreshExplorer() {
+        val m = explorer ?: return
+        scope.launch {
+            runCatching { m.refresh() }.onFailure { status = "No se pudo refrescar: ${it.message}" }
+        }
+    }
+
+    /** Opens [o]'s rows in an editor tab beside the console, on a connection of its own so open cursors never clash. */
+    fun openData(o: DbObject) {
+        val m = explorer ?: return
+        dataTabs.indexOfFirst { it.obj == o }.let { if (it >= 0) { activeEditor = it; return } }
+        val target = form.toDataSource(); val pw = form.passwordOrNull
+        val sql = m.source.dialect.selectAll(o)
+        status = "Abriendo ${o.name}…"
+        scope.launch {
+            val session = Session(target, pw)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    when (val r = session.runScript(listOf(sql), PAGE).single()) {
+                        is StatementResult.Rows -> ResultTab(o.name, r).also { it.loadMore(PAGE) }
+                        is StatementResult.Failed -> error(r.message)
+                        else -> error("sin resultado")
+                    }
+                }
+            }.onSuccess { tab ->
+                dataTabs += DataTab(o, tab, session); activeEditor = dataTabs.lastIndex
+                status = "${o.name}: ${tab.rows.size} filas${if (tab.exhausted) "" else "+"}"
+            }.onFailure {
+                status = "No se pudo abrir ${o.name}: ${it.message}"
+                withContext(Dispatchers.IO) { session.close() }
+            }
+        }
+    }
+
+    fun closeDataTab(i: Int) {
+        if (i !in dataTabs.indices) return
+        val t = dataTabs.removeAt(i)
+        scope.launch(Dispatchers.IO) { t.close() }
+        activeEditor = when { activeEditor == CONSOLE_TAB -> CONSOLE_TAB; activeEditor > i -> activeEditor - 1; activeEditor == i -> (i - 1).coerceAtLeast(CONSOLE_TAB); else -> activeEditor }
+    }
+
+    fun showDdl(o: DbObject) {
+        val m = explorer ?: return
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { m.source.ddl(o) } }
+                .onSuccess { ddlView = DdlView(o.name, it) }
+                .onFailure { status = "No se pudo obtener el DDL de ${o.name}: ${it.message}" }
+        }
+    }
+
+    /** Adds [text] after the current editor content, leaving the caret at the end. */
+    fun appendToEditor(text: String) {
+        val joined = editor.text.trimEnd().let { if (it.isEmpty()) text else "$it\n\n$text" }
+        setEditorText(joined)
+    }
+
+    fun dispose() { dataTabs.forEach { it.close() }; sessions.close(); introspectors.close() }
+}
