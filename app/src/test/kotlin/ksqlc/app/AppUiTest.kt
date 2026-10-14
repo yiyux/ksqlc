@@ -282,4 +282,33 @@ class AppUiTest {
         assertEquals(ksqlc.app.ui.DarkColors.error, colourAt(text.indexOf("nope")))        // not a column
         assertEquals(ksqlc.app.ui.DarkColors.synIdent, colourAt(text.indexOf("lower")))    // a call, not a column
     }
+
+    @Test fun savedConnectionsAreListedOnStartupAndClickingOneConnects() {
+        val store = ConnectionStore(Files.createTempDirectory("ksqlc-ui-saved"), InMemorySecretStore())
+        val db = tempDb()
+        java.sql.DriverManager.getConnection("jdbc:sqlite:$db").use { it.createStatement().execute("create table piezas(id integer primary key)") }
+        store.save(ksqlc.core.DataSource("id-1", "mi base", ksqlc.core.DbKind.SQLITE, "jdbc:sqlite:$db", null), "")
+        store.save(ksqlc.core.DataSource("id-2", "otra", ksqlc.core.DbKind.SQLITE, "jdbc:sqlite:$db", null), "")
+        val st = AppState(CoroutineScope(SupervisorJob() + Dispatchers.Default), store, SettingsStore(Files.createTempDirectory("ksqlc-ui-saved-settings")))
+        try {
+            rule.setContent { App(st) }
+            frames()
+            // before connecting, the explorer already lists every configured data source
+            rule.onNodeWithTag("ds-node:mi base").assertExists()
+            rule.onNodeWithTag("ds-node:otra").assertExists()
+            assertEquals(null, st.explorer)
+
+            rule.onNodeWithTag("ds-node:mi base").performClick()
+            val end = System.nanoTime() + 20_000_000_000L
+            while (st.explorer == null || rule.onAllNodesWithTag("tree:ns:.main").fetchSemanticsNodes().isEmpty()) {
+                check(System.nanoTime() < end) { "timeout conectando (${st.status})" }
+                Thread.sleep(50); rule.mainClock.advanceTimeByFrame()
+            }
+            assertEquals("mi base", st.form.name)
+            rule.onNodeWithTag("ds-node:otra").assertExists()          // the others stay listed
+
+            rule.onNodeWithTag("ds-node:mi base").performClick(); frames()   // collapses the connected one
+            assertEquals(0, rule.onAllNodesWithTag("tree:ns:.main").fetchSemanticsNodes().size)
+        } finally { st.dispose() }
+    }
 }

@@ -145,4 +145,19 @@ class WindowSnapshotTest {
 
     @Test fun darkAssistance() = assistance(ThemeMode.DARK, "assist-dark")
     @Test fun lightAssistance() = assistance(ThemeMode.LIGHT, "assist-light")
+
+    /** First start with data sources already configured: the explorer lists them before anything is connected. */
+    @Test fun explorerListsSavedDataSources() = runDesktopComposeUiTest(1722, 1000) {
+        mainClock.autoAdvance = false
+        val store = ConnectionStore(Files.createTempDirectory("ksqlc-snap-store"), InMemorySecretStore())
+        store.save(DataSource("a", "produccion", DbKind.POSTGRES, "jdbc:postgresql://db.example/app", "app"), "")
+        store.save(DataSource("b", "demo@localhost", DbKind.SQLITE, "jdbc:sqlite:${seededDb()}", null), "")
+        store.save(DataSource("c", "reportes", DbKind.MYSQL, "jdbc:mysql://db.example/rep", "rep"), "")
+        val state = AppState(CoroutineScope(SupervisorJob() + Dispatchers.Default), store, SettingsStore(Files.createTempDirectory("ksqlc-snap-settings")).also { it.save(Settings(themeMode = ThemeMode.DARK)) })
+        try {
+            setContent { App(state) }
+            repeat(4) { mainClock.advanceTimeByFrame() }
+            onRoot().savePng("explorer-saved-dark")
+        } finally { state.dispose() }
+    }
 }

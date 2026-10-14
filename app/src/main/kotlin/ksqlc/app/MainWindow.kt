@@ -94,7 +94,7 @@ private fun TopBar(state: AppState) {
                     KIcon(IconKind.ChevronDown, tint = c.textSecondary, size = 12.dp)
                 }
                 DropdownMenu(menu, { menu = false }) {
-                    state.saved.forEach { ds -> DropdownMenuItem(text = { Text("${ds.name}  (${ds.kind.label()})", fontSize = 13.sp) }, onClick = { menu = false; state.select(ds); state.connect() }) }
+                    state.saved.forEach { ds -> DropdownMenuItem(text = { Text("${ds.name}  (${ds.kind.label()})", fontSize = 13.sp) }, onClick = { menu = false; state.selectAndConnect(ds) }) }
                     DropdownMenuItem(text = { Text("Nuevo data source…", fontSize = 13.sp) }, onClick = { menu = false; state.dataSourceDialog = true })
                 }
             }

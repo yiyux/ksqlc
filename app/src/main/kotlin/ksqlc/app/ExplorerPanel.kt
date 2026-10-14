@@ -11,7 +11,9 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,10 +98,10 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
         if (showFilter && model != null) {
             CompactTextField(filter, { filter = it }, Modifier.fillMaxWidth().padding(8.dp), placeholder = "Filtrar", testTag = "explorer-filter")
         }
-        if (model == null) {
+        if (model == null && state.saved.isEmpty()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    if (state.connecting) "Leyendo el esquema…" else "Sin esquema cargado. Añade un data source, o ejecuta SQL en la consola para conectar.",
+                    if (state.connecting) "Leyendo el esquema…" else "Sin data sources. Añade uno, o ejecuta SQL en la consola para conectar.",
                     fontSize = 12.sp, color = c.textSecondary,
                 )
                 if (!state.connecting) {
@@ -109,60 +111,94 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
             }
             return@Column
         }
-        val rows = visibleRows(model.roots, filter)
+        val rows = if (model != null) visibleRows(model.roots, filter) else emptyList()
         val list = rememberLazyListState()
+        val activeId = state.form.currentId
+        var collapsed by remember(activeId) { mutableStateOf(false) }
+        val activeSaved = state.saved.any { it.id == activeId }
         // "go to declaration" from the editor: show everything again and bring the selected row into view
         LaunchedEffect(state.revealTick) {
-            if (state.revealTick == 0) return@LaunchedEffect
-            filter = ""
-            val at = visibleRows(model.roots, "").indexOfFirst { it.node.id == state.explorerSelectedId }
+            if (state.revealTick == 0 || model == null) return@LaunchedEffect
+            filter = ""; collapsed = false
+            val all = visibleRows(model.roots, "")
+            val at = all.indexOfFirst { it.node.id == state.explorerSelectedId }
             if (at >= 0) {
+                val rowsBefore = state.saved.takeWhile { it.id != activeId }.size + 1   // connection rows above, plus the active one
                 val visible = list.layoutInfo.visibleItemsInfo
-                // +1: the connection row sits above the tree rows
-                if (visible.isEmpty() || at + 1 < visible.first().index || at + 1 > visible.last().index - 1) list.scrollToItem((at + 1 - 3).coerceAtLeast(0))
+                if (visible.isEmpty() || at + rowsBefore < visible.first().index || at + rowsBefore > visible.last().index - 1) list.scrollToItem((at + rowsBefore - 3).coerceAtLeast(0))
             }
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             LazyColumn(Modifier.fillMaxSize().padding(top = 4.dp), state = list) {
-                item(key = "connection-root") {
-                    TreeLine(0, expandable = false, expanded = true, icon = IconKind.Database, label = state.form.name, detail = null, selected = false, iconTint = c.accentIcon)
-                }
-                if (rows.isEmpty()) item(key = "empty") {
-                    Text(
-                        if (filter.isBlank()) "Sin esquemas" else "Nada coincide con «$filter» (solo se filtra lo ya cargado)",
-                        Modifier.padding(start = 30.dp, top = 6.dp), fontSize = 12.sp, color = c.textMuted,
-                    )
-                }
-                items(rows, key = { it.node.id }) { (node, depth) ->
-                    val o = node.obj
-                    ContextMenuArea(items = {
-                        buildList {
-                            if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem("Abrir datos") { state.openData(o) })
-                            if (o != null) {
-                                add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
-                                add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
+                for (ds in state.saved) {
+                    val active = ds.id == activeId
+                    item(key = "ds:${ds.id}") {
+                        Column(Modifier.testTag("ds-node:${ds.name}").clickable {
+                            when {
+                                !active -> { collapsed = false; state.selectAndConnect(ds) }
+                                model != null -> collapsed = !collapsed
+                                else -> state.connect()
                             }
-                            if (node.kind == NodeKind.NAMESPACE) add(ContextMenuItem("Refrescar") { state.refreshExplorer() })
-                        }
-                    }) {
-                        Column(
-                            Modifier.testTag("tree:${node.id}").combinedClickable(
-                                onClick = {
-                                    state.explorerSelectedId = node.id
-                                    if (node.expandable) scope.launch { if (node.expanded) node.expanded = false else model.expand(node) }
-                                },
-                                onDoubleClick = { if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) state.openData(o) },
-                            ),
-                        ) {
-                            TreeLine(depth + 1, node.expandable, node.expanded, iconOf(node.kind), node.label, node.detail, selectedId == node.id, node.loading)
-                            node.error?.let {
-                                Text("Error: $it", Modifier.padding(start = 36.dp + Indent * (depth + 1), bottom = 4.dp), fontSize = 12.sp, color = c.error)
-                            }
+                        }) {
+                            TreeLine(0, expandable = true, expanded = active && model != null && !collapsed, icon = IconKind.Database,
+                                label = ds.name, detail = ds.kind.label(), selected = false, loading = active && state.connecting, iconTint = if (active) c.accentIcon else c.textSecondary)
                         }
                     }
+                    if (active && model != null && !collapsed) nodeItems(state, model, rows, filter, 1, scope, clipboard)
+                }
+                if (!activeSaved && model != null) {
+                    item(key = "connection-root") {
+                        TreeLine(0, expandable = false, expanded = true, icon = IconKind.Database, label = state.form.name, detail = null, selected = false, iconTint = c.accentIcon)
+                    }
+                    nodeItems(state, model, rows, filter, 1, scope, clipboard)
                 }
             }
             ListScrollbar(list, Modifier.align(Alignment.CenterEnd).fillMaxHeight())
+        }
+    }
+}
+
+/** The tree rows of the connected data source, drawn [base] levels in. */
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.nodeItems(
+    state: AppState, model: TreeModel, rows: List<TreeRow>, filter: String, base: Int,
+    scope: kotlinx.coroutines.CoroutineScope, clipboard: androidx.compose.ui.platform.ClipboardManager,
+) {
+    if (rows.isEmpty()) item(key = "empty") {
+        val c = Ksqlc.colors
+        Text(
+            if (filter.isBlank()) "Sin esquemas" else "Nada coincide con «$filter» (solo se filtra lo ya cargado)",
+            Modifier.padding(start = 30.dp, top = 6.dp), fontSize = 12.sp, color = c.textMuted,
+        )
+    }
+    items(rows, key = { it.node.id }) { (node, depth) ->
+        val c = Ksqlc.colors
+        val o = node.obj
+        val selectedId = state.explorerSelectedId
+        ContextMenuArea(items = {
+            buildList {
+                if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem("Abrir datos") { state.openData(o) })
+                if (o != null) {
+                    add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
+                    add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
+                }
+                if (node.kind == NodeKind.NAMESPACE) add(ContextMenuItem("Refrescar") { state.refreshExplorer() })
+            }
+        }) {
+            Column(
+                Modifier.testTag("tree:${node.id}").combinedClickable(
+                    onClick = {
+                        state.explorerSelectedId = node.id
+                        if (node.expandable) scope.launch { if (node.expanded) node.expanded = false else model.expand(node) }
+                    },
+                    onDoubleClick = { if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) state.openData(o) },
+                ),
+            ) {
+                TreeLine(depth + base, node.expandable, node.expanded, iconOf(node.kind), node.label, node.detail, selectedId == node.id, node.loading)
+                node.error?.let {
+                    Text("Error: $it", Modifier.padding(start = 36.dp + Indent * (depth + base), bottom = 4.dp), fontSize = 12.sp, color = c.error)
+                }
+            }
         }
     }
 }

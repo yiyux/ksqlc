@@ -61,6 +61,14 @@ class AppState(
     var saved by mutableStateOf(runCatching { store.list() }.getOrDefault(emptyList()))
         private set
 
+    init {
+        // first start with configured data sources: make the first one the active connection (not connected yet)
+        saved.firstOrNull()?.let { c ->
+            form.load(c)
+            scope.launch { form.password = withContext(Dispatchers.IO) { runCatching { store.password(c.id) }.getOrNull() }.orEmpty() }
+        }
+    }
+
     // --- window state, persisted -----------------------------------------------------------
     var settings by mutableStateOf(settingsStore.load())
         private set
@@ -202,6 +210,16 @@ class AppState(
         form.load(c)
         // The keychain can prompt, so keep it off the UI thread.
         scope.launch { form.password = withContext(Dispatchers.IO) { store.password(c.id) }.orEmpty() }
+    }
+
+    /** Makes [c] the active connection and reads its schema, once its password has been fetched from the keychain. */
+    fun selectAndConnect(c: DataSource) {
+        disconnect()
+        form.load(c)
+        scope.launch {
+            form.password = withContext(Dispatchers.IO) { store.password(c.id) }.orEmpty()
+            connect()
+        }
     }
 
     /** Saves [draft] (new or existing), makes it the active connection and reads its schema. */
