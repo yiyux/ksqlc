@@ -137,12 +137,14 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
             Row(Modifier.height(HeaderHeight).background(c.headerBg)) {
                 Box(Modifier.width(RowNumberWidth).fillMaxHeight().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) })
                 cols.forEach { col ->
+                    Tip(col.name, col.typeName.lowercase(), Modifier.width(ColumnWidth).fillMaxHeight()) {
                     Row(
-                        Modifier.width(ColumnWidth).fillMaxHeight().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) }.padding(horizontal = 8.dp),
+                        Modifier.fillMaxSize().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) }.padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         KIcon(IconKind.Column, tint = c.accentIcon, size = 14.dp)
                         Text(col.name, fontSize = 13.sp, color = c.gridText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                     }
                 }
             }

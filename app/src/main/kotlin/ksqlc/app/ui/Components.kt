@@ -334,3 +334,31 @@ fun DropdownField(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
         KIcon(IconKind.ChevronDown, tint = c.textSecondary, size = 12.dp)
     }
 }
+
+
+/**
+ * Small hover card near the pointer: [name] in semibold, then ": [detail]". Appears after a short delay and
+ * is a floating popup, so it never changes the layout of what it covers.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun Tip(name: String, detail: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val c = Ksqlc.colors
+    androidx.compose.foundation.TooltipArea(
+        tooltip = {
+            val shape = RoundedCornerShape(6.dp)
+            Row(Modifier.clip(shape).background(c.popupBg, shape).border(1.dp, c.border, shape).padding(horizontal = 10.dp, vertical = 6.dp).testTag("tip")) {
+                Text(
+                    androidx.compose.ui.text.buildAnnotatedString {
+                        pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)); append(name); pop()
+                        append(": "); append(detail)
+                    },
+                    fontSize = 13.sp, color = c.text, maxLines = 1,
+                )
+            }
+        },
+        modifier = modifier, delayMillis = 400,
+        tooltipPlacement = androidx.compose.foundation.TooltipPlacement.CursorPoint(offset = androidx.compose.ui.unit.DpOffset(0.dp, 16.dp)),
+        content = content,
+    )
+}
