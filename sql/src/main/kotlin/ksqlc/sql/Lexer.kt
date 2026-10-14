@@ -56,7 +56,7 @@ fun tokenize(sql: String): List<Token> {
             c.isLetter() || c == '_' -> {
                 while (i < n && (sql[i].isLetterOrDigit() || sql[i] == '_' || sql[i] == '$')) i++
                 val word = sql.substring(start, i).uppercase()
-                add(if (word in KEYWORDS) TokenKind.KEYWORD else if (word in TYPES) TokenKind.TYPE else TokenKind.IDENT, start, i)
+                add(if (word in SQL_KEYWORDS) TokenKind.KEYWORD else if (word in TYPES) TokenKind.TYPE else TokenKind.IDENT, start, i)
             }
             c in PUNCT_CHARS -> { i++; add(TokenKind.PUNCT, start, i) }
             else -> {
@@ -122,7 +122,7 @@ private fun dollarTag(sql: String, i: Int): String? {
     return sql.substring(i, j + 1)
 }
 
-private val KEYWORDS = setOf(
+val SQL_KEYWORDS: Set<String> = setOf(
     "SELECT", "FROM", "WHERE", "GROUP", "BY", "ORDER", "HAVING", "LIMIT", "OFFSET", "FETCH", "FIRST", "NEXT", "ROWS", "ROW", "ONLY",
     "UNION", "ALL", "INTERSECT", "EXCEPT", "DISTINCT", "AS", "ON", "USING", "JOIN", "INNER", "LEFT", "RIGHT", "FULL", "OUTER", "CROSS",
     "NATURAL", "LATERAL", "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "MERGE", "CREATE", "ALTER", "DROP", "TRUNCATE", "RENAME",
@@ -140,3 +140,27 @@ private val TYPES = setOf(
     "NVARCHAR", "NCHAR", "TEXT", "CLOB", "BOOLEAN", "BOOL", "BIT", "DATE", "TIME", "TIMESTAMP", "TIMESTAMPTZ", "DATETIME", "NUMERIC", "DECIMAL",
     "MONEY", "FLOAT", "DOUBLE", "REAL", "UUID", "JSON", "JSONB", "XML", "BLOB", "BYTEA", "BINARY", "VARBINARY",
 )
+
+/** True when a STRING / QUOTED_IDENT / block-comment token reaches its closing delimiter (the lexer lets them run to the end of input). */
+fun isTerminated(sql: String, t: Token): Boolean {
+    val text = sql.substring(t.start, t.end)
+    return when {
+        t.kind == TokenKind.COMMENT -> !text.startsWith("/*") || (text.length >= 4 && text.endsWith("*/"))
+        t.kind == TokenKind.QUOTED_IDENT || (t.kind == TokenKind.STRING && text.startsWith("'")) -> {
+            val q = text[0]
+            var i = 1
+            var closed = false
+            while (i < text.length) {
+                if (text[i] == q) { if (i + 1 < text.length && text[i + 1] == q) { i += 2; continue }; closed = i + 1 == text.length; break }
+                if (q == '\'' && text[i] == '\\' && i + 1 < text.length) { i += 2; continue }
+                i++
+            }
+            closed
+        }
+        t.kind == TokenKind.STRING -> {   // $tag$ ... $tag$
+            val tag = text.substring(0, text.indexOf('$', 1) + 1)
+            text.length >= 2 * tag.length && text.endsWith(tag)
+        }
+        else -> true
+    }
+}

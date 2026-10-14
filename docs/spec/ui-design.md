@@ -144,3 +144,16 @@ Isla del editor: y 43–484. Isla Services: y 490–968 (hueco de 5 dp). Ambas c
 Capturas generadas por los tests en `app/build/snapshots/` (`window-dark.png`, `window-light.png`, `editor-*.png`).
 
 Desviaciones deliberadas: el azul del botón principal es `#3170E8` (contraste 4,55:1 con texto blanco) y no el `#456FDC` observado (4,2:1); el texto de estado en claro es algo más oscuro que el original por legibilidad.
+
+
+## Editor inteligente (fase 3)
+Colores provisionales (no observados en DataGrip; ajustar cuando se midan):
+
+| Token | Oscuro | Claro | Uso |
+|---|---|---|---|
+| `occurrence` | `#2F3A52` | `#E3EBFC` | otros usos del identificador bajo el cursor |
+| `warning` | `#E5B73B` | `#C68A00` | subrayado ondulado, punto del gutter y texto de aviso |
+| `popupBg` | `#26282C` | `#FFFFFF` | lista de autocompletado |
+| `popupSelection` | `#2F4A8C` | `#D2DEFC` | fila elegida de la lista |
+
+Lista de autocompletado: 340 dp de ancho, filas de 24 dp, hasta 12 visibles, radio 6 dp, borde 1 dp, bajo el cursor. Errores en rojo (`error`), avisos en ámbar; el mensaje del problema bajo el cursor sustituye al texto de la barra de estado.

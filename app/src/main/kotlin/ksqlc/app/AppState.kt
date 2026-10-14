@@ -11,7 +11,9 @@ import ksqlc.core.*
 import ksqlc.drivers.Introspector
 import ksqlc.drivers.Session
 import ksqlc.drivers.testConnection
+import ksqlc.sql.Diagnostic
 import ksqlc.sql.StatementRange
+import ksqlc.sql.formatSql
 import ksqlc.sql.changesSchema
 import ksqlc.sql.splitStatements
 import ksqlc.sql.statementAt
@@ -77,6 +79,41 @@ class AppState(
         private set
     var caretLine by mutableStateOf(1)
     var caretColumn by mutableStateOf(1)
+    /** Problems found in [editor] by the background check; refreshed shortly after each edit. */
+    var diagnostics by mutableStateOf<List<Diagnostic>>(emptyList())
+    val diagnosticAtCaret: Diagnostic? get() = editor.selection.let { s -> if (s.collapsed) diagnostics.firstOrNull { s.start >= it.start && s.start <= it.end } else null }
+
+    /** The text before the last programmatic edit (format, comment, duplicate), so ⌘Z can take it back. */
+    private var undoSlot: Pair<String, TextFieldValue>? = null
+
+    /** Replaces the editor content with a result of an editor action, remembering how to undo it. */
+    fun applyEdit(v: TextFieldValue) {
+        if (v.text != editor.text) { undoSlot = v.text to editor; lastRun = null }
+        editor = v
+    }
+
+    /** Restores the text from before the last programmatic edit, if the editor still holds exactly what that edit produced. */
+    fun undoEdit(): Boolean {
+        val (after, before) = undoSlot ?: return false
+        if (editor.text != after) return false
+        undoSlot = null; editor = before; lastRun = null
+        return true
+    }
+
+    fun format() {
+        val sel = editor.selection
+        val whole = sel.collapsed || editor.text.substring(sel.min, sel.max).isBlank()
+        val text = editor.text
+        if (whole) {
+            val out = formatSql(text)
+            applyEdit(TextFieldValue(out, TextRange(out.length.coerceAtMost(sel.start.coerceAtMost(out.length)))))
+        } else {
+            val out = formatSql(text.substring(sel.min, sel.max))
+            applyEdit(TextFieldValue(text.replaceRange(sel.min, sel.max, out), TextRange(sel.min, sel.min + out.length)))
+        }
+        status = "SQL formateado"
+    }
+
     var lastRun by mutableStateOf<RunMarker?>(null)
         private set
 
@@ -116,6 +153,40 @@ class AppState(
 
     var explorer by mutableStateOf<TreeModel?>(null)
         private set
+
+    /** What the editor completes and checks against; built after each schema read. */
+    var catalog by mutableStateOf<SchemaCatalog?>(null)
+        private set
+
+    /** The explorer row that is selected, and a counter that asks it to scroll there. */
+    var explorerSelectedId by mutableStateOf<String?>(null)
+    var revealTick by mutableStateOf(0)
+        private set
+
+    /** Shows [target] in the Database Explorer: opens the panel, expands down to it and selects it. */
+    fun revealInExplorer(target: NameTarget) {
+        val m = explorer ?: return
+        val o = catalog?.objectOf(target.table) ?: return
+        if (!settings.explorerVisible) updateSettings { it.copy(explorerVisible = true) }
+        scope.launch {
+            val id = m.reveal(o, target.column)
+            if (id != null) { explorerSelectedId = id; revealTick++ } else status = "${o.name} no está en el explorador"
+        }
+    }
+
+    /** ⌘B: jumps from the name at [offset] in the editor to its place in the explorer. */
+    fun gotoDeclaration(offset: Int) {
+        val cat = catalog ?: run { status = "Sin esquema cargado"; return }
+        val t = resolveTarget(editor.text, offset, cat)
+        if (t == null) status = "No se encontró la declaración" else revealInExplorer(t)
+    }
+
+    /** ⌘⌥B: opens the DDL of the table the name at [offset] refers to. */
+    fun showDdlAt(offset: Int) {
+        val cat = catalog ?: return
+        val t = resolveTarget(editor.text, offset, cat) ?: run { status = "No se encontró la declaración"; return }
+        cat.objectOf(t.table)?.let(::showDdl)
+    }
     var connecting by mutableStateOf(false)
         private set
 
@@ -243,9 +314,9 @@ class AppState(
         val ds = form.toDataSource(); val pw = form.passwordOrNull
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw)).also { it.load() } } }
-                .onSuccess { explorer = it; explorerKey = keyOf(ds, pw); if (announce) status = "Esquema cargado: ${ds.name}" }
+                .onSuccess { explorer = it; explorerKey = keyOf(ds, pw); if (announce) status = "Esquema cargado: ${ds.name}"; loadCatalog(it) }
                 .onFailure {
-                    explorer = null; explorerKey = null
+                    explorer = null; explorerKey = null; catalog = null
                     status = "No se pudo leer el esquema: ${it.message}"
                     scope.launch(Dispatchers.IO) { introspectors.close() }
                 }
@@ -253,8 +324,14 @@ class AppState(
         }
     }
 
+    private fun loadCatalog(m: TreeModel) {
+        val cat = SchemaCatalog(m.source, scope)
+        catalog = cat
+        scope.launch(Dispatchers.IO) { runCatching { cat.load() } }
+    }
+
     fun disconnect() {
-        explorer = null; explorerKey = null
+        explorer = null; explorerKey = null; catalog = null
         scope.launch(Dispatchers.IO) { sessions.close(); introspectors.close() }
         status = "Desconectado"
     }
@@ -263,6 +340,7 @@ class AppState(
         val m = explorer ?: return
         scope.launch {
             runCatching { m.refresh() }.onFailure { status = "No se pudo refrescar: ${it.message}" }
+            loadCatalog(m)
         }
     }
 

@@ -67,6 +67,20 @@ class TreeModel(val source: SchemaSource, private val io: CoroutineDispatcher = 
         }
     }
 
+    /** Opens the path down to [o] (and its [column]); returns the id of the deepest node reached, or null if [o] is not in the tree. */
+    suspend fun reveal(o: DbObject, column: String? = null): String? {
+        val space = roots.firstOrNull { it.ns == o.ns } ?: return null
+        expand(space)
+        val group = space.children?.firstOrNull { g -> g.children?.any { it.obj == o } == true } ?: return null
+        expand(group)
+        val node = group.children?.firstOrNull { it.obj == o } ?: return null
+        if (column == null) return node.id
+        expand(node)
+        val cols = node.children?.firstOrNull { it.id.endsWith("/cols") } ?: return node.id
+        expand(cols)
+        return cols.children?.firstOrNull { it.label.equals(column, true) }?.id ?: cols.id
+    }
+
     /** Reloads everything and re-opens the nodes that were open before. */
     suspend fun refresh() {
         val open = buildSet { collectExpanded(roots, this) }

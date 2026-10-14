@@ -18,7 +18,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import ksqlc.sql.Severity
+import ksqlc.sql.diagnose
 import ksqlc.app.ui.*
 import ksqlc.storage.ThemeMode
 
@@ -116,6 +120,8 @@ private fun EditorIsland(state: AppState) {
             ToolButton(IconKind.PlayAll, "Ejecutar script (⌘⇧↵)", state::runScript, enabled = !state.running, tint = c.success)
             ToolButton(IconKind.Stop, "Cancelar", state::cancel, enabled = state.running, tint = c.error)
             VSeparator()
+            ToolButton(IconKind.Format, "Formatear SQL (⌘⌥L)", state::format)
+            VSeparator()
             Text("Tx: Auto", fontSize = 12.sp, color = c.text, modifier = Modifier.padding(horizontal = 6.dp))
             if (state.running) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
             Spacer(Modifier.weight(1f))
@@ -123,10 +129,26 @@ private fun EditorIsland(state: AppState) {
             Text(state.form.name, fontSize = 12.sp, color = c.textSecondary, maxLines = 1, modifier = Modifier.padding(start = 6.dp, end = 4.dp))
         }
         Separator()
+        val catalog = state.catalog
+        val version = catalog?.version ?: 0
+        // problems are checked a moment after typing stops, off the UI thread
+        LaunchedEffect(state.editor.text, catalog, version) {
+            delay(300)
+            val text = state.editor.text
+            state.diagnostics = withContext(Dispatchers.Default) { diagnose(text, catalog) }
+        }
+        val quote: (String) -> String = { name -> state.explorer?.source?.dialect?.quote(name) ?: "\"$name\"" }
+        val support = remember(catalog, version, state.diagnostics) {
+            EditorSupport(
+                schema = catalog, schemaVersion = version, diagnostics = state.diagnostics, quote = quote,
+                onEdit = state::applyEdit, onUndo = state::undoEdit, onGoto = state::gotoDeclaration, onShowDdl = state::showDdlAt, onFormat = state::format,
+            )
+        }
         SqlEditor(
             state.editor, state::onEditorChange, state.lastRun, state::runSelectionOrCurrent, state::runScript,
             { l, col -> state.caretLine = l; state.caretColumn = col },
             Modifier.fillMaxWidth().weight(1f).testTag("editor"),
+            support,
         )
     }
 }
@@ -135,7 +157,9 @@ private fun EditorIsland(state: AppState) {
 private fun AppStatusBar(state: AppState) {
     val c = Ksqlc.colors
     StatusBar(Modifier.height(31.dp)) {
-        Text(state.status, fontSize = 12.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("status"))
+        val problem = state.diagnosticAtCaret
+        if (problem != null) Text(problem.message, fontSize = 12.sp, color = if (problem.severity == Severity.ERROR) c.error else c.warning, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("problem"))
+        else Text(state.status, fontSize = 12.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("status"))
         Text("${state.caretLine}:${state.caretColumn}", fontSize = 12.sp, color = c.textMuted, modifier = Modifier.testTag("caret"))
         Text("LF", fontSize = 12.sp, color = c.textMuted)
         Text("UTF-8", fontSize = 12.sp, color = c.textMuted)

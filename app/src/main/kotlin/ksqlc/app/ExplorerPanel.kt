@@ -79,7 +79,7 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
     val clipboard = LocalClipboardManager.current
     var filter by remember { mutableStateOf("") }
     var showFilter by remember { mutableStateOf(false) }
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    val selectedId = state.explorerSelectedId
 
     Column(modifier) {
         PanelHeader("Database Explorer")
@@ -111,6 +111,17 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
         }
         val rows = visibleRows(model.roots, filter)
         val list = rememberLazyListState()
+        // "go to declaration" from the editor: show everything again and bring the selected row into view
+        LaunchedEffect(state.revealTick) {
+            if (state.revealTick == 0) return@LaunchedEffect
+            filter = ""
+            val at = visibleRows(model.roots, "").indexOfFirst { it.node.id == state.explorerSelectedId }
+            if (at >= 0) {
+                val visible = list.layoutInfo.visibleItemsInfo
+                // +1: the connection row sits above the tree rows
+                if (visible.isEmpty() || at + 1 < visible.first().index || at + 1 > visible.last().index - 1) list.scrollToItem((at + 1 - 3).coerceAtLeast(0))
+            }
+        }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             LazyColumn(Modifier.fillMaxSize().padding(top = 4.dp), state = list) {
                 item(key = "connection-root") {
@@ -137,7 +148,7 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
                         Column(
                             Modifier.testTag("tree:${node.id}").combinedClickable(
                                 onClick = {
-                                    selectedId = node.id
+                                    state.explorerSelectedId = node.id
                                     if (node.expandable) scope.launch { if (node.expanded) node.expanded = false else model.expand(node) }
                                 },
                                 onDoubleClick = { if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) state.openData(o) },

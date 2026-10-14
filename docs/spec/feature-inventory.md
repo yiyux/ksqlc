@@ -35,5 +35,6 @@ clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92
 | Database Explorer | implementado (fase 2) | Árbol perezoso namespace → grupo → objeto → columnas/índices/FK, refresco (manual y tras DDL), filtro, abrir datos con doble clic. Faltan niveles de introspección, mostrar esquemas de sistema, búsqueda de texto completo. |
 | DDL | implementado (fase 2) | Ver/copiar/abrir en consola. Nativo en MySQL/MariaDB (`SHOW CREATE`), SQLite (`sqlite_master`), PostgreSQL (vistas/rutinas nativas, tablas generadas). Genérico en SQL Server/Oracle. |
 | Alteraciones (Drop/Truncate/…) | pendiente | |
-| Editor inteligente, edición de datos, import/export, diff, ER, historial | pendiente | fases 3–5 |
+| Editor SQL | implementado (fase 3) | Autocompletado contextual (tablas, esquemas, columnas por alias, palabras clave), ir a la declaración (⌘B / ⌘clic → explorador, ⌘⌥B → DDL), comentar (⌘/), duplicar (⌘D), ampliar selección (⌘W), autocierre de paréntesis y comillas, sangría, formatear (⌘⌥L), errores en línea (comillas/comentarios/paréntesis sin cerrar, tabla y columna desconocidas), resaltado de usos del identificador. ⌘Z deshace comentar/duplicar/formatear. Faltan cambio de dialecto, IntroduceAlias, ExtractNamedQuery/Function. |
+| Edición de datos, import/export, diff, ER, historial | pendiente | fases 4–5 |
 

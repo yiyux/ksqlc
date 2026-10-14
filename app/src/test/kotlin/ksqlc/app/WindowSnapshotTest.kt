@@ -107,4 +107,38 @@ class WindowSnapshotTest {
 
     @Test fun darkDialog() = dialog(ThemeMode.DARK, "dialog-dark")
     @Test fun lightDialog() = dialog(ThemeMode.LIGHT, "dialog-light")
+
+    /** The editor assistance on screen: a completion list, an unknown table, an unknown column, and the other uses of a name. */
+    private fun assistance(mode: ThemeMode, name: String) = runDesktopComposeUiTest(1722, 1000) {
+        mainClock.autoAdvance = false
+        val state = AppState(
+            CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            ConnectionStore(Files.createTempDirectory("ksqlc-snap-store"), InMemorySecretStore()),
+            SettingsStore(Files.createTempDirectory("ksqlc-snap-settings")).also { it.save(Settings(themeMode = mode)) },
+        )
+        try {
+            state.form.name = "demo@localhost"; state.form.database = seededDb()
+            setContent { App(state) }
+            fun until(ms: Long = 20_000, cond: () -> Boolean) { val end = System.nanoTime() + ms * 1_000_000; while (!cond()) { check(System.nanoTime() < end) { "timeout (${state.status}) diag=${state.diagnostics} catalog=${state.catalog?.complete}" }; Thread.sleep(40); mainClock.advanceTimeByFrame() } }
+            state.onEditorChange(TextFieldValue("select 1"))
+            state.runScript()
+            until { !state.running && state.catalog?.complete == true }
+            val text = "select a.nombre, a.precio, a.stok\nfrom articulo a\nwhere a.nombre like 'g%' and a.precio > 1;\n\nselect * from nada;\n\nselect * from artic"
+            state.onEditorChange(TextFieldValue(text, TextRange(text.indexOf("a.nombre") + 4)))
+            until { state.diagnostics.any { "stok" in it.message } && state.diagnostics.any { "nada" in it.message } }
+            val tail = TextFieldValue(text, TextRange(text.length))
+            onNode(hasTestTag("editor")).performClick()
+            state.onEditorChange(tail)
+            onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("editor"))).performTextInput("u")
+            until { onAllNodesWithTag("completion").fetchSemanticsNodes().isNotEmpty() && state.diagnostics.any { "articu" in it.message } }
+            repeat(4) { mainClock.advanceTimeByFrame() }
+            // the completion list is a popup with a root of its own: save both layers
+            val roots = onAllNodes(isRoot())
+            roots[0].savePng(name)
+            if (roots.fetchSemanticsNodes().size > 1) roots[1].savePng("$name-popup")
+        } finally { state.dispose() }
+    }
+
+    @Test fun darkAssistance() = assistance(ThemeMode.DARK, "assist-dark")
+    @Test fun lightAssistance() = assistance(ThemeMode.LIGHT, "assist-light")
 }
