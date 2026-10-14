@@ -14,6 +14,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(compose.desktop.uiTestJUnit4)
     testImplementation(compose.desktop.currentOs)
+    testImplementation("org.testcontainers:testcontainers-postgresql:2.0.5")
 }
 compose.desktop { application {
     mainClass = "ksqlc.app.MainKt"

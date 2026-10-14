@@ -1,6 +1,7 @@
 package ksqlc.app
 
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -45,7 +46,8 @@ fun parseMoment(text: String, kind: TemporalKind): Moment? = runCatching {
     val g = m.groupValues
     val date = LocalDate.of(g[1].toInt(), g[2].toInt(), g[3].toInt())
     val time = LocalTime.of(g[4].ifEmpty { "0" }.toInt(), g[5].ifEmpty { "0" }.toInt(), g[6].ifEmpty { "0" }.toInt())
-    val offset = g[7].let { o -> if (o.isEmpty()) base.offset else if (o == "Z") ZoneOffset.UTC else ZoneOffset.of(if (o.length == 5) o.substring(0, 3) + ":" + o.substring(3) else o) }
+    // without an offset the value is in the machine's zone, whose offset depends on the date (summer time)
+    val offset = g[7].let { o -> if (o.isEmpty()) ZoneId.systemDefault().rules.getOffset(LocalDateTime.of(date, time)) else if (o == "Z") ZoneOffset.UTC else ZoneOffset.of(if (o.length == 5) o.substring(0, 3) + ":" + o.substring(3) else o) }
     Moment(date, time, offset)
 }.getOrNull()
 
