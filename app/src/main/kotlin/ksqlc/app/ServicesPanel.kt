@@ -44,12 +44,23 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier) {
                         state.tabs.forEachIndexed { i, t -> add(TabSpec(t.title, state.selectedTab == i, "tab:$i", IconKind.Table, { state.selectedTab = i }, { state.closeTab(i) })) }
                     },
                     Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 8.dp), height = 26.dp, spacing = 4.dp,
-                    trailing = { state.tabs.getOrNull(state.selectedTab)?.let { t -> ToolButton(IconKind.Export, "Exportar resultado…", { state.exportResult(t) }, Modifier.testTag("export-result")) } },
+                    trailing = { state.tabs.getOrNull(state.selectedTab)?.let { t -> ToolButton(IconKind.Export, "Exportar resultado…", { state.exportResult(t.shown) }, Modifier.testTag("export-result")) } },
                 )
                 Separator()
                 val tab = state.tabs.getOrNull(state.selectedTab)
+                val data = tab?.edit
                 if (tab == null) OutputLog(state, Modifier.fillMaxSize())
-                else Grid(tab, onLoadMore = { scope.launch(Dispatchers.IO) { tab.loadMore(PAGE) } }, modifier = Modifier.fillMaxSize())
+                else if (data == null) Grid(tab, onLoadMore = { scope.launch(Dispatchers.IO) { tab.loadMore(PAGE) } }, modifier = Modifier.fillMaxSize())
+                else {
+                    val grid = data.grid
+                    Row(Modifier.fillMaxWidth().height(34.dp).background(c.toolbarBg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        EditButtons(state, data)
+                        VSeparator()
+                        EditStatus(state, data, "result")
+                    }
+                    Separator()
+                    Grid(grid, onLoadMore = { scope.launch(Dispatchers.IO) { grid.loadMore(PAGE) } }, modifier = Modifier.fillMaxSize().testTag("result-grid"), editing = data.editor, onNotice = { state.status = it })
+                }
             }
         }
     }

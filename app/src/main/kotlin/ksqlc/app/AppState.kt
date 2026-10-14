@@ -18,6 +18,7 @@ import ksqlc.sql.Diagnostic
 import ksqlc.sql.StatementRange
 import ksqlc.sql.formatSql
 import ksqlc.sql.changesSchema
+import ksqlc.sql.simpleSelectTable
 import ksqlc.sql.splitStatements
 import ksqlc.sql.statementAt
 import ksqlc.storage.ConnectionStore
@@ -158,9 +159,14 @@ class AppState(
     var activeEditor by mutableStateOf(CONSOLE_TAB)
 
     fun closeTab(i: Int) {
+        val tab = tabs.getOrNull(i) ?: return
+        confirmDiscard(tab.edit?.unsaved == true, "«${tab.title}» tiene cambios sin enviar o sin confirmar.") { closeTabNow(i) }
+    }
+
+    private fun closeTabNow(i: Int) {
         if (i !in tabs.indices) return
         val t = tabs.removeAt(i)
-        scope.launch(Dispatchers.IO) { t.close() }
+        scope.launch(Dispatchers.IO) { t.dispose() }
         selectedTab = when { tabs.isEmpty() -> OUTPUT_TAB; selectedTab > i -> selectedTab - 1; else -> selectedTab.coerceAtMost(tabs.lastIndex) }
     }
 
@@ -295,9 +301,13 @@ class AppState(
      * Runs [statements] on the console session. [title] names the result tab (used when opening a table);
      * [range] is where a single statement sits in the editor, so it can be outlined once it has run.
      */
-    fun run(statements: List<String>, title: String? = null, range: StatementRange? = null) {
+    fun run(statements: List<String>, title: String? = null, range: StatementRange? = null, discardEdits: Boolean = false) {
         if (statements.isEmpty()) { status = "Nada que ejecutar"; return }
         if (running) return
+        if (!discardEdits && tabs.any { it.edit?.unsaved == true }) {
+            confirmDiscard(true, "Los resultados editados tienen cambios sin enviar o sin confirmar.") { run(statements, title, range, discardEdits = true) }
+            return
+        }
         running = true; status = "Ejecutando…"
         val target = form.toDataSource(); val pw = form.passwordOrNull
         val textAtStart = editor.text
@@ -305,7 +315,7 @@ class AppState(
             val old = tabs.toList()
             val outcome = runCatching {
                 withContext(Dispatchers.IO) {
-                    old.forEach { it.close() }
+                    old.forEach { it.dispose() }
                     sessions.get(target, pw).runScript(statements, PAGE).mapIndexed { i, r ->
                         r to (r as? StatementResult.Rows)?.let { ResultTab(title ?: "Resultado ${i + 1}", it).also { t -> t.loadMore(PAGE) } }
                     }
@@ -314,6 +324,7 @@ class AppState(
             outcome.onSuccess { results ->
                 tabs.clear(); tabs.addAll(results.mapNotNull { it.second })
                 servicesVisible = true      // a run shows its results, even if the panel was hidden
+                tabs.forEach { attachEditor(it, target, pw) }
                 selectedTab = if (tabs.isEmpty()) OUTPUT_TAB else 0
                 results.forEach { (r, tab) ->
                     when (r) {
@@ -413,6 +424,32 @@ class AppState(
         }
     }
 
+    /**
+     * Makes a console result editable when it is a plain read of one table that shows its whole key: opens a connection of its
+     * own for sending changes (so the result's open cursor and the console's transaction are left alone). Does nothing otherwise.
+     */
+    private fun attachEditor(tab: ResultTab, target: DataSource, pw: String?) {
+        val m = explorer ?: return
+        val cat = catalog ?: return
+        val q = simpleSelectTable(tab.result.sql) ?: return
+        scope.launch {
+            val prepared = runCatching {
+                withContext(Dispatchers.IO) {
+                    val matches = cat.tables().filter { it.name.equals(q.name, true) && (q.schema == null || it.schema.equals(q.schema, true)) }
+                    // an unqualified name found in several schemas depends on the search path: not worth guessing
+                    val o = matches.singleOrNull()?.takeIf { !it.isView }?.let(cat::objectOf)?.takeIf { it.kind == DbObjectKind.TABLE } ?: return@withContext null
+                    val d = m.source.details(o)
+                    val shown = tab.result.columns.map { it.name.lowercase() }
+                    val known = d.columns.map { it.name.lowercase() }.toSet()
+                    val ok = d.primaryKey.isNotEmpty() && shown.size == shown.toSet().size && shown.all { it in known } && d.primaryKey.all { it.lowercase() in shown }
+                    if (!ok) return@withContext null
+                    DataTab(o, tab, Session(target, pw), tab.result.sql.trim().trimEnd(';'), TableEditor(o, m.source.dialect, target.kind, d.primaryKey))
+                }
+            }.getOrNull() ?: return@launch
+            if (tab in tabs) tab.edit = prepared else withContext(Dispatchers.IO) { prepared.session.close() }
+        }
+    }
+
     /** Re-runs a table tab with the WHERE / ORDER BY currently typed in it. */
     fun applyFilters(tab: DataTab) {
         if (tab.loading) return
@@ -483,7 +520,7 @@ class AppState(
     }
 
     /** Changes that would be lost by closing everything: pending edits or unconfirmed transactions. */
-    val hasUnsaved: Boolean get() = consolePending || dataTabs.any { it.unsaved }
+    val hasUnsaved: Boolean get() = consolePending || dataTabs.any { it.unsaved } || tabs.any { it.edit?.unsaved == true }
 
     /**
      * Switches between confirming every statement and confirming by hand, for the console and every open table tab, and
@@ -493,7 +530,7 @@ class AppState(
         if (manual == form.manualTx) return
         if (!manual && hasUnsaved) { status = "Confirma (Commit) o descarta (Rollback) los cambios antes de pasar a Auto"; return }
         form.manualTx = manual
-        scope.launch(Dispatchers.IO) { sessions.peek()?.setAutoCommit(!manual); dataTabs.forEach { it.session.setAutoCommit(!manual) } }
+        scope.launch(Dispatchers.IO) { sessions.peek()?.setAutoCommit(!manual); dataTabs.forEach { it.session.setAutoCommit(!manual) }; tabs.forEach { it.edit?.session?.setAutoCommit(!manual) } }
         val id = form.currentId
         if (id != null && saved.any { it.id == id }) {
             val pw = form.password.ifEmpty { storedPassword(id).orEmpty() }
@@ -691,5 +728,5 @@ class AppState(
         scope.launch { withContext(Dispatchers.IO) { runCatching { history?.clear(id) } }; historyEntries = emptyList() }
     }
 
-    fun dispose() { diffJob?.close(); dataTabs.forEach { it.close() }; sessions.close(); introspectors.close() }
+    fun dispose() { diffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
 }

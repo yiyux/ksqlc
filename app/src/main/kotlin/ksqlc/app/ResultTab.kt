@@ -42,6 +42,18 @@ class ResultTab(val title: String, val result: StatementResult.Rows) {
     }
 
     fun close() = result.cursor.close()
+
+    /**
+     * Set when this result is a plain read of one table and its key: the rows can be edited, sent back through [edit]'s own
+     * connection and re-read there. [edit]'s grid replaces this one once something has been sent.
+     */
+    var edit by mutableStateOf<DataTab?>(null)
+
+    /** The grid to show: the first read, or the latest one after changes were sent. */
+    val shown: ResultTab get() = edit?.grid ?: this
+
+    /** Closes this result and the connection that edits it. */
+    fun dispose() { close(); edit?.close() }
 }
 
 /**

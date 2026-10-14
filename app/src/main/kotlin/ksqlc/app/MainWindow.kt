@@ -218,16 +218,10 @@ private fun DataTabContent(state: AppState, data: DataTab) {
         Row(Modifier.fillMaxWidth().height(34.dp).background(c.toolbarBg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             ToolButton(IconKind.Refresh, "Recargar", { if (ed.hasChanges) state.status = "Envía o revierte los cambios pendientes antes de recargar" else state.applyFilters(data) }, enabled = !data.loading)
             VSeparator()
-            ToolButton(IconKind.Plus, "Añadir fila", { ed.addRow(grid.result.columns.size) }, enabled = ed.canInsert && !data.loading)
-            ToolButton(IconKind.Minus, "Borrar filas seleccionadas", { ed.deleteSelected(grid) }, enabled = ed.canInsert && !data.loading)
-            ToolButton(IconKind.Revert, "Revertir cambios", ed::revert, enabled = ed.hasChanges && !data.loading)
-            ToolButton(IconKind.Preview, "Ver SQL de los cambios", { state.previewChanges(data) }, enabled = ed.hasChanges)
-            ToolButton(IconKind.Submit, "Enviar cambios", { state.submitChanges(data) }, enabled = ed.hasChanges && !data.loading, tint = if (ed.hasChanges) c.success else null)
+            EditButtons(state, data)
             ToolButton(IconKind.Export, "Exportar datos…", { state.exportData(data) }, Modifier.testTag("export-open"), enabled = !data.loading)
             VSeparator()
-            TxControls(state.form.manualTx, data.pending, state::setTxManual, { state.commitTab(data) }, { state.rollbackTab(data) }, "tab")
-            if (ed.hasChanges) Text("${ed.changeCount} cambio(s) sin enviar", fontSize = 12.sp, color = c.textSecondary, modifier = Modifier.padding(start = 8.dp).testTag("pending-count"))
-            if (data.loading) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
+            EditStatus(state, data, "tab")
         }
         Separator()
         Row(Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -238,6 +232,27 @@ private fun DataTabContent(state: AppState, data: DataTab) {
         Separator()
         Grid(grid, onLoadMore = { scope.launch(Dispatchers.IO) { grid.loadMore(PAGE) } }, modifier = Modifier.fillMaxWidth().weight(1f).testTag("data-grid"), editing = ed, onNotice = { state.status = it }, onSort = { j, asc -> state.sortBy(data, j, asc) })
     }
+}
+
+/** Add / delete / revert / preview / send for the changes of [data]; shared by table tabs and editable console results. */
+@Composable
+internal fun RowScope.EditButtons(state: AppState, data: DataTab) {
+    val c = Ksqlc.colors
+    val ed = data.editor
+    ToolButton(IconKind.Plus, "Añadir fila", { ed.addRow(data.grid.result.columns.size) }, enabled = ed.canInsert && !data.loading)
+    ToolButton(IconKind.Minus, "Borrar filas seleccionadas", { ed.deleteSelected(data.grid) }, enabled = ed.canInsert && !data.loading)
+    ToolButton(IconKind.Revert, "Revertir cambios", ed::revert, enabled = ed.hasChanges && !data.loading)
+    ToolButton(IconKind.Preview, "Ver SQL de los cambios", { state.previewChanges(data) }, enabled = ed.hasChanges)
+    ToolButton(IconKind.Submit, "Enviar cambios", { state.submitChanges(data) }, enabled = ed.hasChanges && !data.loading, tint = if (ed.hasChanges) c.success else null)
+}
+
+/** Transaction controls, the count of unsent changes and the loading spinner of [data]; [scope] keeps test tags apart. */
+@Composable
+internal fun RowScope.EditStatus(state: AppState, data: DataTab, scope: String) {
+    val c = Ksqlc.colors
+    TxControls(state.form.manualTx, data.pending, state::setTxManual, { state.commitTab(data) }, { state.rollbackTab(data) }, scope)
+    if (data.editor.hasChanges) Text("${data.editor.changeCount} cambio(s) sin enviar", fontSize = 12.sp, color = c.textSecondary, modifier = Modifier.padding(start = 8.dp).testTag(if (scope == "tab") "pending-count" else "pending-count:$scope"))
+    if (data.loading) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
 }
 
 /** SQL colours for a filter box; names that are not columns of the table (and not calls) are drawn as errors. */
