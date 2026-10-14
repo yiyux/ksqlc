@@ -22,7 +22,7 @@ clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92
 | Transacciones | Transaction.Commit/Rollback, SubmitAndCommit, RevertAndRollback (modo manual/auto) | 4 |
 | Import/Export | ShowDumpDialog, ImportTable, ImportFromSql, Dump/Restore.Native, CopyTable, DumpToSqlDataSource | 5 |
 | Diff | ShowDiff, ShowContentDiff | 5 |
-| Diagramas | ShowUmlDiagram (módulo diagrams) | 5 |
+| Diagramas | ShowUmlDiagram (módulo diagrams) | descartado |
 | Historial | DataSource.History.*, Console.Jdbc.BrowseHistory, ShowSQLLog | 5 |
 | Rutinas | ExecuteRoutine, DebugRoutine | 5 |
 | SSH | módulo `database.ssh` (túnel) | 5 |
@@ -43,5 +43,5 @@ clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92
 | Importar CSV | hecho | Asignación de columnas, vista previa, transacción única, error con fila y columna; «Abrir archivo SQL…» en la consola. |
 | Dump y restauración nativos | hecho | pg_dump/psql/pg_restore, mysqldump/mysql (y variantes MariaDB) y sqlite3, con la contraseña por entorno; SQL Server y Oracle no. |
 | Comparar esquemas | hecho | DDL de dos esquemas (de la conexión activa o de cualquier data source guardado), emparejado por tipo y nombre, normalizado sin el nombre del esquema. |
-| Diagramas ER, diff de contenido | pendiente | fuera de la fase 5 |
+| Diff de contenido de tablas | pendiente | fuera de la fase 5 (el diagrama ER se descartó) |
 
