@@ -47,6 +47,13 @@ import ksqlc.app.ui.*
 
 private val RowNumberWidth = 39.dp
 private val ColumnWidth = 112.dp
+
+/** Width of a column: dates and times get room for their full text (`2026-01-31 10:00:00`, plus `+01:00` with a zone) in the monospace font. */
+internal fun columnWidth(typeName: String, engine: ksqlc.core.DbKind?) = when (temporalKind(typeName, engine)) {
+    TemporalKind.DATETIME -> 168.dp
+    TemporalKind.DATETIME_TZ -> 216.dp
+    else -> ColumnWidth
+}
 private val HeaderHeight = 26.dp
 private val RowHeight = 27.dp
 
@@ -99,6 +106,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
             null -> tab.rows.getOrNull(i)?.getOrNull(j)?.toString()
         }
     }
+    val widths = cols.map { columnWidth(it.typeName, editing?.engine) }
     fun isDefault(i: Int, j: Int) = editing?.valueAt(i, j, tab) is CellValue.Default
     fun raw(i: Int, j: Int): String = when (val v = editing?.valueAt(i, j, tab)) {
         is CellValue.Text -> v.text
@@ -152,7 +160,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
             Row(Modifier.height(HeaderHeight).background(c.headerBg)) {
                 Box(Modifier.width(RowNumberWidth).fillMaxHeight().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) })
                 cols.forEachIndexed { j, col ->
-                    Tip(col.name, col.typeName.lowercase(), Modifier.width(ColumnWidth).fillMaxHeight()) {
+                    Tip(col.name, col.typeName.lowercase(), Modifier.width(widths[j]).fillMaxHeight()) {
                     Row(
                         Modifier.fillMaxSize().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) }.padding(horizontal = 6.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -180,7 +188,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                     }
                 }
             }
-            Box(Modifier.weight(1f).width(RowNumberWidth + ColumnWidth * cols.size)) {
+            Box(Modifier.weight(1f).width(RowNumberWidth + widths.fold(0.dp) { a, w -> a + w })) {
                 LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(bottom = 44.dp)) {   // room for the floating rows pill
                     items(visible.size) { pos ->
                         val i = visible[pos]
@@ -217,7 +225,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                                 val isNumber = numeric[j]
                                 val cell: @Composable () -> Unit = {
                                     Box(
-                                        Modifier.testTag("cell:$i:$j").width(ColumnWidth).fillMaxHeight().background(bg).drawBehind { lines(c.gridLine) }
+                                        Modifier.testTag("cell:$i:$j").width(widths[j]).fillMaxHeight().background(bg).drawBehind { lines(c.gridLine) }
                                             .combinedClickable(
                                                 enabled = editCell != i to j,      // while editing, clicks belong to the text field
                                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null,

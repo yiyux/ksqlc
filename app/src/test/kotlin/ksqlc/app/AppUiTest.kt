@@ -535,6 +535,7 @@ class AppUiTest {
     @Test fun textColumnsHaveNoPicker() {
         rule.setContent { App(state) }
         openEvents()
+        rule.onNodeWithTag("cell:0:3").performTouchInput { swipeLeft() }; frames()
         rule.onNodeWithTag("cell:0:5").performMouseInput { doubleClick() }
         untilTag("cell-editor")
         assertEquals(0, rule.onAllNodesWithTag("date-picker").fetchSemanticsNodes().size)

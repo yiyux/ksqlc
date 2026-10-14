@@ -23,6 +23,7 @@ import androidx.compose.ui.window.PopupProperties
 import ksqlc.app.ui.*
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -111,7 +112,15 @@ fun DatePickerPopup(kind: TemporalKind, text: String, onText: (String, Boolean) 
                     Text(":", color = c.textSecondary, modifier = Modifier.padding(horizontal = 2.dp))
                     unit("s", current.time.second) { current.withTime(s = current.time.second + it) }
                 }
-                if (kind.hasOffset) Text("UTC" + current.offset.id.let { if (it == "Z") "+00:00" else it }, Modifier.fillMaxWidth().testTag("offset"), fontSize = 11.sp, color = c.textMuted, textAlign = TextAlign.Center)
+                if (kind.hasOffset) {
+                    // 15-minute steps reach every real zone (+05:30, +05:45); the range is the one java.time accepts
+                    fun shift(min: Int) = put(current.copy(offset = ZoneOffset.ofTotalSeconds((current.offset.totalSeconds + min * 60).coerceIn(-18 * 3600, 18 * 3600))))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        Tap("offset-", Modifier.size(24.dp), { shift(-15) }) { Text("−", fontSize = 14.sp, color = c.link) }
+                        Text("UTC" + current.offset.id.let { if (it == "Z") "+00:00" else it }, Modifier.testTag("offset"), fontSize = 11.sp, color = c.textMuted, textAlign = TextAlign.Center)
+                        Tap("offset+", Modifier.size(24.dp), { shift(15) }) { Text("+", fontSize = 14.sp, color = c.link) }
+                    }
+                }
             }
             Row(Modifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Tap("date-now", Modifier.height(26.dp), { put(now().let { n -> if (kind == TemporalKind.DATETIME_TZ) n else n }, done = kind == TemporalKind.DATE) }) {

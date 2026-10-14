@@ -157,9 +157,11 @@ class SqlServerTemporalTest {
             rule.onNodeWithTag("offset").assertTextContains("UTC+01:00")
             rule.onNodeWithTag("day:2026-01-12").performClick(); frames()
             rule.onNodeWithTag("h+").performClick(); frames()
+            repeat(4) { rule.onNodeWithTag("offset+").performClick(); frames() }
+            rule.onNodeWithTag("offset").assertTextContains("UTC+02:00")
             rule.onNodeWithTag("date-ok").performClick(); frames()
             assertNull(tab.submit())
-            assertEquals("2026-01-12 11:20:30.0000000 +01:00", stored("select dtz from ev").single().single())
+            assertEquals("2026-01-12 11:20:30.0000000 +02:00", stored("select dtz from ev").single().single())
         }
     }
 

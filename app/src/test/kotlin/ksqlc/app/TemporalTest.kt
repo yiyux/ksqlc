@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -80,5 +81,15 @@ class TemporalTest {
         assertEquals(LocalDate.of(2026, 3, 8), page.last())
         val mon = monthPage(YearMonth.of(2026, 6))     // 1 Jun 2026 is a Monday: starts on the 1st
         assertEquals(LocalDate.of(2026, 6, 1), mon.first())
+    }
+}
+
+class ColumnWidthTest {
+    @kotlin.test.Test fun temporalColumnsGetRoomForTheirText() {
+        kotlin.test.assertEquals(112.dp, columnWidth("varchar", null))
+        kotlin.test.assertEquals(112.dp, columnWidth("date", null))
+        kotlin.test.assertEquals(168.dp, columnWidth("datetime2", null))
+        kotlin.test.assertEquals(168.dp, columnWidth("date", ksqlc.core.DbKind.ORACLE))
+        kotlin.test.assertEquals(216.dp, columnWidth("timestamptz", null))
     }
 }
