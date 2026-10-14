@@ -19,6 +19,8 @@ import ksqlc.sql.StatementRange
 import ksqlc.sql.formatSql
 import ksqlc.sql.changesSchema
 import ksqlc.sql.simpleSelectTable
+import ksqlc.sql.findParams
+import ksqlc.sql.fillParams
 import ksqlc.sql.splitStatements
 import ksqlc.sql.statementAt
 import ksqlc.storage.ConnectionStore
@@ -301,13 +303,14 @@ class AppState(
      * Runs [statements] on the console session. [title] names the result tab (used when opening a table);
      * [range] is where a single statement sits in the editor, so it can be outlined once it has run.
      */
-    fun run(statements: List<String>, title: String? = null, range: StatementRange? = null, discardEdits: Boolean = false) {
+    fun run(statements: List<String>, title: String? = null, range: StatementRange? = null, discardEdits: Boolean = false, filled: Boolean = false) {
         if (statements.isEmpty()) { status = "Nada que ejecutar"; return }
         if (running) return
         if (!discardEdits && tabs.any { it.edit?.unsaved == true }) {
-            confirmDiscard(true, "Los resultados editados tienen cambios sin enviar o sin confirmar.") { run(statements, title, range, discardEdits = true) }
+            confirmDiscard(true, "Los resultados editados tienen cambios sin enviar o sin confirmar.") { run(statements, title, range, discardEdits = true, filled = filled) }
             return
         }
+        if (!filled) { withParams(statements) { run(it, title, range, discardEdits = true, filled = true) }; return }
         running = true; status = "Ejecutando…"
         val target = form.toDataSource(); val pw = form.passwordOrNull
         val textAtStart = editor.text
@@ -545,6 +548,31 @@ class AppState(
     }
 
     var confirmation by mutableStateOf<Confirmation?>(null)
+
+    /** The run waiting for parameter values, if any. */
+    var paramPrompt by mutableStateOf<ParamPrompt?>(null)
+
+    /** Last value given to each `:name` parameter, offered again the next time it appears. */
+    private val paramMemory = HashMap<String, String>()
+
+    /**
+     * Asks for the parameters of [statements] (`:name`, and `?` except in PostgreSQL), then calls [go] with the statements
+     * filled in. Without parameters [go] runs at once.
+     */
+    private fun withParams(statements: List<String>, go: (List<String>) -> Unit) {
+        val positional = form.effectiveKind != DbKind.POSTGRES
+        val refs = statements.map { findParams(it, positional) }
+        if (refs.all { it.isEmpty() }) { go(statements); return }
+        // one entry per distinct :name, one per `?`, in the order they appear
+        var n = 0
+        val keys = refs.map { list -> list.map { r -> if (r.name == "?") "? ${++n}" else r.name } }
+        val asked = keys.flatten().distinct()
+        paramPrompt = ParamPrompt(asked, asked.map { paramMemory[it].orEmpty() }) { values ->
+            val byKey = asked.zip(values).toMap()
+            asked.zip(values).forEach { (k, v) -> if (!k.startsWith("?")) paramMemory[k] = v }
+            go(statements.mapIndexed { i, sql -> fillParams(sql, refs[i], keys[i].map { byKey.getValue(it) }) })
+        }
+    }
 
     fun requestDisconnect() = confirmDiscard(hasUnsaved, "Hay cambios sin enviar o transacciones sin confirmar.") { disconnect() }
 

@@ -88,6 +88,7 @@ fun MainWindow(state: AppState) {
         NativeDialog(state)
         DiffDialog(state)
         ConfirmDialog(state)
+        ParamDialog(state)
     }
 }
 
