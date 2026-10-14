@@ -362,12 +362,22 @@ class AppState(
                     }
                 }
             }.onSuccess { tab ->
-                dataTabs += DataTab(o, tab, session); activeEditor = dataTabs.lastIndex
+                dataTabs += DataTab(o, tab, session, sql); activeEditor = dataTabs.lastIndex
                 status = "${o.name}: ${tab.rows.size} filas${if (tab.exhausted) "" else "+"}"
             }.onFailure {
                 status = "No se pudo abrir ${o.name}: ${it.message}"
                 withContext(Dispatchers.IO) { session.close() }
             }
+        }
+    }
+
+    /** Re-runs a table tab with the WHERE / ORDER BY currently typed in it. */
+    fun applyFilters(tab: DataTab) {
+        if (tab.loading) return
+        status = "Consultando ${tab.obj.name}…"
+        scope.launch {
+            val error = withContext(Dispatchers.IO) { runCatching { tab.reload() }.getOrElse { it.message ?: it.toString() } }
+            status = if (error != null) "Error: $error" else "${tab.obj.name}: ${tab.grid.rows.size} filas${if (tab.grid.exhausted) "" else "+"}"
         }
     }
 

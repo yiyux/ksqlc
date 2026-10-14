@@ -12,6 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -111,8 +114,7 @@ private fun EditorIsland(state: AppState) {
         Separator()
         val data = state.dataTabs.getOrNull(state.activeEditor)
         if (data != null) {
-            val scope = rememberCoroutineScope()
-            Grid(data.grid, onLoadMore = { scope.launch(Dispatchers.IO) { data.grid.loadMore(PAGE) } }, modifier = Modifier.fillMaxSize().testTag("data-grid"))
+            DataTabContent(state, data)
             return
         }
         Row(Modifier.fillMaxWidth().height(34.dp).background(c.toolbarBg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -164,5 +166,44 @@ private fun AppStatusBar(state: AppState) {
         Text("LF", fontSize = 12.sp, color = c.textMuted)
         Text("UTF-8", fontSize = 12.sp, color = c.textMuted)
         Text("4 spaces", fontSize = 12.sp, color = c.textMuted)
+    }
+}
+
+/** A table's rows under a small toolbar and the WHERE / ORDER BY boxes; Enter in either re-runs the query. */
+@Composable
+private fun DataTabContent(state: AppState, data: DataTab) {
+    val c = Ksqlc.colors
+    val scope = rememberCoroutineScope()
+    val grid = data.grid
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().height(34.dp).background(c.toolbarBg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            ToolButton(IconKind.Refresh, "Recargar", { state.applyFilters(data) }, enabled = !data.loading)
+            if (data.loading) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
+        }
+        Separator()
+        Row(Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically) {
+            FilterBox(IconKind.Filter, "WHERE", data.where, { data.where = it }, { state.applyFilters(data) }, "filter-where", Modifier.weight(1f))
+            VSeparator()
+            FilterBox(IconKind.Sort, "ORDER BY", data.orderBy, { data.orderBy = it }, { state.applyFilters(data) }, "filter-order", Modifier.weight(1f))
+        }
+        Separator()
+        Grid(grid, onLoadMore = { scope.launch(Dispatchers.IO) { grid.loadMore(PAGE) } }, modifier = Modifier.fillMaxWidth().weight(1f).testTag("data-grid"))
+    }
+}
+
+@Composable
+private fun FilterBox(icon: IconKind, hint: String, value: String, onChange: (String) -> Unit, onApply: () -> Unit, tag: String, modifier: Modifier) {
+    val c = Ksqlc.colors
+    Row(modifier.fillMaxHeight().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        KIcon(icon, tint = c.textSecondary, size = 14.dp)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (value.isEmpty()) Text(hint, fontSize = 13.sp, color = c.textMuted, maxLines = 1)
+            androidx.compose.foundation.text.BasicTextField(
+                value, onChange, Modifier.fillMaxWidth().testTag(tag).onPreviewKeyEvent { e ->
+                    if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && (e.key == androidx.compose.ui.input.key.Key.Enter || e.key == androidx.compose.ui.input.key.Key.NumPadEnter)) { onApply(); true } else false
+                },
+                singleLine = true, textStyle = MonoStyle.copy(color = c.text, fontSize = 13.sp), cursorBrush = androidx.compose.ui.graphics.SolidColor(c.text),
+            )
+        }
     }
 }

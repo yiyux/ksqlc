@@ -239,4 +239,29 @@ class AppUiTest {
         setEditor("select 2")
         assertEquals(null, state.lastRun)
     }
+
+    @Test fun whereAndOrderByFiltersReRunTheTableTab() {
+        rule.setContent { App(state) }
+        state.form.database = tempDb()
+        setEditor("create table customers(id integer primary key, name text); insert into customers values (1, 'Ada'), (2, 'Grace'), (3, 'Linus');")
+        runAll()
+        until { !state.running && state.catalog?.complete == true }
+        state.openData(state.catalog!!.objectOf(ksqlc.sql.TableRef("main", "customers"))!!)
+        until { state.dataTabs.singleOrNull()?.grid?.rows?.size == 3 }
+        val tab = state.dataTabs[0]
+        rule.onNodeWithTag("filter-where").assertExists()
+        rule.onNodeWithTag("filter-order").assertExists()
+
+        rule.onNodeWithTag("filter-where").performTextInput("id > 1")
+        rule.onNodeWithTag("filter-order").performTextInput("name desc")
+        rule.onNodeWithTag("filter-order").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Enter) }
+        until { tab.grid.rows.map { it[1] } == listOf("Linus", "Grace") }
+        assertEquals("select * from \"main\".\"customers\" where id > 1 order by name desc".lowercase().replace("\"main\".", "").replace("\"", ""), tab.query().lowercase().replace("\"main\".", "").replace("\"", ""))
+
+        // a bad filter keeps the previous rows and reports the error
+        rule.onNodeWithTag("filter-where").performTextInput(" and nope = 1")
+        rule.onNodeWithTag("filter-where").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Enter) }
+        until { state.status.startsWith("Error") }
+        assertEquals(listOf("Linus", "Grace"), tab.grid.rows.map { it[1] })
+    }
 }
