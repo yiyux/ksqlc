@@ -18,6 +18,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -51,7 +53,10 @@ fun MainWindow(state: AppState) {
     var explorerWidth by remember { mutableStateOf(s.explorerWidthDp.dp) }
     var resultsRatio by remember { mutableStateOf(s.resultsRatio) }
 
-    Box(Modifier.fillMaxSize().background(c.windowBg)) {
+    Box(Modifier.fillMaxSize().background(c.windowBg).onPreviewKeyEvent { e ->
+        // ⌥⌘E opens the history from anywhere
+        if (e.type == KeyEventType.KeyDown && e.key == Key.E && e.isMetaPressed && e.isAltPressed) { state.openHistory(); true } else false
+    }) {
         Column(Modifier.fillMaxSize()) {
             TopBar(state)
             Row(Modifier.weight(1f).fillMaxWidth().padding(start = 7.dp, end = 7.dp)) {
@@ -74,6 +79,7 @@ fun MainWindow(state: AppState) {
         }
         if (state.dataSourceDialog) DataSourceDialog(state)
         DdlDialog(state)
+        HistoryDialog(state)
         ConfirmDialog(state)
     }
 }
@@ -135,6 +141,7 @@ private fun EditorIsland(state: AppState) {
             ToolButton(IconKind.Stop, "Cancelar", state::cancel, enabled = state.running, tint = c.error)
             VSeparator()
             ToolButton(IconKind.Format, "Formatear SQL (⌘⌥L)", state::format)
+            ToolButton(IconKind.History, "Historial (⌥⌘E)", state::openHistory, Modifier.testTag("history-open"))
             VSeparator()
             TxControls(state.form.manualTx, state.consolePending, state::setTxManual, state::commitConsole, state::rollbackConsole, "console")
             if (state.running) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }

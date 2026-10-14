@@ -9,10 +9,12 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import ksqlc.storage.ConnectionStore
+import ksqlc.storage.HistoryStore
+import ksqlc.storage.SettingsStore
 
 fun main() = application {
     val scope = rememberCoroutineScope()
-    val state = remember { AppState(scope, ConnectionStore.default()) }
+    val state = remember { AppState(scope, ConnectionStore.default(), SettingsStore.default(), HistoryStore.default()) }
     DisposableEffect(Unit) { onDispose { state.dispose() } }
     Window(
         // closing with unsent edits or an open transaction asks first

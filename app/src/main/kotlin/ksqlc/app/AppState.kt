@@ -18,6 +18,8 @@ import ksqlc.sql.changesSchema
 import ksqlc.sql.splitStatements
 import ksqlc.sql.statementAt
 import ksqlc.storage.ConnectionStore
+import ksqlc.storage.HistoryEntry
+import ksqlc.storage.HistoryStore
 import ksqlc.storage.Settings
 import ksqlc.storage.SettingsStore
 import ksqlc.storage.ThemeMode
@@ -60,6 +62,7 @@ class AppState(
     private val scope: CoroutineScope,
     private val store: ConnectionStore,
     private val settingsStore: SettingsStore = SettingsStore.default(),
+    private val history: HistoryStore? = null,
 ) {
     val form = ConnectionForm()
     var saved by mutableStateOf(runCatching { store.list() }.getOrDefault(emptyList()))
@@ -242,6 +245,7 @@ class AppState(
 
     fun deleteConnection(id: String) {
         persist({ store.delete(id) }, "Conexión eliminada")
+        runCatching { history?.clear(id) }
         if (form.currentId == id) form.currentId = null
     }
 
@@ -314,6 +318,7 @@ class AppState(
                         is StatementResult.Failed -> logLine(r.sql, if (r.cancelled) "cancelada" else "ERROR: ${r.message}")
                     }
                 }
+                record(target.id, results.map { (r, tab) -> r.toHistory(tab) })
                 val last = results.lastOrNull()?.first
                 lastMillis = last?.millis
                 status = when {
@@ -419,7 +424,10 @@ class AppState(
         if (tab.loading || !tab.editor.hasChanges) return
         status = "Enviando cambios…"
         scope.launch {
+            val sent = runCatching { tab.editor.statements(tab.grid) }.getOrDefault(emptyList())
             val error = withContext(Dispatchers.IO) { runCatching { tab.submit() }.getOrElse { it.message ?: it.toString() } }
+            val now = System.currentTimeMillis()
+            record(form.currentId ?: "unsaved", sent.map { HistoryEntry(now, it.preview.trimEnd(';') + ";", 0, error == null) })
             status = when {
                 error != null -> "Error: $error"
                 form.manualTx -> "${tab.affected} fila(s) modificadas, pendientes de confirmar (Commit)"
@@ -516,6 +524,34 @@ class AppState(
     fun appendToEditor(text: String) {
         val joined = editor.text.trimEnd().let { if (it.isEmpty()) text else "$it\n\n$text" }
         setEditorText(joined)
+    }
+
+    // --- history -----------------------------------------------------------------------
+    var historyEntries by mutableStateOf<List<HistoryEntry>?>(null)
+        private set
+
+    private fun StatementResult.toHistory(tab: ResultTab?) = HistoryEntry(
+        System.currentTimeMillis(), sql, millis, ok = this !is StatementResult.Failed,
+        rows = when (this) { is StatementResult.Rows -> tab?.rows?.size?.toLong(); is StatementResult.Updated -> count; else -> null },
+    )
+
+    private fun record(id: String, entries: List<HistoryEntry>) {
+        val h = history ?: return
+        scope.launch(Dispatchers.IO) { runCatching { h.append(id, entries) } }
+    }
+
+    /** Opens the history of the active connection. */
+    fun openHistory() {
+        val h = history ?: run { status = "El historial no está disponible"; return }
+        val id = form.currentId ?: "unsaved"
+        scope.launch { historyEntries = withContext(Dispatchers.IO) { runCatching { h.load(id) }.getOrDefault(emptyList()) } }
+    }
+
+    fun closeHistory() { historyEntries = null }
+
+    fun clearHistory() {
+        val id = form.currentId ?: "unsaved"
+        scope.launch { withContext(Dispatchers.IO) { runCatching { history?.clear(id) } }; historyEntries = emptyList() }
     }
 
     fun dispose() { dataTabs.forEach { it.close() }; sessions.close(); introspectors.close() }
