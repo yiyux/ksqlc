@@ -127,12 +127,13 @@ private fun themeLabel(m: ThemeMode) = when (m) { ThemeMode.SYSTEM -> "sistema";
 private fun EditorIsland(state: AppState) {
     val c = Ksqlc.colors
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            PillTab("console [${state.form.name}]", state.activeEditor == CONSOLE_TAB, { state.activeEditor = CONSOLE_TAB }, Modifier.testTag("etab:console"), icon = IconKind.Database)
-            state.dataTabs.forEachIndexed { i, t ->
-                PillTab(t.obj.name, state.activeEditor == i, { state.activeEditor = i }, Modifier.testTag("etab:$i"), icon = IconKind.Table, onClose = { state.closeDataTab(i) })
-            }
-        }
+        OverflowTabs(
+            buildList {
+                add(TabSpec("console [${state.form.name}]", state.activeEditor == CONSOLE_TAB, "etab:console", IconKind.Database, { state.activeEditor = CONSOLE_TAB }))
+                state.dataTabs.forEachIndexed { i, t -> add(TabSpec(t.obj.name, state.activeEditor == i, "etab:$i", IconKind.Table, { state.activeEditor = i }, { state.closeDataTab(i) })) }
+            },
+            Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 6.dp),
+        )
         Separator()
         val data = state.dataTabs.getOrNull(state.activeEditor)
         if (data != null) {
