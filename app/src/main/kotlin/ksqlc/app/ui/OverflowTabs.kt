@@ -25,7 +25,7 @@ class TabSpec(val title: String, val selected: Boolean, val tag: String, val ico
  * list of those tabs; picking one selects it, and the selected tab is always scrolled into view.
  */
 @Composable
-fun OverflowTabs(tabs: List<TabSpec>, modifier: Modifier = Modifier, height: Dp = 28.dp) {
+fun OverflowTabs(tabs: List<TabSpec>, modifier: Modifier = Modifier, height: Dp = 28.dp, spacing: Dp = 0.dp, trailing: @Composable RowScope.() -> Unit = {}) {
     val scroll = rememberScrollState()
     val starts = remember { mutableStateMapOf<Int, Pair<Int, Int>>() }      // tab index -> (x, width) inside the scrolled content
     var viewport by remember { mutableIntStateOf(0) }
@@ -37,8 +37,8 @@ fun OverflowTabs(tabs: List<TabSpec>, modifier: Modifier = Modifier, height: Dp 
         val (x, w) = starts[selected] ?: return@LaunchedEffect
         if (x < scroll.value) scroll.scrollTo(x) else if (x + w > scroll.value + viewport) scroll.scrollTo(x + w - viewport)
     }
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f, fill = false).onSizeChanged { viewport = it.width }.horizontalScroll(scroll)) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing)) {
+        Row(Modifier.weight(1f, fill = false).onSizeChanged { viewport = it.width }.horizontalScroll(scroll), horizontalArrangement = Arrangement.spacedBy(spacing)) {
             tabs.forEachIndexed { i, t ->
                 PillTab(
                     t.title, t.selected, t.onClick, Modifier.testTag(t.tag).onGloballyPositioned { starts[i] = it.positionInParent().x.toInt() to it.size.width },
@@ -65,5 +65,6 @@ fun OverflowTabs(tabs: List<TabSpec>, modifier: Modifier = Modifier, height: Dp 
                 }
             }
         }
+        trailing()
     }
 }

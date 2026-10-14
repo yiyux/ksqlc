@@ -38,13 +38,14 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier) {
             ServicesTree(state, Modifier.width(240.dp).fillMaxHeight())
             Separator(vertical = true)
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                Row(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 8.dp).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PillTab("Output", state.selectedTab == OUTPUT_TAB, { state.selectedTab = OUTPUT_TAB }, Modifier.testTag("tab:output"), icon = IconKind.Index, height = 26.dp)
-                    state.tabs.forEachIndexed { i, t ->
-                        PillTab(t.title, state.selectedTab == i, { state.selectedTab = i }, Modifier.testTag("tab:$i"), icon = IconKind.Table, height = 26.dp, onClose = { state.closeTab(i) })
-                    }
-                    state.tabs.getOrNull(state.selectedTab)?.let { t -> ToolButton(IconKind.Export, "Exportar resultado…", { state.exportResult(t) }, Modifier.testTag("export-result")) }
-                }
+                OverflowTabs(
+                    buildList {
+                        add(TabSpec("Output", state.selectedTab == OUTPUT_TAB, "tab:output", IconKind.Index, { state.selectedTab = OUTPUT_TAB }))
+                        state.tabs.forEachIndexed { i, t -> add(TabSpec(t.title, state.selectedTab == i, "tab:$i", IconKind.Table, { state.selectedTab = i }, { state.closeTab(i) })) }
+                    },
+                    Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 8.dp), height = 26.dp, spacing = 4.dp,
+                    trailing = { state.tabs.getOrNull(state.selectedTab)?.let { t -> ToolButton(IconKind.Export, "Exportar resultado…", { state.exportResult(t) }, Modifier.testTag("export-result")) } },
+                )
                 Separator()
                 val tab = state.tabs.getOrNull(state.selectedTab)
                 if (tab == null) OutputLog(state, Modifier.fillMaxSize())

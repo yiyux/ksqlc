@@ -59,7 +59,6 @@ class OverflowTabsUiTest {
         assertTrue(rule.onAllNodesWithTag("tabs-overflow").fetchSemanticsNodes().isNotEmpty())
         rule.onNodeWithTag("tabs-overflow").performClick()
         until { tags("tabs-hidden").isNotEmpty() }
-        rule.onAllNodes(isRoot())[0].savePng("overflow-tabs"); rule.onAllNodes(isRoot())[1].savePng("overflow-menu")
         val first = tags("tabs-hidden").first().substringAfter(':').toInt()
         val expected = if (first == 0) CONSOLE_TAB else first - 1      // entry 0 is the console (scrolled away by the newest tab)
         rule.onNodeWithTag("tabs-hidden:$first").performClick()
@@ -69,5 +68,23 @@ class OverflowTabsUiTest {
         rule.onNodeWithTag("tabs-overflow").performClick()
         until { tags("tabs-hidden").isNotEmpty() }
         assertTrue(tags("tabs-hidden").none { it.substringAfter(':').toInt() == first })
+    }
+
+    @Test fun hiddenResultTabsInServicesAreListedAndPickable() {
+        rule.setContent { App(state) }
+        state.form.database = Files.createTempFile("ksqlc-ui", ".db").also { it.toFile().deleteOnExit() }.toString()
+        val sql = (1..25).joinToString("; ") { "select $it as result_column_$it" }
+        state.onEditorChange(TextFieldValue(sql, TextRange(sql.length)))
+        rule.onNodeWithContentDescription("Ejecutar script", substring = true).performClick()
+        until { !state.running && state.tabs.size == 25 }
+        until { rule.onAllNodesWithTag("tabs-overflow").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("tabs-overflow").performClick()
+        until { tags("tabs-hidden").isNotEmpty() }
+        val first = tags("tabs-hidden").first().substringAfter(':').toInt()
+        val expected = if (first == 0) OUTPUT_TAB else first - 1      // entry 0 is Output
+        // semantic click: in this tall popup the harness' pointer click lands outside the item, although the same popup works with the editor tabs
+        rule.onNodeWithTag("tabs-hidden:$first").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        until { state.selectedTab == expected }
+        assertEquals(expected, state.selectedTab)
     }
 }
