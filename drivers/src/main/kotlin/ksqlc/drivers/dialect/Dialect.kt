@@ -27,6 +27,12 @@ interface Dialect {
      */
     fun call(conn: Connection, o: DbObject): List<String> = error("Este motor no tiene rutinas que ejecutar")
 
+    /** An editable copy of table [o], or null when the engine's tables cannot be modified yet. */
+    fun tableModel(conn: Connection, o: DbObject): TableModel? = null
+
+    /** The statements that turn [before] into [after] on table [o]; empty when nothing changed. */
+    fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = error("Este motor no puede modificar tablas")
+
     companion object {
         fun of(kind: DbKind): Dialect = when (kind) {
             DbKind.POSTGRES -> PostgresDialect

@@ -11,4 +11,5 @@ interface SchemaSource {
     fun details(o: DbObject): TableDetails
     fun ddl(o: DbObject): String
     fun call(o: DbObject): List<String> = error("Este motor no tiene rutinas que ejecutar")
+    fun tableModel(o: DbObject): TableModel? = null
 }

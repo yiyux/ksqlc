@@ -58,3 +58,6 @@ fun dropForeignKeySql(kind: DbKind, table: DbObject, fk: String): String? {
 
 /** Engines whose routines the explorer can call (SQLite has none; a Cassandra function needs a table to select from). */
 fun supportsRoutineCall(kind: DbKind) = kind in setOf(DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.MSSQL, DbKind.ORACLE)
+
+/** Engines whose tables the Modify dialog can change. */
+fun supportsModifyTable(kind: DbKind) = kind == DbKind.POSTGRES
