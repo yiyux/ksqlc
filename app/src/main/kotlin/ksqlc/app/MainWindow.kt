@@ -155,6 +155,7 @@ private fun EditorIsland(state: AppState) {
             ToolButton(IconKind.Explain, "Explain: plan de ejecución", { state.explain(false) }, Modifier.testTag("explain"), enabled = !state.running)
             ToolButton(IconKind.Analyze, "Explain analyze: ejecuta y mide", { state.explain(true) }, Modifier.testTag("explain-analyze"), enabled = !state.running)
             VSeparator()
+            ToolButton(IconKind.Notebook, "Modo notebook: una celda por sentencia, con su resultado debajo", { state.notebookMode = !state.notebookMode }, Modifier.testTag("notebook-toggle"), selected = state.notebookMode)
             ToolButton(IconKind.Format, "Formatear SQL (⌘⌥L)", state::format)
             ToolButton(IconKind.Folder, "Abrir archivo SQL…", state::openSqlFile)
             ToolButton(IconKind.History, "Historial (⌥⌘E)", state::openHistory, Modifier.testTag("history-open"))
@@ -182,7 +183,8 @@ private fun EditorIsland(state: AppState) {
                 onEdit = state::applyEdit, onUndo = state::undoEdit, onGoto = state::gotoDeclaration, onShowDdl = state::showDdlAt, onFormat = state::format,
             )
         }
-        SqlEditor(
+        if (state.notebookMode) NotebookView(state, Modifier.fillMaxWidth().weight(1f))
+        else SqlEditor(
             state.editor, state::onEditorChange, state.lastRun, state::runSelectionOrCurrent, state::runScript,
             { l, col -> state.caretLine = l; state.caretColumn = col },
             Modifier.fillMaxWidth().weight(1f).testTag("editor"),

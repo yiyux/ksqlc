@@ -299,7 +299,87 @@ class AppState(
     private val slashBlocks: Boolean get() = editorKind == DbKind.ORACLE
     private val goBatches: Boolean get() = editorKind == DbKind.MSSQL
 
+    // --- notebook ----------------------------------------------------------------------
+
+    /** The console shows each statement of its text as a cell with its result under it. The text stays the single source: cells are its statements. */
+    var notebookMode by mutableStateOf(false)
+
+    /** The cell that last had the keyboard; the run buttons act on it. */
+    var notebookCell by mutableStateOf(0)
+
+    /** What a cell's last run produced; [source] is the cell text it ran, to tell when the cell has changed since. */
+    class CellRun(val source: String, val running: Boolean = false, val tab: ResultTab? = null, val message: String? = null, val ok: Boolean = true, val millis: Long = 0)
+
+    val cellRuns = mutableStateMapOf<Int, CellRun>()
+
+    fun cells(): List<StatementRange> = splitStatements(editor.text, slashBlocks, goBatches)
+
+    private fun cellText(i: Int): String? = cells().getOrNull(i)?.text(editor.text)
+
+    fun editCell(i: Int, text: String) {
+        val r = cells().getOrNull(i) ?: return
+        setEditorText(editor.text.replaceRange(r.start, r.end, text))
+    }
+
+    fun addCell() {
+        setEditorText(editor.text.trimEnd().let { if (it.isEmpty()) "select 1;" else (if (it.endsWith(";")) it else "$it;") + "\n\nselect 1;" })
+        notebookCell = cells().lastIndex
+    }
+
+    fun deleteCell(i: Int) {
+        val r = cells().getOrNull(i) ?: return
+        setEditorText((editor.text.substring(0, r.start) + editor.text.substring(r.next)).trim().let { if (it.isEmpty()) "" else it })
+        val moved = cellRuns.filterKeys { it != i }.mapKeys { (k, _) -> if (k > i) k - 1 else k }
+        cellRuns.clear(); cellRuns.putAll(moved)
+        notebookCell = notebookCell.coerceAtMost((cells().size - 1).coerceAtLeast(0))
+    }
+
+    fun runCell(i: Int) = runCells(listOf(i))
+
+    fun runAllCells() = runCells(cells().indices.toList())
+
+    /** Runs the cells in order, each under its own result, stopping at the first failure. Parameters are asked for once, for all of them. */
+    private fun runCells(indexes: List<Int>) {
+        if (running) return
+        val sources = indexes.mapNotNull { cellText(it) }
+        if (sources.isEmpty()) { status = "Nada que ejecutar"; return }
+        withParams(sources) { filled ->
+            running = true; status = "Ejecutando…"
+            val target = form.toDataSource(); val pw = form.passwordOrNull
+            scope.launch {
+                var failed = false
+                for ((n, i) in indexes.withIndex()) {
+                    val source = sources[n]
+                    cellRuns[i] = CellRun(source, running = true)
+                    val outcome = runCatching {
+                        withContext(Dispatchers.IO) {
+                            val r = sessions.get(target, pw).runScript(listOf(filled[n]), PAGE).single()
+                            // only the last result of a session keeps its cursor, so a cell keeps the first page it read and lets go of the cursor
+                            r to (r as? StatementResult.Rows)?.let { ResultTab("Celda ${i + 1}", it).also { t -> t.loadMore(PAGE); t.close() } }
+                        }
+                    }
+                    outcome.onSuccess { (r, tab) ->
+                        cellRuns[i] = when (r) {
+                            is StatementResult.Rows -> CellRun(source, tab = tab, millis = r.millis)
+                            is StatementResult.Updated -> CellRun(source, message = "${r.count} filas afectadas", millis = r.millis)
+                            is StatementResult.Failed -> CellRun(source, message = r.message, ok = false, millis = r.millis)
+                        }
+                        record(target.id, listOf(r.toHistory(tab)))
+                        if (r is StatementResult.Failed) failed = true
+                        else if (changesSchema(r.sql)) refreshExplorer()
+                    }.onFailure { cellRuns[i] = CellRun(source, message = it.message ?: it.toString(), ok = false); failed = true }
+                    if (failed) break
+                }
+                status = if (failed) "Error en una celda" else "${indexes.size} celda(s) ejecutada(s)"
+                running = false
+                consolePending = sessions.peek()?.pending == true
+                if (explorer == null || explorerKey != keyOf(target, pw)) connect(announce = false)
+            }
+        }
+    }
+
     fun runSelectionOrCurrent() {
+        if (notebookMode) { runCell(notebookCell); return }
         val text = editor.text
         val sel = editor.selection
         if (!sel.collapsed) {
@@ -318,7 +398,7 @@ class AppState(
     fun explain(analyze: Boolean) {
         val text = editor.text
         val sel = editor.selection
-        val sql = (if (!sel.collapsed) text.substring(sel.min, sel.max) else statementAt(text, sel.start, slashBlocks, goBatches)?.text(text))?.trim()?.trimEnd(';')?.trim()
+        val sql = (if (notebookMode) cellText(notebookCell) else if (!sel.collapsed) text.substring(sel.min, sel.max) else statementAt(text, sel.start, slashBlocks, goBatches)?.text(text))?.trim()?.trimEnd(';')?.trim()
         if (sql.isNullOrBlank()) { status = "Nada que explicar"; return }
         val kind = form.effectiveKind
         val script = explainScript(kind, sql, analyze) ?: run { status = "${if (analyze) "Explain analyze" else "Explain"} no está disponible para ${kind.label()}"; return }
@@ -328,7 +408,9 @@ class AppState(
         else go()
     }
 
-    fun runScript() = run(splitStatements(editor.text, slashBlocks, goBatches).map { it.text(editor.text) })
+    fun runScript() { if (notebookMode) runAllCells() else runAllText() }
+
+    private fun runAllText() = run(splitStatements(editor.text, slashBlocks, goBatches).map { it.text(editor.text) })
 
     fun cancel() { sessions.peek()?.cancel() }
 

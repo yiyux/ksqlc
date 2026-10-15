@@ -69,7 +69,9 @@ fun cellText(v: Any?): String = v?.toString()?.replace("\r\n", "⏎")?.replace('
 @Composable
 fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, editing: TableEditor? = null, onNotice: (String) -> Unit = {},
          /** Header arrows. Null = the grid orders the rows it has loaded; given = the owner orders them (e.g. in the query) and reloads. */
-         onSort: ((column: Int, asc: Boolean?) -> Unit)? = null) {
+         onSort: ((column: Int, asc: Boolean?) -> Unit)? = null,
+         /** The floating "N rows" pill; off where the owner says the count itself (a notebook cell). */
+         showRowsPill: Boolean = true) {
     val c = Ksqlc.colors
     val clipboard = LocalClipboardManager.current
     val hscroll = rememberScrollState()
@@ -331,7 +333,7 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         ListScrollbar(list, Modifier.align(Alignment.CenterEnd).padding(top = HeaderHeight).fillMaxHeight())
         val wide = hscroll.maxValue > 0
         if (wide) HorizontalScrollbar(rememberScrollbarAdapter(hscroll), Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(end = 12.dp).testTag("grid-hscroll"), style = scrollbarStyle())
-        RowsPill(tab, if (filtersSnapshot.isEmpty()) null else visible.count { it < tab.rows.size }, onLoadMore, Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = if (wide) 18.dp else 10.dp))
+        if (showRowsPill) RowsPill(tab, if (filtersSnapshot.isEmpty()) null else visible.count { it < tab.rows.size }, onLoadMore, Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = if (wide) 18.dp else 10.dp))
         bigCell?.let { (i, j) ->
             BigCellEditor(
                 "${cols[j].name} (${cols[j].typeName.lowercase()})", raw(i, j), isJsonType(cols[j].typeName),

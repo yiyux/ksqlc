@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 /** ksqlc's own glyphs, drawn on a 16x16 grid. Deliberately simple; they are not copies of any other product's icons. */
 enum class IconKind {
     Database, Schema, Folder, Table, View, MatView, Sequence, Routine, Column, Key, Index, ForeignKey,
-    Play, PlayAll, Stop, Refresh, Plus, Minus, Copy, Filter, Gear, ChevronRight, ChevronDown, Close, Contrast, Format, Sort, Revert, Preview, Submit, Check, Rollback, Calendar, History, Export, Search, Updown, ArrowUp, ArrowDown, Explain, Analyze,
+    Play, PlayAll, Stop, Refresh, Plus, Minus, Copy, Filter, Gear, ChevronRight, ChevronDown, Close, Contrast, Format, Sort, Revert, Preview, Submit, Check, Rollback, Calendar, History, Export, Search, Updown, ArrowUp, ArrowDown, Explain, Analyze, Notebook,
 }
 
 @Composable
@@ -106,6 +106,7 @@ private fun DrawScope.drawGlyph(kind: IconKind, c: Color) {
         IconKind.Search -> { drawCircle(c, 4.2f, Offset(6.8f, 6.8f), style = line); seg(c, 10f, 10f, 13.5f, 13.5f) }
         IconKind.Explain -> { box(c, 5.5f, 2f, 5f, 3.5f); seg(c, 8f, 5.5f, 8f, 8f); seg(c, 4f, 8f, 12f, 8f); seg(c, 4f, 8f, 4f, 10f); seg(c, 12f, 8f, 12f, 10f); box(c, 1.5f, 10f, 5f, 3.5f); box(c, 9.5f, 10f, 5f, 3.5f) }
         IconKind.Analyze -> { drawCircle(c, 5.2f, Offset(8f, 9f), style = line); seg(c, 8f, 9f, 8f, 5.8f); seg(c, 8f, 9f, 10.2f, 10.5f); seg(c, 6.5f, 2f, 9.5f, 2f) }
+        IconKind.Notebook -> { box(c, 2.5f, 2f, 11f, 5f); box(c, 2.5f, 9f, 11f, 5f); seg(c, 5f, 4.5f, 9f, 4.5f); seg(c, 5f, 11.5f, 11f, 11.5f) }
         IconKind.Updown -> { poly(c, 5f, 6.5f, 8f, 3.5f, 11f, 6.5f); poly(c, 5f, 9.5f, 8f, 12.5f, 11f, 9.5f) }
         IconKind.ArrowUp -> { seg(c, 8f, 13f, 8f, 3.5f); poly(c, 4.5f, 7f, 8f, 3.5f, 11.5f, 7f) }
         IconKind.ArrowDown -> { seg(c, 8f, 3f, 8f, 12.5f); poly(c, 4.5f, 9f, 8f, 12.5f, 11.5f, 9f) }
