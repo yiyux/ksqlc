@@ -57,6 +57,8 @@ object PostgresDialect : MetaDialect() {
         else listOf("select * from $q(" + inputs.joinToString(", ") { holders.next() } + ")")
     }
 
+    override fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = postgresAlterTable(this, o, before, after)
+
     override fun tableModel(conn: Connection, o: DbObject): TableModel {
         val (oid, tableComment) = conn.query(
             """select c.oid::bigint, obj_description(c.oid, 'pg_class') from pg_class c join pg_namespace n on n.oid = c.relnamespace
