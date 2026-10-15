@@ -68,6 +68,16 @@ class SqlServerIntrospectionTest {
         r.cursor.close()
     }
 
+    @Test fun routinesAreCalledWithPlaceholders() = intro().use { i ->
+        val app = Namespace(null, "app")
+        val proc = i.call(DbObject(app, "add_order", DbObjectKind.ROUTINE)).single()
+        assertEquals("exec [app].[add_order] @id = :id", proc)
+        assertEquals(listOf(7), lastRows(fx, listOf(proc.replace(":id", "7"))).single())
+        val fn = i.call(DbObject(app, "twice", DbObjectKind.ROUTINE)).single()
+        assertEquals("select [app].[twice](:n) as [twice]", fn)
+        assertEquals(listOf(42), lastRows(fx, listOf(fn.replace(":n", "21"))).single())
+    }
+
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE, ns: Namespace = app) = DbObject(ns, name, kind)
 

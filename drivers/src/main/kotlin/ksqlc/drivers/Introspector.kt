@@ -37,6 +37,7 @@ class Introspector(private val ds: DataSource, private val password: String?) : 
     @Synchronized override fun objects(ns: Namespace): List<DbObject> = dialect.objects(connection(), ns, includeSystem)
     @Synchronized override fun details(o: DbObject): TableDetails = dialect.details(connection(), o)
     @Synchronized override fun ddl(o: DbObject): String = dialect.ddl(connection(), o)
+    @Synchronized override fun call(o: DbObject): List<String> = dialect.call(connection(), o)
 
     @Synchronized override fun close() {
         runCatching { conn?.close() }

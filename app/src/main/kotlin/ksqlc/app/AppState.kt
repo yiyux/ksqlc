@@ -756,6 +756,16 @@ class AppState(
         }
     }
 
+    /** Calls routine [o] from the console: its input parameters are asked for, and what it returns shows in the result tabs. */
+    fun callRoutine(o: DbObject) {
+        val m = explorer ?: return
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { m.source.call(o) } }
+                .onSuccess { run(it) }
+                .onFailure { status = "No se puede ejecutar ${o.name}: ${it.message}" }
+        }
+    }
+
     /** Asks to run the alteration [sql] (shown as is), runs it on the console's connection, logs it and reloads the explorer. */
     fun alter(title: String, sql: String) {
         confirmation = Confirmation(title, sql, "Ejecutar") {

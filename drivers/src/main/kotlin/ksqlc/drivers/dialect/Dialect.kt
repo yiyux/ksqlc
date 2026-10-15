@@ -21,6 +21,12 @@ interface Dialect {
     fun details(conn: Connection, o: DbObject): TableDetails
     fun ddl(conn: Connection, o: DbObject): String
 
+    /**
+     * The statements that call routine [o]. Each input parameter is a `:name` placeholder, so the console asks for the values
+     * before running; the parameters it cannot take (OUT ones, where the engine needs a variable to hold them) make this fail.
+     */
+    fun call(conn: Connection, o: DbObject): List<String> = error("Este motor no tiene rutinas que ejecutar")
+
     companion object {
         fun of(kind: DbKind): Dialect = when (kind) {
             DbKind.POSTGRES -> PostgresDialect
@@ -30,5 +36,16 @@ interface Dialect {
             DbKind.ORACLE -> OracleDialect
             DbKind.CASSANDRA -> CassandraDialect
         }
+    }
+}
+
+/** The `:name` placeholder of each parameter: its name made safe for [ksqlc.sql.findParams], or `argN` when it has none, never repeated. */
+internal fun placeholders(names: List<String?>): List<String> {
+    val seen = HashSet<String>()
+    return names.mapIndexed { i, raw ->
+        val base = raw.orEmpty().removePrefix("@").replace(Regex("\\W"), "_").ifEmpty { "arg${i + 1}" }.let { if (it[0].isDigit()) "_$it" else it }
+        var n = base; var k = 2
+        while (!seen.add(n.lowercase())) n = base + "_" + k++
+        ":$n"
     }
 }

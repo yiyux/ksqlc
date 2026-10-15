@@ -10,4 +10,5 @@ interface SchemaSource {
     fun objects(ns: Namespace): List<DbObject>
     fun details(o: DbObject): TableDetails
     fun ddl(o: DbObject): String
+    fun call(o: DbObject): List<String> = error("Este motor no tiene rutinas que ejecutar")
 }

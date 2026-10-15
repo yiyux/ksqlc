@@ -113,6 +113,15 @@ object OracleDialect : MetaDialect() {
         return TableDetails(cols, pk.firstOrNull()?.name, pk.map { it.col }, (indexes + uniques).sortedBy { it.name.lowercase() }, fks)
     }
 
+    override fun call(conn: Connection, o: DbObject): List<String> {
+        val type = conn.query("select object_type from all_objects where owner = ? and object_name = ? and object_type in ('PROCEDURE','FUNCTION')", o.ns.schema, o.name) { it.getString(1) }.firstOrNull() ?: error("${o.name} no existe")
+        // position 0 is a function's return value
+        val params = conn.query("select argument_name, in_out from all_arguments where owner = ? and object_name = ? and package_name is null and data_level = 0 and position > 0 order by position", o.ns.schema, o.name) { it.getString(1) to it.getString(2) }
+        if (params.any { it.second != "IN" }) error("tiene parámetros de salida y todavía no se pueden pedir")
+        val args = placeholders(params.map { it.first }).joinToString(", ")
+        return listOf(if (type == "FUNCTION") "select ${qualified(o)}($args) as ${quote(o.name)} from dual" else "begin ${qualified(o)}($args); end;")
+    }
+
     override fun ddl(conn: Connection, o: DbObject): String {
         val type = when (o.kind) {
             DbObjectKind.TABLE -> "TABLE"

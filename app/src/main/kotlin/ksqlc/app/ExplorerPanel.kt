@@ -34,6 +34,7 @@ import ksqlc.drivers.dropForeignKeySql
 import ksqlc.drivers.dropIndexSql
 import ksqlc.drivers.dropSql
 import ksqlc.drivers.refreshMatViewSql
+import ksqlc.drivers.supportsRoutineCall
 import ksqlc.drivers.truncateSql
 
 private fun iconOf(k: NodeKind) = when (k) {
@@ -200,6 +201,7 @@ private fun LazyListScope.nodeItems(
                     if (o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem("Exportar datos…") { state.exportObject(o) })
                     if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Importar CSV…") { state.openImport(o) })
                     if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Dump con la herramienta del motor…") { state.openNative(false, o) })
+                    if (node.kind == NodeKind.ROUTINE && supportsRoutineCall(state.form.effectiveKind)) add(ContextMenuItem("Ejecutar…") { state.callRoutine(o) })
                     add(ContextMenuItem("Comparar esquema con…") { state.openDiff(o.ns, o.name) })
                     add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
                     add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })

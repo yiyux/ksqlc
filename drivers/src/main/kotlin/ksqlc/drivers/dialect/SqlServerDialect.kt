@@ -38,6 +38,19 @@ object SqlServerDialect : MetaDialect() {
         }
     }
 
+    override fun call(conn: Connection, o: DbObject): List<String> {
+        val type = conn.query("select o.type from sys.objects o join sys.schemas s on s.schema_id = o.schema_id where s.name = ? and o.name = ?", o.ns.schema, o.name) { it.getString(1).trim() }.firstOrNull() ?: error("${o.name} no existe")
+        val params = conn.query("select name, is_output from sys.parameters where object_id = object_id(?) and parameter_id > 0 order by parameter_id", qualified(o)) { it.getString(1) to it.getBoolean(2) }
+        if (params.any { it.second }) error("tiene parámetros de salida y todavía no se pueden pedir")
+        val holders = placeholders(params.map { it.first })
+        val q = qualified(o)
+        return listOf(when (type) {
+            "FN", "FS" -> "select $q(${holders.joinToString(", ")}) as ${quote(o.name)}"
+            "IF", "TF", "FT" -> "select * from $q(${holders.joinToString(", ")})"
+            else -> "exec $q" + params.indices.joinToString(", ", prefix = if (params.isEmpty()) "" else " ") { "${params[it].first} = ${holders[it]}" }
+        })
+    }
+
     /** A column as the catalog has it; [details] and [ddl] both start from this. */
     private class Col(
         val name: String, val type: String, val length: Int, val precision: Int, val scale: Int, val nullable: Boolean,

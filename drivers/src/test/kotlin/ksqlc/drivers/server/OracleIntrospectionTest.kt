@@ -58,6 +58,16 @@ class OracleIntrospectionTest {
         intro().use { i -> i.onlyNamespace = owner.lowercase(); assertEquals(listOf(owner), i.namespaces().map { it.label }) }
     }
 
+    @Test fun routinesAreCalledWithPlaceholders() = intro().use { i ->
+        val proc = DbObject(ns, "ADD_ORDER", DbObjectKind.ROUTINE)
+        val q = Dialect.of(DbKind.ORACLE).qualified(proc)
+        val call = i.call(proc).single()
+        assertEquals("begin $q(:P_ID); end;", call)
+        Session(fx.ds, fx.password).use { s -> assertFalse(s.runScript(listOf(call.replace(":P_ID", "1"))).single() is StatementResult.Failed) }
+        val fn = i.call(DbObject(ns, "TWICE", DbObjectKind.ROUTINE)).single()
+        assertEquals(42, (lastRows(fx, listOf(fn.replace(":N", "21"))).single().single() as Number).toInt())
+    }
+
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE) = DbObject(ns, name, kind)
 

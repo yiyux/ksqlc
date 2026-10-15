@@ -37,6 +37,25 @@ object PostgresDialect : MetaDialect() {
         return relations + routines
     }
 
+    override fun call(conn: Connection, o: DbObject): List<String> {
+        val name = o.name.substringBefore('(')
+        // the name carries the identity arguments, which tell overloads apart (see [objects])
+        val row = conn.query(
+            """select p.prokind, p.proargnames::text[], p.proargmodes::text[], p.pronargs from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+               where n.nspname = ? and p.prokind in ('f','p') and p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' = ?""",
+            o.ns.schema, o.name,
+        ) { rs -> Triple(rs.getString(1), rs.getArray(2)?.array as Array<*>?, rs.getArray(3)?.array as Array<*>?) to rs.getInt(4) }.firstOrNull() ?: error("${o.name} no existe")
+        val (kind, argNames, argModes) = row.first
+        val count = argModes?.size ?: row.second
+        // 'o' is an OUT argument (a procedure still wants a slot for it), 't' a column of the result table
+        fun modeOf(i: Int) = argModes?.get(i) as String? ?: "i"
+        val inputs = (0 until count).filter { modeOf(it) in setOf("i", "b", "v") }
+        val holders = placeholders(inputs.map { argNames?.getOrNull(it) as String? }).iterator()
+        val q = "${quote(o.ns.schema!!)}.${quote(name)}"
+        return if (kind == "p") listOf("call $q(" + (0 until count).joinToString(", ") { if (modeOf(it) == "o") "null" else holders.next() } + ")")
+        else listOf("select * from $q(" + inputs.joinToString(", ") { holders.next() } + ")")
+    }
+
     override fun ddl(conn: Connection, o: DbObject): String = when (o.kind) {
         DbObjectKind.TABLE, DbObjectKind.SEQUENCE -> generateDdl(o, details(conn, o))
         DbObjectKind.VIEW, DbObjectKind.MATERIALIZED_VIEW -> {

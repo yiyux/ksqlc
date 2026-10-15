@@ -38,6 +38,26 @@ object MySqlDialect : MetaDialect() {
         }
     }
 
+    override fun call(conn: Connection, o: DbObject): List<String> {
+        val params = conn.query(
+            "select parameter_mode, parameter_name from information_schema.parameters where specific_schema = ? and specific_name = ? and ordinal_position > 0 order by ordinal_position",
+            o.ns.catalog, o.name,
+        ) { it.getString(1) to it.getString(2) }
+        val holders = placeholders(params.map { it.second })
+        if (routineType(conn, o) == "FUNCTION") return listOf("select ${qualified(o)}(${holders.joinToString(", ")}) as ${quote(o.name)}")
+        // an OUT argument needs a session variable to hold it, shown afterwards; an INOUT one starts with the value asked for
+        val before = ArrayList<String>(); val after = ArrayList<String>()
+        val args = params.mapIndexed { i, (mode, _) ->
+            val v = "@ksqlc_" + holders[i].drop(1)
+            when (mode) {
+                "OUT" -> v.also { after += "$v as ${holders[i].drop(1)}" }
+                "INOUT" -> v.also { before += "set $v = ${holders[i]}"; after += "$v as ${holders[i].drop(1)}" }
+                else -> holders[i]
+            }
+        }
+        return before + "call ${qualified(o)}(${args.joinToString(", ")})" + listOfNotNull(after.takeIf { it.isNotEmpty() }?.let { "select ${it.joinToString(", ")}" })
+    }
+
     private fun routineType(conn: Connection, o: DbObject): String =
         conn.query("select routine_type from information_schema.routines where routine_schema = ? and routine_name = ?", o.ns.catalog, o.name) { it.getString(1) }
             .firstOrNull() ?: "PROCEDURE"
