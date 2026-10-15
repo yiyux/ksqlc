@@ -21,20 +21,28 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The app against a running Cassandra node: `KSQLC_CASSANDRA=host:port` (skipped without it; Docker is not used here). */
+/** The app against Cassandra: a running node given by `KSQLC_CASSANDRA=host:port`, else a Docker container (skipped without either). */
 @OptIn(ExperimentalTestApi::class)
 class CassandraUiTest {
     @get:Rule val rule = createComposeRule()
 
-    private val node = System.getenv("KSQLC_CASSANDRA")
+    private var node: String? = System.getenv("KSQLC_CASSANDRA")
+    private var container: org.testcontainers.cassandra.CassandraContainer? = null
     private val state = AppState(
         CoroutineScope(SupervisorJob() + Dispatchers.Default),
         ConnectionStore(Files.createTempDirectory("ksqlc-ui-c"), InMemorySecretStore()),
         SettingsStore(Files.createTempDirectory("ksqlc-ui-cs")),
     )
 
-    @Before fun setUp() { assumeTrue("KSQLC_CASSANDRA no definido", node != null); rule.mainClock.autoAdvance = false }
-    @After fun tearDown() = state.dispose()
+    @Before fun setUp() {
+        if (node == null) {
+            assumeTrue("Docker no disponible y KSQLC_CASSANDRA no definido", runCatching { org.testcontainers.DockerClientFactory.instance().isDockerAvailable }.getOrDefault(false))
+            val c = org.testcontainers.cassandra.CassandraContainer("cassandra:5.0").also { it.start() }
+            container = c; node = "${c.contactPoint.hostString}:${c.contactPoint.port}"
+        }
+        rule.mainClock.autoAdvance = false
+    }
+    @After fun tearDown() { state.dispose(); container?.stop() }
 
     private fun until(cond: () -> Boolean) {
         val end = System.nanoTime() + 60_000_000_000

@@ -19,6 +19,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-mariadb:2.0.5")
     testImplementation("org.testcontainers:testcontainers-mssqlserver:2.0.5")
     testImplementation("org.testcontainers:testcontainers-oracle-free:2.0.5")
+    testImplementation("org.testcontainers:testcontainers-cassandra:2.0.5")
 }
 compose.desktop { application {
     mainClass = "ksqlc.app.MainKt"
