@@ -68,6 +68,22 @@ class ModifyDraftTest {
         assertNotNull(d.problem)
     }
 
+    @Test fun renamingOverAnotherColumnsNameNeverStealsItsReferences() {
+        val d = draft()
+        d.updateColumn(1) { it.copy(name = "id") }
+        d.updateColumn(1) { it.copy(name = "idx") }
+        assertEquals(listOf("id"), d.model.keys[0].columns)
+        assertEquals(listOf("idx"), d.model.indexes[0].columns.map { it.name })
+    }
+
+    @Test fun typingANameThatPassesThroughAnotherColumnsNameKeepsEveryReference() {
+        val d = draft()
+        for (n in 1.."identifier".length) d.updateColumn(1) { it.copy(name = "identifier".take(n)) }
+        assertEquals(listOf("id"), d.model.keys[0].columns)
+        assertEquals(listOf("identifier"), d.model.indexes[0].columns.map { it.name })
+        assertEquals(listOf("alter table \"app\".\"t\" rename column \"name\" to \"identifier\""), d.statements)
+    }
+
     @Test fun listHelpers() {
         assertEquals(listOf(1, 9, 3), listOf(1, 2, 3).replaced(1, 9))
         assertEquals(listOf(2, 1, 3), listOf(1, 2, 3).moved(0, 1))

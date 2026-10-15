@@ -28,21 +28,28 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
     fun rename(name: String) { model = model.copy(name = name) }
     fun comment(text: String) { model = model.copy(comment = text.ifBlank { null }) }
 
+    /** The name under which keys, foreign keys and indexes refer to column i; parallel to model.columns, so references follow the column and not its name. */
+    private var refNames = before.columns.map { it.name }
+    private var aliases = 0
+
     /** Renaming a column rewrites the keys, foreign keys and indexes that use it, so they stay the same element. */
     fun updateColumn(i: Int, f: (ColumnModel) -> ColumnModel) {
-        val old = model.columns[i]
-        val new = f(old)
+        val new = f(model.columns[i])
+        val oldRef = refNames[i]
+        // A name another column has gets a placeholder reference, so that column's references are never touched.
+        val newRef = if (model.columns.withIndex().any { (n, c) -> n != i && c.name.equals(new.name, ignoreCase = true) }) "\u0000${aliases++}" else new.name
         var m = model.copy(columns = model.columns.replaced(i, new))
-        if (new.name != old.name) {
-            fun r(l: List<String>) = l.map { if (it == old.name) new.name else it }
+        if (newRef != oldRef) {
+            fun r(l: List<String>) = l.map { if (it == oldRef) newRef else it }
             m = m.copy(
                 keys = m.keys.map { it.copy(columns = r(it.columns)) },
                 foreignKeys = m.foreignKeys.map { it.copy(columns = r(it.columns)) },
                 indexes = m.indexes.map { ix ->
-                    ix.copy(columns = ix.columns.map { c -> if (c.expression || c.name != old.name) c else c.copy(name = new.name) }, include = r(ix.include))
+                    ix.copy(columns = ix.columns.map { c -> if (c.expression || c.name != oldRef) c else c.copy(name = newRef) }, include = r(ix.include))
                 },
             )
         }
+        refNames = refNames.replaced(i, newRef)
         model = m
     }
 
@@ -65,7 +72,10 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
         val first = listOfNotNull(model.columns.firstOrNull()?.name)
         val t = model.name
         when (group) {
-            "columns" -> model = model.copy(columns = model.columns + ColumnModel(null, unique("column_name", model.columns.map { it.name }), "integer"))
+            "columns" -> {
+                val c = ColumnModel(null, unique("column_name", model.columns.map { it.name }), "integer")
+                model = model.copy(columns = model.columns + c); refNames = refNames + c.name
+            }
             "keys" -> model = model.copy(keys = model.keys + KeyModel(null, unique("${t}_key", constraintNames()), false, first))
             "fks" -> model = model.copy(foreignKeys = model.foreignKeys + ForeignKeyModel(null, unique("${t}_fk", constraintNames()), first, obj.ns, "", emptyList()))
             "indexes" -> model = model.copy(indexes = model.indexes + IndexModel(null, unique("${t}_idx", constraintNames()), false, "btree", first.map { IndexColumn(it) }))
@@ -86,7 +96,7 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
         val i = sel.index
         if (i < 0 || i >= count(sel.group)) return
         model = when (sel.group) {
-            "columns" -> model.copy(columns = model.columns.without(i))
+            "columns" -> model.copy(columns = model.columns.without(i)).also { refNames = refNames.without(i) }
             "keys" -> model.copy(keys = model.keys.without(i))
             "fks" -> model.copy(foreignKeys = model.foreignKeys.without(i))
             "indexes" -> model.copy(indexes = model.indexes.without(i))
@@ -99,7 +109,10 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
         val i = sel.index
         if (i < 0 || i >= count(sel.group)) return
         when (sel.group) {
-            "columns" -> model.columns[i].let { c -> model = model.copy(columns = model.columns + c.copy(origin = null, name = unique("${c.name}_copy", model.columns.map { it.name }))) }
+            "columns" -> model.columns[i].let { c ->
+                val copy = c.copy(origin = null, name = unique("${c.name}_copy", model.columns.map { it.name }))
+                model = model.copy(columns = model.columns + copy); refNames = refNames + copy.name
+            }
             "keys" -> model.keys[i].let { k -> model = model.copy(keys = model.keys + k.copy(origin = null, primary = false, name = unique("${k.name}_copy", constraintNames()))) }
             "fks" -> model.foreignKeys[i].let { f -> model = model.copy(foreignKeys = model.foreignKeys + f.copy(origin = null, name = unique("${f.name}_copy", constraintNames()))) }
             "indexes" -> model.indexes[i].let { x -> model = model.copy(indexes = model.indexes + x.copy(origin = null, name = unique("${x.name}_copy", constraintNames()))) }
