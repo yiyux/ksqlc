@@ -19,7 +19,11 @@ class Introspector(private val ds: DataSource, private val password: String?) : 
     /** Also list the engine's own schemas and objects; takes effect on the next read. */
     @Volatile var includeSystem = false
 
-    @Synchronized override fun namespaces(): List<Namespace> = dialect.namespaces(connection(), includeSystem)
+    /** When set, only the namespace with this name (any case) is listed: "single database" mode. */
+    @Volatile var onlyNamespace: String? = null
+
+    @Synchronized override fun namespaces(): List<Namespace> =
+        dialect.namespaces(connection(), includeSystem).let { all -> onlyNamespace?.takeIf { it.isNotBlank() }?.let { only -> all.filter { it.label.equals(only, true) } } ?: all }
     @Synchronized override fun objects(ns: Namespace): List<DbObject> = dialect.objects(connection(), ns, includeSystem)
     @Synchronized override fun details(o: DbObject): TableDetails = dialect.details(connection(), o)
     @Synchronized override fun ddl(o: DbObject): String = dialect.ddl(connection(), o)

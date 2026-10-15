@@ -5,6 +5,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ksqlc.core.*
@@ -52,7 +54,7 @@ class Holder<T : AutoCloseable>(private val create: (DataSource, String?) -> T) 
     @Synchronized fun close() { value?.close(); value = null; key = null }
 }
 
-fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password)
+fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password, ds.options.toString())
 
 /** A read-only text dialog: a table's DDL, or the SQL a submit would run ([heading] says which). */
 class DdlView(val title: String, val text: String, val heading: String = "DDL")
@@ -230,6 +232,9 @@ class AppState(
         private set
 
     private val sessions = Holder<Session>(::Session)
+
+    /** The console's live connection, or null before the first run and after it was closed for inactivity. */
+    internal val consoleSession: Session? get() = sessions.peek()
     private val introspectors = Holder<Introspector>(::Introspector)
     private var explorerKey: List<String?>? = null
 
@@ -261,7 +266,7 @@ class AppState(
     /** Saves [draft] (new or existing), makes it the active connection and reads its schema. */
     fun applyDraft(draft: ConnectionForm) {
         val id = draft.currentId ?: UUID.randomUUID().toString().also { draft.currentId = it }
-        val changed = form.toDataSource().url != draft.toDataSource().url || form.user != draft.user || form.password != draft.password
+        val changed = form.toDataSource().url != draft.toDataSource().url || form.user != draft.user || form.password != draft.password || form.options != draft.options
         persist({ store.save(draft.toDataSource().copy(id = id), draft.password) }, "Conexión \"${draft.name}\" guardada")
         form.copyFrom(draft)
         if (changed || explorer == null) { disconnect(); connect() }
@@ -366,7 +371,7 @@ class AppState(
                         }
                         record(target.id, listOf(r.toHistory(tab)))
                         if (r is StatementResult.Failed) failed = true
-                        else if (changesSchema(r.sql)) refreshExplorer()
+                        else if (changesSchema(r.sql) && target.options.autoSync) refreshExplorer()
                     }.onFailure { cellRuns[i] = CellRun(source, message = it.message ?: it.toString(), ok = false); failed = true }
                     if (failed) break
                 }
@@ -477,7 +482,7 @@ class AppState(
                 val ddlRan = results.any { (r, _) -> r !is StatementResult.Failed && changesSchema(r.sql) }
                 when {
                     explorerKey != keyOf(target, pw) -> connect(announce = false)   // first run, or the connection changed
-                    ddlRan -> refreshExplorer()
+                    ddlRan && target.options.autoSync -> refreshExplorer()
                 }
             }.onFailure { status = "Error: ${it.message}"; logLine("", "ERROR: ${it.message}"); selectedTab = OUTPUT_TAB }
             running = false
@@ -493,7 +498,7 @@ class AppState(
         connecting = true
         val ds = form.toDataSource(); val pw = form.passwordOrNull
         scope.launch {
-            runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw).also { it.includeSystem = settings.showSystemSchemas }).also { it.load() } } }
+            runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw).also { it.includeSystem = settings.showSystemSchemas; it.onlyNamespace = singleDatabaseName(ds) }).also { it.load() } } }
                 .onSuccess { explorer = it; explorerKey = keyOf(ds, pw); if (announce) status = "Esquema cargado: ${ds.name}"; loadCatalog(it) }
                 .onFailure {
                     explorer = null; explorerKey = null; catalog = null
@@ -548,7 +553,7 @@ class AppState(
                         is StatementResult.Failed -> error(r.message)
                         else -> error("sin resultado")
                     }
-                    tab to TableEditor(o, m.source.dialect, target.kind, key)
+                    tab to TableEditor(o, m.source.dialect, target.kind, key, target.options.readOnly)
                 }
             }.onSuccess { (tab, editor) ->
                 dataTabs += DataTab(o, tab, session, sql, editor); activeEditor = dataTabs.lastIndex
@@ -579,7 +584,7 @@ class AppState(
                     val known = d.columns.map { it.name.lowercase() }.toSet()
                     val ok = d.primaryKey.isNotEmpty() && shown.size == shown.toSet().size && shown.all { it in known } && d.primaryKey.all { it.lowercase() in shown }
                     if (!ok) return@withContext null
-                    DataTab(o, tab, Session(target, pw), tab.result.sql.trim().trimEnd(';'), TableEditor(o, m.source.dialect, target.kind, d.primaryKey))
+                    DataTab(o, tab, Session(target, pw), tab.result.sql.trim().trimEnd(';'), TableEditor(o, m.source.dialect, target.kind, d.primaryKey, target.options.readOnly))
                 }
             }.getOrNull() ?: return@launch
             if (tab in tabs) tab.edit = prepared else withContext(Dispatchers.IO) { prepared.session.close() }
@@ -889,5 +894,40 @@ class AppState(
         scope.launch { withContext(Dispatchers.IO) { runCatching { history?.clear(id) } }; historyEntries = emptyList() }
     }
 
-    fun dispose() { diffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
+    /** The one namespace "single database" mode keeps: the database or keyspace of the URL, or the user's own schema in Oracle. */
+    private fun singleDatabaseName(ds: DataSource): String? = if (!ds.options.singleDatabase) null else when (ds.kind) {
+        DbKind.ORACLE -> ds.user
+        DbKind.MYSQL, DbKind.MARIADB, DbKind.CASSANDRA -> JdbcUrl.parse(ds.url)?.database
+        else -> null
+    }?.takeIf { it.isNotBlank() }
+
+    // --- housekeeping: keep-alive, closing an idle console connection, periodic schema reads -----------
+
+    private var lastKeepAlive = System.currentTimeMillis()
+    private var lastIntrospection = System.currentTimeMillis()
+    /** How long one unit of the introspection interval is; a minute, except in tests. */
+    internal var introspectionUnitMillis = 60_000L
+
+    private val housekeeping = scope.launch {
+        while (isActive) {
+            delay(1000)
+            val o = form.options
+            val now = System.currentTimeMillis()
+            val session = sessions.peek()
+            if (o.keepAliveSeconds > 0 && session != null && now - lastKeepAlive >= o.keepAliveSeconds * 1000L) {
+                lastKeepAlive = now
+                withContext(Dispatchers.IO) { runCatching { session.keepAlive() } }
+            }
+            if (o.autoDisconnectSeconds > 0 && session != null && !running && !consolePending && !session.busy && now - session.lastUsed >= o.autoDisconnectSeconds * 1000L) {
+                withContext(Dispatchers.IO) { sessions.close() }
+                status = "Conexión de la consola cerrada por inactividad; se abre de nuevo al ejecutar"
+            }
+            if (o.introspectionMinutes > 0 && explorer != null && !connecting && now - lastIntrospection >= o.introspectionMinutes * introspectionUnitMillis) {
+                lastIntrospection = now
+                refreshExplorer()
+            }
+        }
+    }
+
+    fun dispose() { housekeeping.cancel(); diffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
 }

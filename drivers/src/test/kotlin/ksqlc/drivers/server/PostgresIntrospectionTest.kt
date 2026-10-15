@@ -1,6 +1,7 @@
 package ksqlc.drivers.server
 
 import ksqlc.core.*
+import ksqlc.drivers.Session
 import ksqlc.drivers.Introspector
 import org.junit.AfterClass
 import org.junit.BeforeClass
@@ -44,6 +45,22 @@ class PostgresIntrospectionTest {
         assertTrue(i.details(i.objects(ns).first { it.name == "pg_class" }).columns.any { it.name == "relname" })
     }
 
+
+    @Test fun theTimeZoneAndStartupScriptApplyAndReadOnlyHoldsEvenForWritingCtes() {
+        Session(fx.ds.copy(options = ConnectionOptions(timeZone = "Asia/Tokyo", startupScript = "set application_name = 'ksqlc-opts'")), fx.password).use { s ->
+            fun one(sql: String) = (s.runScript(listOf(sql)).single() as StatementResult.Rows).let { r -> r.cursor.fetch(1).single().single().toString().also { r.cursor.close() } }
+            assertEquals("Asia/Tokyo", one("show timezone")); assertEquals("ksqlc-opts", one("show application_name"))
+        }
+        Session(fx.ds.copy(options = ConnectionOptions(readOnly = true)), fx.password).use { s ->
+            assertTrue(s.runScript(listOf("insert into app.customers(email) values ('x@x')")).single() is StatementResult.Failed)      // refused before it is sent
+            // a WITH that writes is stopped by the text check
+            val sneaky = s.runScript(listOf("with ins as (insert into app.customers(email) values ('y@y') returning 1) select * from ins")).single()
+            assertTrue(sneaky is StatementResult.Failed && "solo lectura" in sneaky.message, sneaky.toString())
+            // a plain SELECT that writes through a function gets past the check, so the session itself refuses
+            val setval = s.runScript(listOf("select setval('app.customers_id_seq', 999)")).single()
+            assertTrue(setval is StatementResult.Failed && "read-only" in setval.message.lowercase(), setval.toString())
+        }
+    }
 
     private fun intro() = Introspector(fx.ds, fx.password)
 

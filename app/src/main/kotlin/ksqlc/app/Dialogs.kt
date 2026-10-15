@@ -30,6 +30,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ksqlc.app.ui.*
 import ksqlc.core.DbKind
+import ksqlc.drivers.supportsSingleDatabase
+import ksqlc.drivers.supportsTimeZone
+import ksqlc.drivers.supportsTransactions
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import ksqlc.drivers.JdbcUrl
 
 private fun newDraft() = ConnectionForm().apply { name = "Nueva conexión"; kind = DbKind.POSTGRES; portText = "5432"; user = "" }
@@ -39,6 +44,74 @@ private fun Field(label: String, content: @Composable RowScope.() -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(label, Modifier.width(120.dp), fontSize = 13.sp, color = Ksqlc.colors.text, maxLines = 1)
         content()
+    }
+}
+
+/** A label wide enough for the option names, then the control. */
+@Composable
+private fun OField(label: String, content: @Composable RowScope.() -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(label, Modifier.width(210.dp), fontSize = 13.sp, color = Ksqlc.colors.text)
+        content()
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    val c = Ksqlc.colors
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.text)
+        Separator(Modifier.weight(1f))
+    }
+}
+
+/**
+ * The "Opciones" tab: connection behaviour and how the schema is read. Each engine only gets the options it can honour
+ * (a time zone for PostgreSQL, MySQL, MariaDB and Oracle; no transaction control for Cassandra; …). Tags `ds-readonly`, `ds-tx`,
+ * `ds-tz`, `ds-keepalive[-sec]`, `ds-autodisconnect[-sec]`, `ds-single`, `ds-startup`, `ds-autosync`, `ds-introspect`.
+ */
+@Composable
+private fun OptionsTab(draft: ConnectionForm, modifier: Modifier) {
+    val c = Ksqlc.colors
+    val kind = draft.effectiveKind
+    Column(modifier.verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionTitle("Conexión")
+        KCheckbox(draft.readOnly, { draft.readOnly = it }, label = "Solo lectura", modifier = Modifier.testTag("ds-readonly"))
+        if (supportsTransactions(kind)) OField("Control de transacciones:") {
+            SegmentedControl(listOf("Auto", "Manual"), if (draft.manualTx) 1 else 0, { draft.manualTx = it == 1 }, tag = "ds-tx")
+        }
+        if (supportsTimeZone(kind)) OField("Zona horaria:") {
+            CompactTextField(draft.timeZone, { draft.timeZone = it }, Modifier.weight(1f), placeholder = "p. ej. Europe/Madrid o +01:00; vacía = la del servidor", testTag = "ds-tz", height = 28.dp)
+        }
+        Row(Modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            KCheckbox(draft.keepAliveOn, { draft.keepAliveOn = it }, label = "Consulta de keep-alive cada", modifier = Modifier.testTag("ds-keepalive"))
+            CompactTextField(draft.keepAliveText, { draft.keepAliveText = it.filter(Char::isDigit) }, Modifier.width(80.dp), enabled = draft.keepAliveOn, testTag = "ds-keepalive-sec", height = 28.dp)
+            Text("s", fontSize = 13.sp, color = c.text)
+        }
+        Row(Modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            KCheckbox(draft.autoDisconnectOn, { draft.autoDisconnectOn = it }, label = "Cerrar la consola tras", modifier = Modifier.testTag("ds-autodisconnect"))
+            CompactTextField(draft.autoDisconnectText, { draft.autoDisconnectText = it.filter(Char::isDigit) }, Modifier.width(80.dp), enabled = draft.autoDisconnectOn, testTag = "ds-autodisconnect-sec", height = 28.dp)
+            Text("s sin uso", fontSize = 13.sp, color = c.text)
+        }
+        if (supportsSingleDatabase(kind)) KCheckbox(
+            draft.singleDatabase, { draft.singleDatabase = it },
+            label = when (kind) { DbKind.CASSANDRA -> "Modo de un solo keyspace"; DbKind.ORACLE -> "Mostrar solo el esquema del usuario"; else -> "Modo de una sola base de datos" },
+            modifier = Modifier.testTag("ds-single"),
+        )
+        OField("Script de inicio:") {
+            BasicTextField(
+                draft.startupScript, { draft.startupScript = it },
+                Modifier.weight(1f).height(90.dp).clip(RoundedCornerShape(4.dp)).border(1.dp, c.border, RoundedCornerShape(4.dp)).background(c.editorBg).padding(6.dp).testTag("ds-startup"),
+                textStyle = MonoStyle.copy(color = c.text, fontSize = 12.sp), cursorBrush = SolidColor(c.text),
+            )
+        }
+        Text("Se ejecuta cada vez que se abre una conexión (consola y pestañas de tabla).", Modifier.padding(start = 220.dp), fontSize = 11.sp, color = c.textMuted)
+        SectionTitle("Introspección")
+        KCheckbox(draft.autoSync, { draft.autoSync = it }, label = "Sincronizar el explorador tras cambiar el esquema", modifier = Modifier.testTag("ds-autosync"))
+        OField("Intervalo de introspección automática:") {
+            CompactTextField(draft.introspectionText, { draft.introspectionText = it.filter(Char::isDigit) }, Modifier.width(80.dp), testTag = "ds-introspect", height = 28.dp)
+            Text("minutos (vacío = nunca)", fontSize = 13.sp, color = c.text)
+        }
     }
 }
 
@@ -55,6 +128,7 @@ fun DataSourceDialog(state: AppState) {
     var test by remember { mutableStateOf<Result<String>?>(null) }
     var testing by remember { mutableStateOf(false) }
     var kindMenu by remember { mutableStateOf(false) }
+    var tab by remember { mutableStateOf(0) }
     val network = draft.kind != DbKind.SQLITE
     fun close() { state.dataSourceDialog = false }
 
@@ -94,15 +168,20 @@ fun DataSourceDialog(state: AppState) {
                 Column(Modifier.weight(1f).fillMaxHeight().padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
                     Field("Nombre:") { CompactTextField(draft.name, { draft.name = it }, Modifier.weight(1f), testTag = "ds-name", height = 28.dp) }
                     Spacer(Modifier.height(12.dp))
-                    Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.height(26.dp).clip(RoundedCornerShape(6.dp)).background(c.selection).border(1.dp, c.accent.copy(alpha = 0.45f), RoundedCornerShape(6.dp)).padding(horizontal = 12.dp),
-                            contentAlignment = Alignment.Center,
-                        ) { Text("General", fontSize = 13.sp, color = c.text) }
+                    Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("General", "Opciones").forEachIndexed { i, label ->
+                            val on = tab == i
+                            Box(
+                                Modifier.height(26.dp).clip(RoundedCornerShape(6.dp)).then(if (on) Modifier.background(c.selection).border(1.dp, c.accent.copy(alpha = 0.45f), RoundedCornerShape(6.dp)) else Modifier)
+                                    .clickable { tab = i }.padding(horizontal = 12.dp).testTag("ds-tab:$i"),
+                                contentAlignment = Alignment.Center,
+                            ) { Text(label, fontSize = 13.sp, color = if (on) c.text else c.textSecondary) }
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     Separator()
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (tab == 1) OptionsTab(draft, Modifier.weight(1f))
+                    else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Field("Motor:") {
                             Box(Modifier.weight(1f)) {
                                 DropdownField(draft.kind.label(), { kindMenu = true }, Modifier.fillMaxWidth().testTag("ds-kind"), icon = IconKind.Database, enabled = !draft.customUrl)

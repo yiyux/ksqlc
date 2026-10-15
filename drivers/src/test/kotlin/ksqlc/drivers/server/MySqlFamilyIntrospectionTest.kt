@@ -33,6 +33,24 @@ abstract class MySqlFamilyBase {
     }
 
 
+    @Test fun theTimeZoneAppliesAndSingleDatabaseNarrowsTheTree() {
+        Session(fx.ds.copy(options = ConnectionOptions(timeZone = "+05:30")), fx.password).use { s ->
+            val r = s.runScript(listOf("select @@session.time_zone")).single() as StatementResult.Rows
+            assertEquals("+05:30", r.cursor.fetch(1).single().single().toString()); r.cursor.close()
+        }
+        Session(fx.ds.copy(options = ConnectionOptions(readOnly = true)), fx.password).use { s ->      // the session-wide read-only statement is accepted by the engine
+            val r = s.runScript(listOf("select 1")).single() as StatementResult.Rows
+            assertEquals("1", r.cursor.fetch(1).single().single().toString()); r.cursor.close()
+            assertTrue(s.runScript(listOf("create table app.nope(a int)")).single() is StatementResult.Failed)
+        }
+        intro().use { i ->
+            i.includeSystem = true
+            assertTrue(i.namespaces().size > 1)
+            i.onlyNamespace = "APP"       // any case
+            assertEquals(listOf("app"), i.namespaces().map { it.label })
+        }
+    }
+
     private fun intro() = Introspector(fx.ds, fx.password)
 
     @Test fun namespacesAreDatabasesWithoutSystemOnes() {

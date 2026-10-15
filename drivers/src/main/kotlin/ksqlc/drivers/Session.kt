@@ -25,8 +25,38 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
     @Volatile private var cancelRequested = false
     @Volatile private var activeCursor: JdbcCursor? = null
 
+    private val options = ds.options
+    /** When something last used this session (a statement started or finished), for closing it after a while idle. */
+    @Volatile var lastUsed: Long = System.currentTimeMillis()
+        private set
+    private fun touch() { lastUsed = System.currentTimeMillis() }
+    /** A statement is running or a result is still open on this connection. */
+    val busy: Boolean get() = current != null || activeCursor?.isClosed == false
+
     @Synchronized private fun connection(): Connection =
-        conn?.takeIf { !it.isClosed } ?: openConnection(ds, password).also { it.autoCommit = autoCommit; conn = it }
+        conn?.takeIf { !it.isClosed } ?: openConnection(ds, password).also { c ->
+            c.autoCommit = autoCommit
+            // drivers differ on whether they accept the flag (SQLite refuses it after connecting): the check on what is sent covers the rest
+            if (options.readOnly) runCatching { c.isReadOnly = true }
+            try {
+                sessionStartup(ds.kind, options).forEach { sql -> c.createStatement().use { it.execute(sql) } }
+            } catch (e: SQLException) {
+                runCatching { c.close() }
+                throw SQLException("Falló el script de inicio: ${e.message}", e.sqlState, e.errorCode, e)
+            }
+            conn = c
+        }
+
+    /** Runs the keep-alive query if the connection is open and nothing else is using it. Returns whether it ran. */
+    @Synchronized fun keepAlive(): Boolean {
+        val c = conn?.takeIf { !it.isClosed } ?: return false
+        if (busy) return false
+        return runCatching { c.createStatement().use { it.execute(keepAliveSql(ds.kind)) }; keepAlives++; true }.getOrDefault(false)
+    }
+
+    /** How many keep-alive queries have run on this session (for tests and the status line). */
+    @Volatile var keepAlives = 0
+        private set
 
     /** Switches between confirming every statement and confirming by hand. Resolve [pending] work first: JDBC commits it when going back to auto. */
     @Synchronized fun setAutoCommit(auto: Boolean) {
@@ -45,6 +75,8 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
      * Returns the number of affected rows, or a failure whose message names the statement that went wrong.
      */
     @Synchronized fun execute(statements: List<DmlStatement>): Result<Long> {
+        if (options.readOnly) return Result.failure(SQLException(readOnlyViolation("insert")))
+        touch()
         var current: String? = null
         return transact({ current }) { c ->
             var total = 0L
@@ -62,7 +94,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
      * fit its column); that fails the run the same way. Returns the number of rows sent.
      */
     @Synchronized fun executeBatch(sql: String, rows: Iterator<List<Any?>>, batchSize: Int = 500, onProgress: (Long) -> Unit = {}): Result<Long> =
-        transact({ sql }) { c ->
+        if (options.readOnly) Result.failure(SQLException(readOnlyViolation("insert"))) else transact({ sql }) { c ->
             var sent = 0L
             c.prepareStatement(sql).use { ps ->
                 var inBatch = 0
@@ -113,6 +145,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
      */
     fun runScript(statements: List<String>, keepRows: Int = 500): List<StatementResult> {
         cancelRequested = false
+        touch()
         activeCursor?.close(); activeCursor = null
         val results = mutableListOf<StatementResult>()
         for (sql in statements) {
@@ -120,6 +153,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
             results += r
             if (r is StatementResult.Failed || cancelRequested) break
         }
+        touch()
         return results.mapIndexed { i, r ->
             if (r is StatementResult.Rows && i != results.lastIndex) r.materialized(keepRows) else r
         }
@@ -128,6 +162,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
     private fun runOne(sql: String): StatementResult {
         val t0 = System.nanoTime()
         fun ms() = (System.nanoTime() - t0) / 1_000_000
+        if (options.readOnly) readOnlyViolation(sql)?.let { return StatementResult.Failed(sql, 0, it) }
         var st: Statement? = null
         try {
             st = connection().createStatement().also { current = it }
@@ -197,7 +232,10 @@ private class JdbcCursor(private val st: Statement, private val rs: ResultSet, p
         else -> rs.getObject(i).let { v -> if (v != null && v.javaClass.name.startsWith("oracle.")) rs.getString(i) else v }
     }
 
-    override fun close() { runCatching { rs.close() }; runCatching { st.close() } }
+    @Volatile var isClosed = false
+        private set
+
+    override fun close() { isClosed = true; runCatching { rs.close() }; runCatching { st.close() } }
 }
 
 private const val ORACLE_TIMESTAMPTZ = -101

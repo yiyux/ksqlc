@@ -50,6 +50,14 @@ class OracleIntrospectionTest {
     }
 
 
+    @Test fun theTimeZoneAppliesAndSingleDatabaseKeepsTheUsersSchema() {
+        Session(fx.ds.copy(options = ConnectionOptions(timeZone = "Asia/Tokyo")), fx.password).use { s ->
+            val r = s.runScript(listOf("select sessiontimezone from dual")).single() as StatementResult.Rows
+            assertEquals("Asia/Tokyo", r.cursor.fetch(1).single().single().toString()); r.cursor.close()
+        }
+        intro().use { i -> i.onlyNamespace = owner.lowercase(); assertEquals(listOf(owner), i.namespaces().map { it.label }) }
+    }
+
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE) = DbObject(ns, name, kind)
 

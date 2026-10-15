@@ -62,6 +62,12 @@ class SqlServerIntrospectionTest {
     }
 
 
+    @Test fun theStartupScriptRunsOnTheConnection() = Session(fx.ds.copy(options = ConnectionOptions(startupScript = "set language spanish")), fx.password).use { s ->
+        val r = s.runScript(listOf("select @@language")).single() as StatementResult.Rows
+        assertTrue(r.cursor.fetch(1).single().single().toString().startsWith("Esp"), "idioma")
+        r.cursor.close()
+    }
+
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE, ns: Namespace = app) = DbObject(ns, name, kind)
 

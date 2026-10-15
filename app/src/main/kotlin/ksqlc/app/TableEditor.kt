@@ -35,11 +35,11 @@ class StateSet {
  * `0 until grid.rows.size` are the rows read; numbers after that are the new rows, in the order they were added.
  * Rows are matched to the database by [primaryKey]; without one (or on a view) existing rows cannot be edited.
  */
-class TableEditor(val obj: DbObject, private val dialect: Dialect, private val kind: DbKind, val primaryKey: List<String>) {
+class TableEditor(val obj: DbObject, private val dialect: Dialect, private val kind: DbKind, val primaryKey: List<String>, private val connectionReadOnly: Boolean = false) {
     /** The engine this table lives in (it decides, for example, whether a DATE column has a time of day). */
     val engine: DbKind get() = kind
 
-    val canInsert = obj.kind == DbObjectKind.TABLE
+    val canInsert = obj.kind == DbObjectKind.TABLE && !connectionReadOnly
     val canEditRows = canInsert && primaryKey.isNotEmpty()
 
     /** Edited cells of existing rows: (row, column) → new value. */
@@ -59,6 +59,7 @@ class TableEditor(val obj: DbObject, private val dialect: Dialect, private val k
 
     /** Why existing rows cannot be edited, for the status bar; null when they can. */
     fun readOnlyReason(): String? = when {
+        connectionReadOnly -> "La conexión es de solo lectura"
         obj.kind != DbObjectKind.TABLE -> "${obj.name} es una vista: solo lectura"
         primaryKey.isEmpty() -> "${obj.name} no tiene clave primaria: se pueden añadir filas, pero no editar ni borrar las existentes"
         else -> null

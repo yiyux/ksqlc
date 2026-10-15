@@ -57,6 +57,11 @@ class CassandraServerTest {
         assertTrue(i.objects(i.namespaces().first { it.label == "system_schema" }).any { it.name == "tables" })
     }
 
+    @Test fun singleDatabaseListsOnlyTheNamedKeyspace() = intro().use { i ->
+        i.onlyNamespace = "KSQLC"
+        assertEquals(listOf("ksqlc"), i.namespaces().map { it.label })
+    }
+
     @Test fun usesTheNativeDialect() = assertSame(CassandraDialect, Dialect.of(DbKind.CASSANDRA))
 
     @Test fun keyspacesAreNamespacesWithoutTheSystemOnes() = intro().use { i ->
