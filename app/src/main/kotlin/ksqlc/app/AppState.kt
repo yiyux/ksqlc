@@ -14,7 +14,9 @@ import ksqlc.drivers.DumpScope
 import ksqlc.drivers.Introspector
 import ksqlc.drivers.JdbcUrl
 import ksqlc.drivers.nativeDumpBlocker
+import ksqlc.drivers.HostKeyDecider
 import ksqlc.drivers.Session
+import ksqlc.drivers.Tunnels
 import ksqlc.drivers.testConnection
 import ksqlc.sql.Diagnostic
 import ksqlc.sql.StatementRange
@@ -54,7 +56,7 @@ class Holder<T : AutoCloseable>(private val create: (DataSource, String?) -> T) 
     @Synchronized fun close() { value?.close(); value = null; key = null }
 }
 
-fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password, ds.options.toString())
+fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password, ds.options.toString(), ds.ssh.toString(), ds.sshSecret)
 
 /** A read-only text dialog: a table's DDL, or the SQL a submit would run ([heading] says which). */
 class DdlView(val title: String, val text: String, val heading: String = "DDL")
@@ -62,7 +64,7 @@ class DdlView(val title: String, val text: String, val heading: String = "DDL")
 /** A yes/no question shown over the window; [onConfirm] runs when the user agrees. */
 private val READ_ONLY_START = setOf("SELECT", "WITH", "VALUES", "TABLE")
 
-class Confirmation(val title: String, val message: String, val confirmLabel: String, val onConfirm: () -> Unit)
+class Confirmation(val title: String, val message: String, val confirmLabel: String, val onCancel: () -> Unit = {}, val onConfirm: () -> Unit)
 
 /** Which result the bottom panel shows: the log, or one of the result grids. */
 const val OUTPUT_TAB = -1
@@ -84,7 +86,10 @@ class AppState(
         // first start with configured data sources: make the first one the active connection (not connected yet)
         saved.firstOrNull()?.let { c ->
             form.load(c)
-            scope.launch { form.password = withContext(Dispatchers.IO) { runCatching { store.password(c.id) }.getOrNull() }.orEmpty() }
+            scope.launch {
+                form.password = withContext(Dispatchers.IO) { runCatching { store.password(c.id) }.getOrNull() }.orEmpty()
+                form.sshSecret = withContext(Dispatchers.IO) { runCatching { store.sshSecret(c.id) }.getOrNull() }.orEmpty()
+            }
         }
     }
 
@@ -245,7 +250,10 @@ class AppState(
         disconnect()
         form.load(c)
         // The keychain can prompt, so keep it off the UI thread.
-        scope.launch { form.password = withContext(Dispatchers.IO) { store.password(c.id) }.orEmpty() }
+        scope.launch {
+            form.password = withContext(Dispatchers.IO) { store.password(c.id) }.orEmpty()
+            form.sshSecret = withContext(Dispatchers.IO) { store.sshSecret(c.id) }.orEmpty()
+        }
     }
 
     /** Makes [c] the active connection and reads its schema, once its password has been fetched from the keychain. */
@@ -259,6 +267,7 @@ class AppState(
         form.load(c)
         scope.launch {
             form.password = withContext(Dispatchers.IO) { store.password(c.id) }.orEmpty()
+            form.sshSecret = withContext(Dispatchers.IO) { store.sshSecret(c.id) }.orEmpty()
             connect()
         }
     }
@@ -266,7 +275,7 @@ class AppState(
     /** Saves [draft] (new or existing), makes it the active connection and reads its schema. */
     fun applyDraft(draft: ConnectionForm) {
         val id = draft.currentId ?: UUID.randomUUID().toString().also { draft.currentId = it }
-        val changed = form.toDataSource().url != draft.toDataSource().url || form.user != draft.user || form.password != draft.password || form.options != draft.options
+        val changed = form.toDataSource().url != draft.toDataSource().url || form.user != draft.user || form.password != draft.password || form.options != draft.options || form.ssh != draft.ssh || form.sshSecret != draft.sshSecret
         persist({ store.save(draft.toDataSource().copy(id = id), draft.password) }, "Conexión \"${draft.name}\" guardada")
         form.copyFrom(draft)
         if (changed || explorer == null) { disconnect(); connect() }
@@ -279,6 +288,7 @@ class AppState(
     }
 
     fun storedPassword(id: String): String? = runCatching { store.password(id) }.getOrNull()
+    fun storedSshSecret(id: String): String? = runCatching { store.sshSecret(id) }.getOrNull()
 
     private fun persist(block: () -> Unit, ok: String) {
         runCatching(block)
@@ -817,7 +827,7 @@ class AppState(
         private set
 
     /** Why dump/restore is not available for the active connection, or null. */
-    val nativeBlocker: String? get() = nativeDumpBlocker(form.effectiveKind, if (form.customUrl) null else JdbcUrl.parse(form.url))
+    val nativeBlocker: String? get() = if (form.ssh.enabled) "La conexión usa un túnel SSH: las herramientas de volcado se conectarían directamente" else nativeDumpBlocker(form.effectiveKind, if (form.customUrl) null else JdbcUrl.parse(form.url))
 
     /** Opens the dump (or restore) dialog. [o] is the table the menu was opened on, [ns] its schema or database. */
     fun openNative(restore: Boolean, o: DbObject? = null, ns: Namespace? = o?.ns) {
@@ -929,5 +939,17 @@ class AppState(
         }
     }
 
-    fun dispose() { housekeeping.cancel(); diffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
+    /** The SSH host key waiting for the user's answer, if any; asked from the thread that is opening the tunnel. */
+    private fun askHostKey(message: String): Boolean {
+        val answer = java.util.concurrent.CompletableFuture<Boolean>()
+        confirmation = Confirmation(
+            "Servidor SSH desconocido", "$message\n\nSi continúas, su clave se recuerda y se avisará si cambia.", "Confiar y continuar",
+            onCancel = { answer.complete(false) }, onConfirm = { confirmation = null; answer.complete(true) },
+        )
+        return runCatching { answer.get(2, java.util.concurrent.TimeUnit.MINUTES) }.getOrDefault(false).also { if (!it) confirmation = null }
+    }
+
+    init { Tunnels.hostKeyDecider = HostKeyDecider(::askHostKey) }
+
+    fun dispose() { housekeeping.cancel(); Tunnels.closeAll(); diffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
 }

@@ -6,6 +6,8 @@ import androidx.compose.runtime.setValue
 import ksqlc.core.ConnectionOptions
 import ksqlc.core.DataSource
 import ksqlc.core.DbKind
+import ksqlc.core.SshAuth
+import ksqlc.core.SshSettings
 import ksqlc.drivers.JdbcUrl
 import ksqlc.drivers.supportsSingleDatabase
 import ksqlc.drivers.supportsTimeZone
@@ -29,6 +31,22 @@ class ConnectionForm {
     var manualTx by mutableStateOf(false)
 
     // the "Options" tab; each switch has its number beside it, kept as text while it is being typed
+    // the SSH tunnel of the "SSH/SSL" tab
+    var sshEnabled by mutableStateOf(false)
+    var sshHost by mutableStateOf("")
+    var sshPortText by mutableStateOf("22")
+    var sshUser by mutableStateOf("")
+    var sshAuth by mutableStateOf(SshAuth.PASSWORD)
+    var sshKeyFile by mutableStateOf("")
+    /** The SSH password, or the key's passphrase. */
+    var sshSecret by mutableStateOf("")
+
+    val ssh: SshSettings get() = SshSettings(sshEnabled && kind != DbKind.SQLITE && !customUrl, sshHost.trim(), sshPortText.toIntOrNull() ?: 22, sshUser.trim(), sshAuth, sshKeyFile.trim())
+
+    private fun loadSsh(s: SshSettings) {
+        sshEnabled = s.enabled; sshHost = s.host; sshPortText = s.port.toString(); sshUser = s.user; sshAuth = s.auth; sshKeyFile = s.keyFile
+    }
+
     var readOnly by mutableStateOf(false)
     var timeZone by mutableStateOf("")
     var keepAliveOn by mutableStateOf(false)
@@ -64,13 +82,14 @@ class ConnectionForm {
     val effectiveKind: DbKind get() = if (customUrl) JdbcUrl.kindOf(url) else kind
     val passwordOrNull: String? get() = password.ifBlank { null }
 
-    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && effectiveKind != DbKind.CASSANDRA, options)
+    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && effectiveKind != DbKind.CASSANDRA, options, ssh, sshSecret.ifBlank { null })
 
     fun copyFrom(o: ConnectionForm) {
         currentId = o.currentId; name = o.name; kind = o.kind; host = o.host; portText = o.portText; database = o.database
         ssl = o.ssl; trustCert = o.trustCert; datacenter = o.datacenter; user = o.user; password = o.password; customUrl = o.customUrl; urlText = o.urlText; manualTx = o.manualTx
         readOnly = o.readOnly; timeZone = o.timeZone; keepAliveOn = o.keepAliveOn; keepAliveText = o.keepAliveText; autoDisconnectOn = o.autoDisconnectOn
         autoDisconnectText = o.autoDisconnectText; singleDatabase = o.singleDatabase; startupScript = o.startupScript; autoSync = o.autoSync; introspectionText = o.introspectionText
+        sshEnabled = o.sshEnabled; sshHost = o.sshHost; sshPortText = o.sshPortText; sshUser = o.sshUser; sshAuth = o.sshAuth; sshKeyFile = o.sshKeyFile; sshSecret = o.sshSecret
     }
 
     /**
@@ -78,7 +97,7 @@ class ConnectionForm {
      * port and database come back as fields; any other URL opens in manual-URL mode.
      */
     fun load(c: DataSource) {
-        currentId = c.id; name = c.name; user = c.user.orEmpty(); password = ""; manualTx = c.manualTx; loadOptions(c.options)
+        currentId = c.id; name = c.name; user = c.user.orEmpty(); password = ""; manualTx = c.manualTx; loadOptions(c.options); loadSsh(c.ssh); sshSecret = ""
         val p = JdbcUrl.parse(c.url)
         if (p != null) {
             kind = p.kind; host = p.host.ifBlank { "localhost" }; portText = (p.port ?: JdbcUrl.defaultPort(p.kind))?.toString().orEmpty()

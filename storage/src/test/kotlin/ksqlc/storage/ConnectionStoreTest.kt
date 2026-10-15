@@ -26,6 +26,26 @@ class ConnectionStoreTest {
         assertFalse(ConnectionStore(dir, secrets).list().single().manualTx)
     }
 
+    @Test fun sshSettingsAreSavedAndTheirSecretGoesToTheKeychain() {
+        val tunnel = ksqlc.core.SshSettings(true, "jump.example", 2222, "me", ksqlc.core.SshAuth.KEY, "~/.ssh/id_ed25519")
+        store.save(pg.copy(ssh = tunnel, sshSecret = "frase"), "dbpass")
+        val back = ConnectionStore(dir, secrets).list().single()
+        assertEquals(tunnel, back.ssh)
+        assertNull(back.sshSecret)
+        assertEquals("frase", store.sshSecret("1")); assertEquals("dbpass", store.password("1"))
+        val file = dir.resolve("connections.json").readText()
+        assertFalse(file.contains("frase")); assertFalse(file.contains("dbpass")); assertFalse(file.contains("sshSecret"))
+        store.save(pg.copy(ssh = tunnel), "dbpass", sshSecret = "")      // blank clears it
+        assertNull(store.sshSecret("1"))
+        store.save(pg.copy(sshSecret = "otra"), "dbpass"); store.delete("1")
+        assertNull(store.sshSecret("1")); assertNull(store.password("1"))
+    }
+
+    @Test fun oldFilesHaveNoTunnel() {
+        dir.resolve("connections.json").toFile().writeText("""{"version":1,"connections":[{"id":"9","name":"viejo","kind":"POSTGRES","url":"jdbc:postgresql://h:5432/d"}]}""")
+        assertFalse(ConnectionStore(dir, secrets).list().single().ssh.enabled)
+    }
+
     @Test fun saveReplacesById() {
         store.save(pg, "a")
         store.save(pg.copy(name = "renamed"), "b")

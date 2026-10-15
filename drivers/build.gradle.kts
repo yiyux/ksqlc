@@ -11,6 +11,7 @@ dependencies {
     runtimeOnly("com.microsoft.sqlserver:mssql-jdbc:13.6.0.jre11")
     runtimeOnly("com.oracle.database.jdbc:ojdbc11:23.6.0.24.10")
     runtimeOnly("com.ing.data:cassandra-jdbc-wrapper:5.0.4")
+    implementation("com.github.mwiede:jsch:2.28.8")
     testImplementation(kotlin("test"))
     testImplementation("org.testcontainers:testcontainers-postgresql:2.0.5")
     testImplementation("org.testcontainers:testcontainers-mysql:2.0.5")
@@ -18,4 +19,5 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-mssqlserver:2.0.5")
     testImplementation("org.testcontainers:testcontainers-oracle-free:2.0.5")
     testImplementation("org.testcontainers:testcontainers-cassandra:2.0.5")
+
 }

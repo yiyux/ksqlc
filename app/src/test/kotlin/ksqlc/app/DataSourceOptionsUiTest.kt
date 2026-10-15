@@ -9,6 +9,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ksqlc.core.*
+import ksqlc.core.SshAuth
+import ksqlc.core.SshSettings
 import ksqlc.storage.ConnectionStore
 import ksqlc.storage.InMemorySecretStore
 import ksqlc.storage.SettingsStore
@@ -34,6 +36,22 @@ class ConnectionFormOptionsTest {
         f.keepAliveOn = false; f.introspectionText = "abc"
         assertEquals(0, f.options.keepAliveSeconds); assertEquals(0, f.options.introspectionMinutes)
         assertEquals(ConnectionOptions(), ConnectionForm().options)
+    }
+}
+
+class ConnectionFormSshTest {
+    @Test fun theTunnelRoundTripsThroughTheFormAndOnlyAppliesWhereItCan() {
+        val f = ConnectionForm().apply {
+            kind = DbKind.POSTGRES; host = "db"; portText = "5432"
+            sshEnabled = true; sshHost = " jump "; sshPortText = "2222"; sshUser = "me"; sshAuth = SshAuth.KEY; sshKeyFile = "~/k"; sshSecret = "frase"
+        }
+        val ds = f.toDataSource()
+        assertEquals(SshSettings(true, "jump", 2222, "me", SshAuth.KEY, "~/k"), ds.ssh); assertEquals("frase", ds.sshSecret)
+        val back = ConnectionForm().also { it.load(ds.copy(id = "x")) }
+        assertEquals(ds.ssh, back.ssh); assertEquals("", back.sshSecret)      // the secret is fetched from the keychain separately
+        f.kind = DbKind.SQLITE; assertEquals(false, f.ssh.enabled)
+        f.kind = DbKind.POSTGRES; f.customUrl = true; assertEquals(false, f.ssh.enabled)
+        assertEquals(SshSettings(), ConnectionForm().ssh)
     }
 }
 
@@ -118,5 +136,31 @@ class DataSourceOptionsUiTest {
         until { state.dataTabs.size == 1 }
         assertTrue(!state.dataTabs[0].editor.canInsert); assertEquals("La conexión es de solo lectura", state.dataTabs[0].editor.readOnlyReason())
     }
-}
 
+    @Test fun theSshTabSavesTheTunnelAndKeepsItsSecretOutOfTheFile() {
+        rule.setContent { App(state) }
+        rule.onNodeWithContentDescription("Nuevo data source").performClick(); until { exists("datasource-dialog") }
+        pickKind(DbKind.POSTGRES)
+        rule.onNodeWithTag("ds-tab:2").performClick(); until { exists("ds-ssh-on") }
+        rule.onNodeWithTag("ds-ssh-host").assertIsNotEnabled()      // nothing to type until the tunnel is switched on
+        rule.onNodeWithTag("ds-ssh-on").performClick(); frames()
+        rule.onNodeWithTag("ds-ssh-host").performTextInput("jump.example")
+        rule.onNodeWithTag("ds-ssh-port").performTextReplacement("2200")
+        rule.onNodeWithTag("ds-ssh-user").performTextInput("me")
+        rule.onNodeWithTag("ds-ssh-auth:1").performClick(); until { exists("ds-ssh-key") }
+        rule.onNodeWithTag("ds-ssh-key").performTextInput("~/.ssh/id_ed25519")
+        rule.onNodeWithTag("ds-ssh-secret").performTextInput("la-frase")
+        rule.onNodeWithTag("ds-apply").performClick()
+        until { state.saved.size == 1 }
+        assertEquals(SshSettings(true, "jump.example", 2200, "me", SshAuth.KEY, "~/.ssh/id_ed25519"), state.saved.single().ssh)
+        assertEquals("la-frase", state.storedSshSecret(state.saved.single().id))
+        assertEquals(null, state.saved.single().sshSecret)
+    }
+
+    @Test fun theSshTabExplainsWhenThereIsNothingToTunnel() {
+        rule.setContent { App(state) }
+        rule.onNodeWithContentDescription("Nuevo data source").performClick(); until { exists("datasource-dialog") }
+        rule.onNodeWithTag("ds-tab:2").performClick(); until { exists("datasource-dialog") && !exists("ds-ssh-on") }      // SQLite is the form's default
+        rule.onNodeWithText("SQLite abre un archivo local", substring = true).assertExists()
+    }
+}

@@ -116,6 +116,44 @@ private fun OptionsTab(draft: ConnectionForm, modifier: Modifier) {
 }
 
 /**
+ * The "SSH/SSL" tab. Tags `ds-ssh-on`, `ds-ssh-host`, `ds-ssh-port`, `ds-ssh-user`, `ds-ssh-auth:i`, `ds-ssh-secret`, `ds-ssh-key`, `ds-ssh-browse`.
+ */
+@Composable
+private fun SshSslTab(draft: ConnectionForm, modifier: Modifier) {
+    val c = Ksqlc.colors
+    val network = draft.effectiveKind != DbKind.SQLITE
+    Column(modifier.verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionTitle("Túnel SSH")
+        if (!network) Text("SQLite abre un archivo local: no usa red.", fontSize = 13.sp, color = c.textMuted)
+        else if (draft.customUrl) Text("El túnel necesita una conexión definida con host y puerto; con «Solo URL» no está disponible.", fontSize = 13.sp, color = c.textMuted)
+        else {
+            val on = draft.sshEnabled
+            KCheckbox(draft.sshEnabled, { draft.sshEnabled = it }, label = "Usar túnel SSH", modifier = Modifier.testTag("ds-ssh-on"))
+            OField("Host:") {
+                CompactTextField(draft.sshHost, { draft.sshHost = it }, Modifier.weight(1f), enabled = on, placeholder = "servidor intermedio", testTag = "ds-ssh-host", height = 28.dp)
+                Text("Puerto:", fontSize = 13.sp, color = c.text)
+                CompactTextField(draft.sshPortText, { draft.sshPortText = it.filter(Char::isDigit) }, Modifier.width(80.dp), enabled = on, testTag = "ds-ssh-port", height = 28.dp)
+            }
+            OField("Usuario:") { CompactTextField(draft.sshUser, { draft.sshUser = it }, Modifier.weight(1f), enabled = on, testTag = "ds-ssh-user", height = 28.dp) }
+            OField("Autenticación:") {
+                SegmentedControl(listOf("Contraseña", "Clave privada"), if (draft.sshAuth == ksqlc.core.SshAuth.KEY) 1 else 0, { draft.sshAuth = if (it == 1) ksqlc.core.SshAuth.KEY else ksqlc.core.SshAuth.PASSWORD }, tag = "ds-ssh-auth")
+            }
+            if (draft.sshAuth == ksqlc.core.SshAuth.KEY) OField("Archivo de clave:") {
+                CompactTextField(draft.sshKeyFile, { draft.sshKeyFile = it }, Modifier.weight(1f), enabled = on, placeholder = "~/.ssh/id_ed25519", testTag = "ds-ssh-key", height = 28.dp)
+                ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(false, "Clave privada SSH")?.let { draft.sshKeyFile = it } }, Modifier.testTag("ds-ssh-browse"), enabled = on)
+            }
+            OField(if (draft.sshAuth == ksqlc.core.SshAuth.KEY) "Frase de la clave:" else "Contraseña:") {
+                CompactTextField(draft.sshSecret, { draft.sshSecret = it }, Modifier.weight(1f), enabled = on, password = true, placeholder = "<oculta>", testTag = "ds-ssh-secret", height = 28.dp)
+            }
+            Text(
+                "La base de datos se alcanza desde el servidor SSH (el host y puerto de General son los que ve ese servidor). Un servidor nuevo se confirma la primera vez y su clave se guarda en ~/.ksqlc/known_hosts. La contraseña se guarda en el llavero.",
+                Modifier.padding(start = 220.dp), fontSize = 11.sp, color = c.textMuted,
+            )
+        }
+    }
+}
+
+/**
  * "Data Sources" dialog laid out like the reference: saved connections on the left, name + General tab on the right,
  * link-style "Probar conexión" and Cancelar / Apply / OK at the bottom. Edits go to a draft; Apply saves it and keeps
  * the dialog open, OK saves and closes, Cancelar discards.
@@ -159,7 +197,10 @@ fun DataSourceDialog(state: AppState) {
                         items(state.saved, key = { it.id }) { ds ->
                             DsRow(ds.name, ds.kind.label(), selected = ds.id == draft.currentId) {
                                 draft.load(ds); test = null
-                                scope.launch { draft.password = withContext(Dispatchers.IO) { state.storedPassword(ds.id) }.orEmpty() }
+                                scope.launch {
+                                    draft.password = withContext(Dispatchers.IO) { state.storedPassword(ds.id) }.orEmpty()
+                                    draft.sshSecret = withContext(Dispatchers.IO) { state.storedSshSecret(ds.id) }.orEmpty()
+                                }
                             }
                         }
                     }
@@ -169,7 +210,7 @@ fun DataSourceDialog(state: AppState) {
                     Field("Nombre:") { CompactTextField(draft.name, { draft.name = it }, Modifier.weight(1f), testTag = "ds-name", height = 28.dp) }
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("General", "Opciones").forEachIndexed { i, label ->
+                        listOf("General", "Opciones", "SSH/SSL").forEachIndexed { i, label ->
                             val on = tab == i
                             Box(
                                 Modifier.height(26.dp).clip(RoundedCornerShape(6.dp)).then(if (on) Modifier.background(c.selection).border(1.dp, c.accent.copy(alpha = 0.45f), RoundedCornerShape(6.dp)) else Modifier)
@@ -181,6 +222,7 @@ fun DataSourceDialog(state: AppState) {
                     Spacer(Modifier.height(8.dp))
                     Separator()
                     if (tab == 1) OptionsTab(draft, Modifier.weight(1f))
+                    else if (tab == 2) SshSslTab(draft, Modifier.weight(1f))
                     else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Field("Motor:") {
                             Box(Modifier.weight(1f)) {
@@ -293,13 +335,14 @@ fun DdlDialog(state: AppState) {
 fun ConfirmDialog(state: AppState) {
     val q = state.confirmation ?: return
     val c = Ksqlc.colors
-    ModalOverlay({ state.confirmation = null }, Modifier.testTag("confirm-dialog"), width = 420.dp, height = 170.dp) {
+    fun cancel() { state.confirmation = null; q.onCancel() }
+    ModalOverlay(::cancel, Modifier.testTag("confirm-dialog"), width = 460.dp, height = if (q.message.length > 160) 260.dp else 170.dp) {
         Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(q.title, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text)
             Text(q.message, fontSize = 13.sp, color = c.textSecondary)
             Spacer(Modifier.weight(1f))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                TextAction("Cancelar", { state.confirmation = null }, Modifier.testTag("confirm-cancel"))
+                TextAction("Cancelar", ::cancel, Modifier.testTag("confirm-cancel"))
                 TextAction(q.confirmLabel, q.onConfirm, Modifier.testTag("confirm-ok"), primary = true)
             }
         }

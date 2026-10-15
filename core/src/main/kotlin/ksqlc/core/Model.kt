@@ -27,6 +27,21 @@ data class ConnectionOptions(
 )
 
 @Serializable
+enum class SshAuth { PASSWORD, KEY }
+
+/** An SSH tunnel to reach the database through a jump host. The password (or key passphrase) is a secret and lives in the keychain, not here. */
+@Serializable
+data class SshSettings(
+    val enabled: Boolean = false,
+    val host: String = "",
+    val port: Int = 22,
+    val user: String = "",
+    val auth: SshAuth = SshAuth.PASSWORD,
+    /** Private key file for [SshAuth.KEY]. */
+    val keyFile: String = "",
+)
+
+@Serializable
 data class DataSource(
     val id: String,
     val name: String,
@@ -36,6 +51,9 @@ data class DataSource(
     /** Transactions are confirmed by hand (Commit/Rollback) instead of after every statement. */
     val manualTx: Boolean = false,
     val options: ConnectionOptions = ConnectionOptions(),
+    val ssh: SshSettings = SshSettings(),
+    /** The SSH password or key passphrase, carried with the connection while it is open; never written to connections.json. */
+    @kotlinx.serialization.Transient val sshSecret: String? = null,
 )
 
 data class Column(val name: String, val typeName: String, val nullable: Boolean = true)
