@@ -79,6 +79,18 @@ abstract class DmlServerBase {
 
     /** Server-specific column values (PostgreSQL has a uuid column). */
     protected open fun extra(): Map<String, CellValue>? = null
+
+    @Test fun explainShowsPlansAndPlainExplainNeverChangesData() = Session(fx.ds, fx.password).use { s ->
+        val table = dialect.qualified(obj("items"))
+        send(s, "items", inserts = listOf(mapOf("id" to t("1"), "qty" to t("1"))))
+        fun plan(sql: String, analyze: Boolean) = explainScript(kind, sql, analyze)!!.let { sc ->
+            (s.runScript(sc.statements).last() as StatementResult.Rows).let { r -> r.cursor.fetch(100).also { r.cursor.close() } }
+        }
+        assertTrue(plan("select * from $table", false).isNotEmpty())
+        assertTrue(plan("select * from $table", true).isNotEmpty())
+        assertTrue(plan("delete from $table", false).isNotEmpty())
+        assertEquals(1, read(s, "items").let { r -> r.cursor.fetch(10).also { r.cursor.close() } }.size)      // the delete was only described
+    }
 }
 
 class PostgresDmlTest : DmlServerBase() {

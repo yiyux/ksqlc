@@ -148,6 +148,8 @@ private fun EditorIsland(state: AppState) {
             ToolButton(IconKind.Play, "Ejecutar (⌘↵)", state::runSelectionOrCurrent, enabled = !state.running, tint = c.success)
             ToolButton(IconKind.PlayAll, "Ejecutar script (⌘⇧↵)", state::runScript, enabled = !state.running, tint = c.success)
             ToolButton(IconKind.Stop, "Cancelar", state::cancel, enabled = state.running, tint = c.error)
+            ToolButton(IconKind.Explain, "Explain: plan de ejecución", { state.explain(false) }, Modifier.testTag("explain"), enabled = !state.running)
+            ToolButton(IconKind.Analyze, "Explain analyze: ejecuta y mide", { state.explain(true) }, Modifier.testTag("explain-analyze"), enabled = !state.running)
             VSeparator()
             ToolButton(IconKind.Format, "Formatear SQL (⌘⌥L)", state::format)
             ToolButton(IconKind.Folder, "Abrir archivo SQL…", state::openSqlFile)

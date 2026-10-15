@@ -46,6 +46,11 @@ class OracleIntrospectionTest {
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE) = DbObject(ns, name, kind)
 
+    @Test fun explainPlanForReadsBackThroughDbmsXplan() = Session(fx.ds, fx.password).use { s ->
+        val rows = s.runScript(explainScript(DbKind.ORACLE, "select 1 from dual", false)!!.statements).last() as StatementResult.Rows
+        assertTrue(rows.cursor.fetch(50).isNotEmpty()); rows.cursor.close()
+    }
+
     @Test fun usesTheNativeDialect() = assertSame(OracleDialect, Dialect.of(DbKind.ORACLE))
 
     @Test fun schemasAreUserOnesWithoutTheOracleMaintainedOnes() = intro().use { i ->

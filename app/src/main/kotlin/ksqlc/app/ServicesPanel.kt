@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -50,6 +51,7 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier) {
                 val tab = state.tabs.getOrNull(state.selectedTab)
                 val data = tab?.edit
                 if (tab == null) OutputLog(state, Modifier.fillMaxSize())
+                else if (tab.plan) PlanView(tab, Modifier.fillMaxSize())
                 else if (data == null) Grid(tab, onLoadMore = { scope.launch(Dispatchers.IO) { tab.loadMore(PAGE) } }, modifier = Modifier.fillMaxSize())
                 else {
                     val grid = data.grid
@@ -106,5 +108,17 @@ private fun OutputLog(state: AppState, modifier: Modifier) {
             items(state.log) { Text(it, style = MonoStyle.copy(fontSize = 12.sp, lineHeight = 18.sp), color = if ("ERROR" in it) c.error else c.text) }
         }
         ListScrollbar(list, Modifier.align(Alignment.CenterEnd).fillMaxHeight())
+    }
+}
+
+/** An execution plan as selectable monospace text, scrollable both ways. */
+@Composable
+private fun PlanView(tab: ResultTab, modifier: Modifier) {
+    val c = Ksqlc.colors
+    val text = remember(tab, tab.rows.size) { planText(tab.result.columns.map { it.name }, tab.rows.toList()) }
+    androidx.compose.foundation.text.selection.SelectionContainer {
+        Box(modifier.background(c.editorBg).verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()).padding(10.dp).testTag("plan-view")) {
+            Text(text, style = MonoStyle.copy(color = c.gridText), softWrap = false)
+        }
     }
 }

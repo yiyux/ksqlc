@@ -2,6 +2,8 @@ package ksqlc.drivers.server
 
 import ksqlc.core.*
 import ksqlc.drivers.Introspector
+import ksqlc.drivers.Session
+import ksqlc.drivers.explainScript
 import ksqlc.drivers.JdbcUrl
 import ksqlc.drivers.dialect.Dialect
 import ksqlc.drivers.dialect.SqlServerDialect
@@ -49,6 +51,17 @@ class SqlServerIntrospectionTest {
     private val app = Namespace(null, "app")
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE, ns: Namespace = app) = DbObject(ns, name, kind)
+
+    @Test fun explainDescribesWithoutRunningAndSwitchesShowplanOff() = Session(fx.ds, fx.password).use { s ->
+        val sc = explainScript(DbKind.MSSQL, "select 1 as one", false)!!
+        try {
+            val rows = s.runScript(sc.statements).last() as StatementResult.Rows
+            assertTrue(rows.cursor.fetch(10).isNotEmpty()); rows.cursor.close()
+        } finally { s.runScript(sc.cleanup) }
+        val after = s.runScript(listOf("select 1 as one")).single() as StatementResult.Rows
+        assertEquals(1, (after.cursor.fetch(1).single().single() as Number).toInt())      // really executed: showplan is off again
+        after.cursor.close()
+    }
 
     @Test fun usesTheNativeDialect() = assertSame(SqlServerDialect, Dialect.of(DbKind.MSSQL))
 

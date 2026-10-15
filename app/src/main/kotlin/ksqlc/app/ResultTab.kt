@@ -10,6 +10,8 @@ import ksqlc.core.StatementResult
 /** One result grid. Rows accumulate page by page; [loadMore] blocks, so call it off the UI thread. */
 class ResultTab(val title: String, val result: StatementResult.Rows) {
     val rows = mutableStateListOf<List<Any?>>()
+    /** An execution plan: shown as aligned text rather than a grid. */
+    var plan = false
     var exhausted by mutableStateOf(false)
     var loading by mutableStateOf(false)
 
@@ -54,6 +56,15 @@ class ResultTab(val title: String, val result: StatementResult.Rows) {
 
     /** Closes this result and the connection that edits it. */
     fun dispose() { close(); edit?.close() }
+}
+
+/** The columns of [rows] as aligned monospace text; a single column (most plans) is just its lines, with no header. */
+fun planText(columns: List<String>, rows: List<List<Any?>>): String {
+    fun cell(v: Any?) = (v?.toString() ?: "NULL").replace("\r\n", " ").replace('\n', ' ')
+    if (columns.size == 1) return rows.joinToString("\n") { it[0]?.toString() ?: "NULL" }
+    val table = listOf(columns) + rows.map { r -> r.map(::cell) }
+    val widths = columns.indices.map { j -> table.maxOf { it[j].length } }
+    return table.joinToString("\n") { r -> r.mapIndexed { j, c -> c.padEnd(widths[j]) }.joinToString("  ").trimEnd() }
 }
 
 /**

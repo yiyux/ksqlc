@@ -20,6 +20,8 @@ import ksqlc.sql.formatSql
 import ksqlc.sql.changesSchema
 import ksqlc.sql.simpleSelectTable
 import ksqlc.sql.findParams
+import ksqlc.sql.firstKeyword
+import ksqlc.drivers.explainScript
 import ksqlc.sql.fillParams
 import ksqlc.sql.splitStatements
 import ksqlc.sql.statementAt
@@ -56,6 +58,8 @@ fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.
 class DdlView(val title: String, val text: String, val heading: String = "DDL")
 
 /** A yes/no question shown over the window; [onConfirm] runs when the user agrees. */
+private val READ_ONLY_START = setOf("SELECT", "WITH", "VALUES", "TABLE")
+
 class Confirmation(val title: String, val message: String, val confirmLabel: String, val onConfirm: () -> Unit)
 
 /** Which result the bottom panel shows: the log, or one of the result grids. */
@@ -291,6 +295,23 @@ class AppState(
         }
     }
 
+    /**
+     * Shows the execution plan of the selected or current statement in a result tab. With [analyze] the statement really runs,
+     * so anything but a read asks first.
+     */
+    fun explain(analyze: Boolean) {
+        val text = editor.text
+        val sel = editor.selection
+        val sql = (if (!sel.collapsed) text.substring(sel.min, sel.max) else statementAt(text, sel.start, slashBlocks)?.text(text))?.trim()?.trimEnd(';')?.trim()
+        if (sql.isNullOrBlank()) { status = "Nada que explicar"; return }
+        val kind = form.effectiveKind
+        val script = explainScript(kind, sql, analyze) ?: run { status = "${if (analyze) "Explain analyze" else "Explain"} no está disponible para ${kind.label()}"; return }
+        val go = { run(script.statements, title = "Plan", plan = true, cleanup = script.cleanup) }
+        if (analyze && firstKeyword(sql) !in READ_ONLY_START)
+            confirmation = Confirmation("Explain analyze", "Esta sentencia se ejecutará de verdad para medirla y puede modificar datos.", "Ejecutar") { confirmation = null; go() }
+        else go()
+    }
+
     fun runScript() = run(splitStatements(editor.text, slashBlocks).map { it.text(editor.text) })
 
     fun cancel() { sessions.peek()?.cancel() }
@@ -303,14 +324,16 @@ class AppState(
      * Runs [statements] on the console session. [title] names the result tab (used when opening a table);
      * [range] is where a single statement sits in the editor, so it can be outlined once it has run.
      */
-    fun run(statements: List<String>, title: String? = null, range: StatementRange? = null, discardEdits: Boolean = false, filled: Boolean = false) {
+    fun run(statements: List<String>, title: String? = null, range: StatementRange? = null, discardEdits: Boolean = false, filled: Boolean = false,
+        plan: Boolean = false, cleanup: List<String> = emptyList(),
+    ) {
         if (statements.isEmpty()) { status = "Nada que ejecutar"; return }
         if (running) return
         if (!discardEdits && tabs.any { it.edit?.unsaved == true }) {
-            confirmDiscard(true, "Los resultados editados tienen cambios sin enviar o sin confirmar.") { run(statements, title, range, discardEdits = true, filled = filled) }
+            confirmDiscard(true, "Los resultados editados tienen cambios sin enviar o sin confirmar.") { run(statements, title, range, discardEdits = true, filled = filled, plan = plan, cleanup = cleanup) }
             return
         }
-        if (!filled) { withParams(statements) { run(it, title, range, discardEdits = true, filled = true) }; return }
+        if (!filled) { withParams(statements) { run(it, title, range, discardEdits = true, filled = true, plan = plan, cleanup = cleanup) }; return }
         running = true; status = "Ejecutando…"
         val target = form.toDataSource(); val pw = form.passwordOrNull
         val textAtStart = editor.text
@@ -319,8 +342,13 @@ class AppState(
             val outcome = runCatching {
                 withContext(Dispatchers.IO) {
                     old.forEach { it.dispose() }
-                    sessions.get(target, pw).runScript(statements, PAGE).mapIndexed { i, r ->
-                        r to (r as? StatementResult.Rows)?.let { ResultTab(title ?: "Resultado ${i + 1}", it).also { t -> t.loadMore(PAGE) } }
+                    val session = sessions.get(target, pw)
+                    try {
+                        session.runScript(statements, PAGE).mapIndexed { i, r ->
+                            r to (r as? StatementResult.Rows)?.let { ResultTab(title ?: "Resultado ${i + 1}", it).also { t -> t.plan = plan; t.loadMore(PAGE) } }
+                        }
+                    } finally {
+                        if (cleanup.isNotEmpty()) runCatching { session.runScript(cleanup) }      // e.g. SHOWPLAN off, also after an error
                     }
                 }
             }
