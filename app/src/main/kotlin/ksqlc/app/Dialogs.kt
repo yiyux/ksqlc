@@ -115,6 +115,13 @@ private fun OptionsTab(draft: ConnectionForm, modifier: Modifier) {
     }
 }
 
+/** Which of the four SSL modes (off, encrypted, verify CA, verify CA and name) an engine offers. */
+private fun sslModesFor(kind: DbKind): List<String> = when (kind) {
+    DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.MSSQL -> listOf("Desactivado", "Cifrado", "Verificar CA", "CA y host")
+    DbKind.CASSANDRA -> listOf("Desactivado", "Cifrado")
+    else -> emptyList()
+}
+
 /**
  * The "SSH/SSL" tab. Tags `ds-ssh-on`, `ds-ssh-host`, `ds-ssh-port`, `ds-ssh-user`, `ds-ssh-auth:i`, `ds-ssh-secret`, `ds-ssh-key`, `ds-ssh-browse`.
  */
@@ -147,6 +154,39 @@ private fun SshSslTab(draft: ConnectionForm, modifier: Modifier) {
             }
             Text(
                 "La base de datos se alcanza desde el servidor SSH (el host y puerto de General son los que ve ese servidor). Un servidor nuevo se confirma la primera vez y su clave se guarda en ~/.ksqlc/known_hosts. La contraseña se guarda en el llavero.",
+                Modifier.padding(start = 220.dp), fontSize = 11.sp, color = c.textMuted,
+            )
+        }
+        SectionTitle("SSL")
+        val modes = sslModesFor(draft.effectiveKind)
+        if (modes.isEmpty()) Text(if (network) "Oracle necesita un listener TCPS y una cartera de certificados, que aquí no se configuran." else "SQLite abre un archivo local: no usa red.", fontSize = 13.sp, color = c.textMuted)
+        else if (draft.customUrl) Text("Con «Solo URL» los parámetros SSL van en la propia URL.", fontSize = 13.sp, color = c.textMuted)
+        else {
+            OField("Modo:") { SegmentedControl(modes, draft.sslMode.coerceAtMost(modes.lastIndex), { draft.sslMode = it }, tag = "ds-ssl-mode") }
+            val verifying = draft.sslMode >= 2
+            val kind = draft.effectiveKind
+            if (modes.size > 2) {
+                OField("Certificado de la CA:") {
+                    CompactTextField(draft.sslCa, { draft.sslCa = it }, Modifier.weight(1f), enabled = verifying, placeholder = "ca.pem (PEM)", testTag = "ds-ssl-ca", height = 28.dp)
+                    ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(false, "Certificado de la CA")?.let { draft.sslCa = it } }, Modifier.testTag("ds-ssl-ca-browse"), enabled = verifying)
+                }
+                if (kind != DbKind.MSSQL) {
+                    OField("Certificado de cliente:") {
+                        CompactTextField(draft.sslCert, { draft.sslCert = it }, Modifier.weight(1f), enabled = draft.sslMode != 0, placeholder = "opcional (PEM)", testTag = "ds-ssl-cert", height = 28.dp)
+                        ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(false, "Certificado de cliente")?.let { draft.sslCert = it } }, Modifier.testTag("ds-ssl-cert-browse"), enabled = draft.sslMode != 0)
+                    }
+                    OField("Clave de cliente:") {
+                        CompactTextField(draft.sslKey, { draft.sslKey = it }, Modifier.weight(1f), enabled = draft.sslMode != 0, placeholder = "opcional (PEM sin frase de paso)", testTag = "ds-ssl-key", height = 28.dp)
+                        ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(false, "Clave de cliente")?.let { draft.sslKey = it } }, Modifier.testTag("ds-ssl-key-browse"), enabled = draft.sslMode != 0)
+                    }
+                }
+            }
+            Text(
+                when (kind) {
+                    DbKind.CASSANDRA -> "Cassandra cifra con el almacén de confianza de Java; no se comprueban archivos propios."
+                    DbKind.MSSQL -> "«Cifrado» acepta cualquier certificado del servidor; «Verificar» lo comprueba con la CA indicada, o con el almacén de Java si no hay ninguna."
+                    else -> "«Cifrado» no comprueba el certificado del servidor. «Verificar CA» lo comprueba con la CA indicada; «y nombre» exige además que el certificado sea para el host."
+                } + if (draft.sshEnabled) " Con túnel SSH el nombre que se comprueba es 127.0.0.1, el extremo local del túnel." else "",
                 Modifier.padding(start = 220.dp), fontSize = 11.sp, color = c.textMuted,
             )
         }
@@ -253,11 +293,6 @@ fun DataSourceDialog(state: AppState) {
                         }
                         if (draft.kind == DbKind.CASSANDRA) Field("Datacenter local:") {
                             CompactTextField(draft.datacenter, { draft.datacenter = it.trim() }, Modifier.weight(1f), enabled = !draft.customUrl, testTag = "ds-dc", height = 28.dp)
-                        }
-                        Field("SSL:") { KCheckbox(draft.ssl, { draft.ssl = it }, label = "Exigir conexión cifrada", enabled = network && !draft.customUrl, modifier = Modifier.testTag("ds-ssl")) }
-                        if (draft.kind == DbKind.MSSQL) Field("") {
-                            // SQL Server servers often use a self-signed certificate, which the driver rejects unless told to trust it
-                            KCheckbox(draft.trustCert, { draft.trustCert = it }, label = "Confiar en el certificado del servidor", enabled = draft.ssl && !draft.customUrl, modifier = Modifier.testTag("ds-trust"))
                         }
                         Field("URL:") {
                             Column(Modifier.weight(1f)) {

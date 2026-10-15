@@ -41,6 +41,21 @@ data class SshSettings(
     val keyFile: String = "",
 )
 
+/** How far the server's certificate is checked. */
+@Serializable
+enum class SslVerify { NONE, CA, FULL }
+
+/** What the "SSL" section adds to the plain "encrypted or not" switch: how the server is verified and the certificate files (PEM). */
+@Serializable
+data class SslSettings(
+    val verify: SslVerify = SslVerify.NONE,
+    /** Certificate authority that signed the server's certificate. */
+    val caFile: String = "",
+    /** Client certificate and its private key, for servers that ask for one. */
+    val clientCertFile: String = "",
+    val clientKeyFile: String = "",
+)
+
 @Serializable
 data class DataSource(
     val id: String,
@@ -52,6 +67,7 @@ data class DataSource(
     val manualTx: Boolean = false,
     val options: ConnectionOptions = ConnectionOptions(),
     val ssh: SshSettings = SshSettings(),
+    val ssl: SslSettings = SslSettings(),
     /** The SSH password or key passphrase, carried with the connection while it is open; never written to connections.json. */
     @kotlinx.serialization.Transient val sshSecret: String? = null,
 )

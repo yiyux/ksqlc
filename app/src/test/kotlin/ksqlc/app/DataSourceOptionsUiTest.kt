@@ -11,6 +11,9 @@ import kotlinx.coroutines.SupervisorJob
 import ksqlc.core.*
 import ksqlc.core.SshAuth
 import ksqlc.core.SshSettings
+import ksqlc.core.SslSettings
+import ksqlc.core.SslVerify
+import ksqlc.drivers.JdbcUrl
 import ksqlc.storage.ConnectionStore
 import ksqlc.storage.InMemorySecretStore
 import ksqlc.storage.SettingsStore
@@ -52,6 +55,31 @@ class ConnectionFormSshTest {
         f.kind = DbKind.SQLITE; assertEquals(false, f.ssh.enabled)
         f.kind = DbKind.POSTGRES; f.customUrl = true; assertEquals(false, f.ssh.enabled)
         assertEquals(SshSettings(), ConnectionForm().ssh)
+    }
+}
+
+class ConnectionFormSslTest {
+    @Test fun theFourModesSetTheUrlFlagsAndTheVerification() {
+        val f = ConnectionForm().apply { kind = DbKind.MSSQL; host = "h"; portText = "1433" }
+        assertEquals(0, f.sslMode)
+        f.sslMode = 1; assertEquals(true, f.ssl); assertEquals(true, f.trustCert); assertEquals(SslVerify.NONE, f.sslVerify)
+        f.sslMode = 2; assertEquals(true, f.ssl); assertEquals(false, f.trustCert); assertEquals(SslVerify.CA, f.sslVerify)
+        f.sslMode = 3; assertEquals(SslVerify.FULL, f.sslVerify); assertEquals(3, f.sslMode)
+        f.sslMode = 0; assertEquals(false, f.ssl); assertEquals(SslSettings(), f.sslSettings)      // files do not travel when SSL is off
+    }
+
+    @Test fun settingsRoundTripAndALegacyEncryptedSqlServerUrlLoadsAsVerifying() {
+        val f = ConnectionForm().apply { kind = DbKind.POSTGRES; host = "h"; portText = "5432"; sslMode = 3; sslCa = " ca.pem "; sslCert = "c.pem"; sslKey = "k.pem" }
+        val ds = f.toDataSource()
+        assertEquals(SslSettings(SslVerify.FULL, "ca.pem", "c.pem", "k.pem"), ds.ssl)
+        val back = ConnectionForm().also { it.load(ds.copy(id = "x")) }
+        assertEquals(3, back.sslMode); assertEquals("ca.pem", back.sslCa); assertEquals("k.pem", back.sslKey)
+        val legacy = ConnectionForm().also { it.load(DataSource("y", "y", DbKind.MSSQL, JdbcUrl.build(DbKind.MSSQL, "h", 1433, "", ssl = true, trustCert = false))) }
+        assertEquals(3, legacy.sslMode)      // encrypt=true without trusting everything: the driver already validates
+        val trusting = ConnectionForm().also { it.load(DataSource("z", "z", DbKind.MSSQL, JdbcUrl.build(DbKind.MSSQL, "h", 1433, "", ssl = true, trustCert = true))) }
+        assertEquals(1, trusting.sslMode)
+        val old = ConnectionForm().also { it.load(DataSource("w", "w", DbKind.POSTGRES, JdbcUrl.build(DbKind.POSTGRES, "h", 5432, "d", ssl = true))) }
+        assertEquals(1, old.sslMode)      // an old connection saved with "encrypted" stays so
     }
 }
 
@@ -161,6 +189,32 @@ class DataSourceOptionsUiTest {
         rule.setContent { App(state) }
         rule.onNodeWithContentDescription("Nuevo data source").performClick(); until { exists("datasource-dialog") }
         rule.onNodeWithTag("ds-tab:2").performClick(); until { exists("datasource-dialog") && !exists("ds-ssh-on") }      // SQLite is the form's default
-        rule.onNodeWithText("SQLite abre un archivo local", substring = true).assertExists()
+        rule.onAllNodesWithText("SQLite abre un archivo local", substring = true).assertCountEquals(2)      // once under the tunnel, once under SSL
+    }
+
+    @Test fun theSslSectionSavesTheModeAndFilesAndOffersWhatEachEngineHas() {
+        rule.setContent { App(state) }
+        rule.onNodeWithContentDescription("Nuevo data source").performClick(); until { exists("datasource-dialog") }
+        pickKind(DbKind.POSTGRES)
+        rule.onNodeWithTag("ds-tab:2").performClick(); until { exists("ds-ssl-mode:0") }
+        assertEquals(setOf("ds-ssl-mode:0", "ds-ssl-mode:1", "ds-ssl-mode:2", "ds-ssl-mode:3"), offered("ds-ssl-mode:0", "ds-ssl-mode:1", "ds-ssl-mode:2", "ds-ssl-mode:3"))
+        assertEquals(setOf("ds-ssl-ca", "ds-ssl-cert", "ds-ssl-key"), offered("ds-ssl-ca", "ds-ssl-cert", "ds-ssl-key"))
+        rule.onNodeWithTag("ds-ssl-ca").assertIsNotEnabled()
+        rule.onNodeWithTag("ds-ssl-mode:3").performClick(); frames()
+        rule.onNodeWithTag("ds-ssl-ca").assertIsEnabled().performTextInput("/certs/ca.pem")
+        rule.onNodeWithTag("ds-ssl-cert").performTextInput("/certs/client.pem")
+        rule.onNodeWithTag("ds-ssl-key").performTextInput("/certs/client.key")
+        rule.onNodeWithTag("ds-apply").performClick()
+        until { state.saved.size == 1 }
+        assertEquals(SslSettings(SslVerify.FULL, "/certs/ca.pem", "/certs/client.pem", "/certs/client.key"), state.saved.single().ssl)
+        assertEquals(true, state.saved.single().url.contains("sslmode=require"))      // the URL stays the plain "encrypted" one; the driver's own mode is applied when connecting
+
+        pickKind(DbKind.CASSANDRA)      // Cassandra only encrypts or not, and Oracle has no SSL here
+        rule.onNodeWithTag("ds-tab:2").performClick(); until { exists("ds-ssl-mode:0") }
+        assertEquals(setOf("ds-ssl-mode:0", "ds-ssl-mode:1"), offered("ds-ssl-mode:0", "ds-ssl-mode:1", "ds-ssl-mode:2"))
+        assertEquals(emptySet(), offered("ds-ssl-ca", "ds-ssl-cert"))
+        pickKind(DbKind.ORACLE)
+        rule.onNodeWithTag("ds-tab:2").performClick(); until { !exists("ds-ssl-mode:0") }
+        rule.onNodeWithText("Oracle necesita un listener TCPS", substring = true).assertExists()
     }
 }

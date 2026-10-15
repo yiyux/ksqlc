@@ -56,7 +56,7 @@ class Holder<T : AutoCloseable>(private val create: (DataSource, String?) -> T) 
     @Synchronized fun close() { value?.close(); value = null; key = null }
 }
 
-fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password, ds.options.toString(), ds.ssh.toString(), ds.sshSecret)
+fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password, ds.options.toString(), ds.ssh.toString(), ds.sshSecret, ds.ssl.toString())
 
 /** A read-only text dialog: a table's DDL, or the SQL a submit would run ([heading] says which). */
 class DdlView(val title: String, val text: String, val heading: String = "DDL")

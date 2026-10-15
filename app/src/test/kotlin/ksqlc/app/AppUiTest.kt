@@ -553,21 +553,27 @@ class AppUiTest {
         assertEquals(1, rule.onAllNodesWithTag("date-picker").fetchSemanticsNodes().size)
     }
 
-    @Test fun sqlServerOffersToTrustTheServerCertificateOnlyWhenEncrypting() {
+    @Test fun theSslModeDecidesWhatSqlServerEncryptsAndTrusts() {
         rule.setContent { App(state) }
         rule.onNodeWithContentDescription("Nuevo data source").performClick()
         untilTag("datasource-dialog")
-        rule.onNodeWithTag("ds-trust", useUnmergedTree = true).assertDoesNotExist()                       // other engines do not show it
         rule.onNodeWithTag("ds-kind").performClick(); settle()
         rule.onNodeWithTag("kind:MSSQL").performClick(); settle()
-        rule.onNodeWithTag("ds-trust", useUnmergedTree = true).assertExists().assertIsNotEnabled()        // nothing to trust until encryption is on
-        rule.onNodeWithTag("ds-url").assertTextContains("jdbc:sqlserver", substring = true)
-        rule.onNodeWithTag("ds-ssl").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()
-        rule.onNodeWithTag("ds-url").assertTextContains("encrypt=true", substring = true)
-        rule.onNodeWithTag("ds-trust", useUnmergedTree = true).assertIsEnabled().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); frames()
-        rule.onNodeWithTag("ds-url").assertTextContains("encrypt=true;trustServerCertificate=true", substring = true)
-        rule.onNodeWithTag("ds-ssl").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); frames()                    // encryption off again: the trust flag leaves the URL
-        rule.onNodeWithTag("ds-url").assertTextContains("encrypt=false", substring = true)
-        assertEquals(false, rule.onNodeWithTag("ds-url").fetchSemanticsNode().config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.EditableText)?.text?.contains("trustServerCertificate"))
+        fun url() = rule.onNodeWithTag("ds-url").fetchSemanticsNode().config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.EditableText)?.text.orEmpty()
+        fun mode(i: Int) {
+            rule.onNodeWithTag("ds-tab:2").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()
+            rule.onNodeWithTag("ds-ssl-mode:$i").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()
+            rule.onNodeWithTag("ds-tab:0").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()
+        }
+        assertTrue("jdbc:sqlserver" in url() && "encrypt=false" in url(), url())
+        mode(1); assertTrue("encrypt=true;trustServerCertificate=true" in url(), url())      // encrypted, any certificate
+        mode(2); assertTrue(url().endsWith("encrypt=true"), url())                          // encrypted and checked
+        mode(3); assertTrue(url().endsWith("encrypt=true"), url())
+        mode(0); assertTrue("encrypt=false" in url() && "trustServerCertificate" !in url(), url())
+        rule.onNodeWithTag("ds-tab:2").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()
+        rule.onNodeWithTag("ds-ssl-ca").assertIsNotEnabled()      // nothing to verify against while the mode does not verify
+        rule.onNodeWithTag("ds-ssl-cert").assertDoesNotExist()      // SQL Server takes no client certificate here
+        rule.onNodeWithTag("ds-ssl-mode:2").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick); settle()
+        rule.onNodeWithTag("ds-ssl-ca").assertIsEnabled()
     }
 }
