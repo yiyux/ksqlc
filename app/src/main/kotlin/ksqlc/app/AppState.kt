@@ -204,6 +204,15 @@ class AppState(
         }
     }
 
+    /** The "go to table" search is open. */
+    var objectSearch by mutableStateOf(false)
+
+    /** Opens the data of [o], or with [reveal] shows it in the explorer; closes the search. */
+    fun pickObject(o: DbObject, reveal: Boolean) {
+        objectSearch = false
+        if (reveal) revealInExplorer(NameTarget(ksqlc.sql.TableRef(o.ns.schema ?: o.ns.catalog, o.name, o.kind != DbObjectKind.TABLE), null)) else openData(o)
+    }
+
     /** ⌘B: jumps from the name at [offset] in the editor to its place in the explorer. */
     fun gotoDeclaration(offset: Int) {
         val cat = catalog ?: run { status = "Sin esquema cargado"; return }

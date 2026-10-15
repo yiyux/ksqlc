@@ -70,6 +70,9 @@ class SchemaCatalog(private val source: SchemaSource, private val scope: Corouti
         return null
     }
 
+    /** Every readable table and view read from the database. */
+    fun all(): List<DbObject> = objects.map { it.second }
+
     fun objectOf(table: TableRef): DbObject? = objects.firstOrNull { it.first == table }?.second
 }
 

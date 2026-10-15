@@ -20,6 +20,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -56,6 +57,8 @@ fun MainWindow(state: AppState) {
     Box(Modifier.fillMaxSize().background(c.windowBg).onPreviewKeyEvent { e ->
         // ⌥⌘E opens the history from anywhere
         if (e.type == KeyEventType.KeyDown && e.key == Key.E && e.isMetaPressed && e.isAltPressed) { state.openHistory(); true }
+        // ⌘⇧O searches tables and views by name
+        else if (e.type == KeyEventType.KeyDown && e.key == Key.O && e.isMetaPressed && e.isShiftPressed) { state.objectSearch = true; true }
         // ⌘8 shows or hides Services
         else if (e.type == KeyEventType.KeyDown && e.key == Key.Eight && e.isMetaPressed) { state.servicesVisible = !state.servicesVisible; true }
         else false
@@ -89,6 +92,7 @@ fun MainWindow(state: AppState) {
         DiffDialog(state)
         ConfirmDialog(state)
         ParamDialog(state)
+        ObjectSearchDialog(state)
     }
 }
 
