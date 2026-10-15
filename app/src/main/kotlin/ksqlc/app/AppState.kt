@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ksqlc.core.*
 import ksqlc.drivers.DumpScope
+import ksqlc.drivers.destructiveChanges
+import ksqlc.drivers.runAtomically
 import ksqlc.drivers.Introspector
 import ksqlc.drivers.JdbcUrl
 import ksqlc.drivers.nativeDumpBlocker
@@ -763,6 +765,48 @@ class AppState(
             runCatching { withContext(Dispatchers.IO) { m.source.call(o) } }
                 .onSuccess { run(it) }
                 .onFailure { status = "No se puede ejecutar ${o.name}: ${it.message}" }
+        }
+    }
+
+    /** The Modify dialog's table while it is open. */
+    var modifyDraft by mutableStateOf<ModifyDraft?>(null)
+    var modifyError by mutableStateOf<String?>(null)
+    var modifyBusy by mutableStateOf(false)
+
+    fun openModify(o: DbObject) {
+        val m = explorer ?: return
+        status = "Leyendo ${o.name}…"
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { m.source.tableModel(o) ?: error("Este motor todavía no permite modificar tablas") } }
+                .onSuccess { modifyError = null; modifyDraft = ModifyDraft(o, it, m.source.dialect) }
+                .onFailure { status = "No se pudo leer ${o.name}: ${it.message}" }
+        }
+    }
+
+    fun closeModify() { modifyDraft = null; modifyError = null }
+
+    /** OK in the Modify dialog: asks first when something loses data, then runs every statement in one transaction. */
+    fun applyModify() {
+        val d = modifyDraft ?: return
+        val statements = d.statements
+        if (statements.isEmpty() || modifyBusy) return
+        val losses = destructiveChanges(d.before, d.model)
+        if (losses.isEmpty()) runModify(statements)
+        else confirmation = Confirmation("Cambios que pierden datos", losses.joinToString("\n"), "Aplicar") { confirmation = null; runModify(statements) }
+    }
+
+    private fun runModify(statements: List<String>) {
+        val target = form.toDataSource(); val pw = form.passwordOrNull
+        modifyBusy = true; modifyError = null
+        scope.launch {
+            val error = withContext(Dispatchers.IO) { runCatching { runAtomically(target, pw, statements) }.getOrElse { it.message ?: it.toString() } }
+            val now = System.currentTimeMillis()
+            record(target.id, statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) })
+            modifyBusy = false
+            if (error != null) { modifyError = error; return@launch }
+            closeModify()
+            status = "Tabla modificada"
+            refreshExplorer()
         }
     }
 

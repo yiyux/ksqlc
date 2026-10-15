@@ -85,6 +85,7 @@ fun MainWindow(state: AppState) {
         }
         if (state.dataSourceDialog) DataSourceDialog(state)
         DdlDialog(state)
+        ModifyDialog(state)
         HistoryDialog(state)
         ExportDialog(state)
         ImportDialog(state)

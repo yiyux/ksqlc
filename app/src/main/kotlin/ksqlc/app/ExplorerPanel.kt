@@ -34,6 +34,7 @@ import ksqlc.drivers.dropForeignKeySql
 import ksqlc.drivers.dropIndexSql
 import ksqlc.drivers.dropSql
 import ksqlc.drivers.refreshMatViewSql
+import ksqlc.drivers.supportsModifyTable
 import ksqlc.drivers.supportsRoutineCall
 import ksqlc.drivers.truncateSql
 
@@ -54,7 +55,7 @@ private val Indent = 19.dp
 
 /** One 24dp tree line: chevron, icon, label and a muted detail. [selected] draws the rounded highlight. */
 @Composable
-private fun TreeLine(
+internal fun TreeLine(
     depth: Int, expandable: Boolean, expanded: Boolean, icon: IconKind, label: String, detail: String?, selected: Boolean,
     loading: Boolean = false, iconTint: androidx.compose.ui.graphics.Color? = null, modifier: Modifier = Modifier,
 ) {
@@ -202,6 +203,7 @@ private fun LazyListScope.nodeItems(
                     if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Importar CSV…") { state.openImport(o) })
                     if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Dump con la herramienta del motor…") { state.openNative(false, o) })
                     if (node.kind == NodeKind.ROUTINE && supportsRoutineCall(state.form.effectiveKind)) add(ContextMenuItem("Ejecutar…") { state.callRoutine(o) })
+                    if (node.kind == NodeKind.TABLE && supportsModifyTable(state.form.effectiveKind) && !state.form.options.readOnly) add(ContextMenuItem("Modificar…") { state.openModify(o) })
                     add(ContextMenuItem("Comparar esquema con…") { state.openDiff(o.ns, o.name) })
                     add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
                     add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
