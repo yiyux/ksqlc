@@ -24,6 +24,16 @@ class IntrospectorSqliteTest {
 
     private fun intro() = Introspector(ds, null)
 
+    @Test fun internalTablesAppearOnlyWhenAsked() {
+        val file = Files.createTempFile("ksqlc-sys", ".db").also { it.toFile().deleteOnExit() }.toString()
+        DriverManager.getConnection("jdbc:sqlite:$file").use { it.createStatement().executeUpdate("create table counted(id integer primary key autoincrement)") }
+        Introspector(DataSource("t", "t", DbKind.SQLITE, "jdbc:sqlite:$file"), null).use { i ->
+            assertEquals(listOf("counted"), i.objects(main).map { it.name })
+            i.includeSystem = true
+            assertEquals(listOf("counted", "sqlite_sequence"), i.objects(main).map { it.name })
+        }
+    }
+
     @Test fun namespacesListMainOnly() {
         intro().use { assertEquals(listOf(main), it.namespaces()) }
     }

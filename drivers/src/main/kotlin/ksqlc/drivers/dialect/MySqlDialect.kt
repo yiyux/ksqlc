@@ -10,16 +10,16 @@ object MySqlDialect : MetaDialect() {
     override fun quote(ident: String) = "`" + ident.replace("`", "``") + "`"
     override fun emptyInsert(table: String, firstColumn: String) = "insert into $table () values ()"
 
-    override fun namespaces(conn: Connection): List<Namespace> =
+    override fun namespaces(conn: Connection, includeSystem: Boolean): List<Namespace> =
         conn.metaData.catalogs.list { Namespace(it.getString("TABLE_CAT"), null) }
-            .filterNot(::isHidden).sortedBy { it.label.lowercase() }
+            .filter { includeSystem || !isHidden(it) }.sortedBy { it.label.lowercase() }
 
-    override fun objects(conn: Connection, ns: Namespace): List<DbObject> {
+    override fun objects(conn: Connection, ns: Namespace, includeSystem: Boolean): List<DbObject> {
         val routines = conn.query(
             "select routine_name, routine_comment from information_schema.routines where routine_schema = ? order by routine_name",
             ns.catalog,
         ) { DbObject(ns, it.getString(1), DbObjectKind.ROUTINE, it.getString(2)?.ifBlank { null }) }
-        return super.objects(conn, ns) + routines
+        return super.objects(conn, ns, includeSystem) + routines
     }
 
     override fun ddl(conn: Connection, o: DbObject): String {

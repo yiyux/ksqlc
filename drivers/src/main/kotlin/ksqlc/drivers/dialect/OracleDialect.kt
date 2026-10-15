@@ -13,10 +13,10 @@ import java.sql.SQLException
 object OracleDialect : MetaDialect() {
     override fun emptyInsert(table: String, firstColumn: String) = "insert into $table ($firstColumn) values (default)"
 
-    override fun namespaces(conn: Connection): List<Namespace> =
-        conn.query("select username from all_users where oracle_maintained = 'N' order by username") { Namespace(null, it.getString(1)) }
+    override fun namespaces(conn: Connection, includeSystem: Boolean): List<Namespace> =
+        conn.query("select username from all_users" + (if (includeSystem) "" else " where oracle_maintained = 'N'") + " order by username") { Namespace(null, it.getString(1)) }
 
-    override fun objects(conn: Connection, ns: Namespace): List<DbObject> {
+    override fun objects(conn: Connection, ns: Namespace, includeSystem: Boolean): List<DbObject> {
         val owner = ns.schema
         fun kind(sql: String, kind: DbObjectKind) = conn.query(sql, owner) { DbObject(ns, it.getString(1), kind, it.getString(2)?.ifBlank { null }) }
         val tables = kind(

@@ -43,6 +43,13 @@ class OracleIntrospectionTest {
     }
 
     private val ns get() = Namespace(null, owner)
+    @Test fun maintainedSchemasAppearOnlyWhenAsked() = intro().use { i ->
+        assertTrue(i.namespaces().none { it.label == "SYS" })
+        i.includeSystem = true
+        assertTrue(i.namespaces().any { it.label == "SYS" })
+    }
+
+
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE) = DbObject(ns, name, kind)
 

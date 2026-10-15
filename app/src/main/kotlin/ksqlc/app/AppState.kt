@@ -493,7 +493,7 @@ class AppState(
         connecting = true
         val ds = form.toDataSource(); val pw = form.passwordOrNull
         scope.launch {
-            runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw)).also { it.load() } } }
+            runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw).also { it.includeSystem = settings.showSystemSchemas }).also { it.load() } } }
                 .onSuccess { explorer = it; explorerKey = keyOf(ds, pw); if (announce) status = "Esquema cargado: ${ds.name}"; loadCatalog(it) }
                 .onFailure {
                     explorer = null; explorerKey = null; catalog = null
@@ -514,6 +514,13 @@ class AppState(
         explorer = null; explorerKey = null; catalog = null
         scope.launch(Dispatchers.IO) { sessions.close(); introspectors.close() }
         status = "Desconectado"
+    }
+
+    /** Shows or hides the engine's own schemas in the explorer (and in what the editor completes), and reads the tree again. */
+    fun toggleSystemSchemas() {
+        updateSettings { it.copy(showSystemSchemas = !it.showSystemSchemas) }
+        introspectors.peek()?.includeSystem = settings.showSystemSchemas
+        refreshExplorer()
     }
 
     fun refreshExplorer() {

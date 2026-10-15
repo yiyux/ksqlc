@@ -15,8 +15,9 @@ interface Dialect {
      */
     fun emptyInsert(table: String, firstColumn: String): String = "insert into $table default values"
 
-    fun namespaces(conn: Connection): List<Namespace>
-    fun objects(conn: Connection, ns: Namespace): List<DbObject>
+    /** [includeSystem] adds the engine's own schemas and objects (`pg_catalog`, `sys`, `mysql`…) that are hidden by default. */
+    fun namespaces(conn: Connection, includeSystem: Boolean = false): List<Namespace>
+    fun objects(conn: Connection, ns: Namespace, includeSystem: Boolean = false): List<DbObject>
     fun details(conn: Connection, o: DbObject): TableDetails
     fun ddl(conn: Connection, o: DbObject): String
 

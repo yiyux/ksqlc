@@ -24,6 +24,15 @@ private val SETUP = listOf(
 abstract class MySqlFamilyBase {
     protected abstract val fx: ServerFixture
     private val app = Namespace("app", null)
+    @Test fun systemSchemasAppearOnlyWhenAsked() = intro().use { i ->
+        assertTrue(i.namespaces().none { it.label == "information_schema" || it.label == "mysql" }, "sin sistema: ${i.namespaces().map { it.label }}")
+        i.includeSystem = true
+        val names = i.namespaces().map { it.label }
+        assertTrue("information_schema" in names && "mysql" in names, "con sistema: $names")
+        assertTrue(i.objects(i.namespaces().first { it.label == "information_schema" }).isNotEmpty())
+    }
+
+
     private fun intro() = Introspector(fx.ds, fx.password)
 
     @Test fun namespacesAreDatabasesWithoutSystemOnes() {

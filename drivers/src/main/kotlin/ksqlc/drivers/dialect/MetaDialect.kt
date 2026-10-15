@@ -15,16 +15,17 @@ abstract class MetaDialect : Dialect {
     override fun qualified(o: DbObject): String =
         (o.ns.schema ?: o.ns.catalog)?.let { quote(it) + "." }.orEmpty() + quote(o.name)
 
-    override fun namespaces(conn: Connection): List<Namespace> =
+    override fun namespaces(conn: Connection, includeSystem: Boolean): List<Namespace> =
         conn.metaData.schemas.use { rs ->
             buildList { while (rs.next()) add(Namespace(null, rs.getString("TABLE_SCHEM"))) }
-        }.filterNot(::isHidden).sortedBy { it.label.lowercase() }
+        }.filter { includeSystem || !isHidden(it) }.sortedBy { it.label.lowercase() }
 
     protected open fun isHidden(ns: Namespace) = ns.label.lowercase() in hiddenNamespaces
 
-    override fun objects(conn: Connection, ns: Namespace): List<DbObject> {
+    override fun objects(conn: Connection, ns: Namespace, includeSystem: Boolean): List<DbObject> {
         val meta = conn.metaData
-        return meta.getTables(ns.catalog, ns.schema?.let { esc(meta, it) }, "%", tableTypes).use { rs ->
+        // with system objects asked for, every table type: MySQL calls the tables of its own information_schema SYSTEM VIEW
+        return meta.getTables(ns.catalog, ns.schema?.let { esc(meta, it) }, "%", if (includeSystem) null else tableTypes).use { rs ->
             buildList {
                 while (rs.next()) kindOf(rs.getString("TABLE_TYPE"))?.let {
                     add(DbObject(ns, rs.getString("TABLE_NAME"), it, rs.getString("REMARKS")?.ifBlank { null }))

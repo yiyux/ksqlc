@@ -49,6 +49,19 @@ class SqlServerIntrospectionTest {
     }
 
     private val app = Namespace(null, "app")
+    @Test fun systemSchemasShowTheirShippedViewsWithColumns() = intro().use { i ->
+        assertTrue(i.namespaces().none { it.label == "sys" || it.label == "INFORMATION_SCHEMA" })
+        i.includeSystem = true
+        val names = i.namespaces().map { it.label }
+        assertTrue("sys" in names && "INFORMATION_SCHEMA" in names && "guest" !in names, names.toString())
+        val sys = i.namespaces().first { it.label == "sys" }
+        val tables = i.objects(sys).first { it.name == "tables" }
+        assertEquals(DbObjectKind.VIEW, tables.kind)
+        assertTrue(i.details(tables).columns.any { it.name == "name" })
+        assertTrue(i.objects(i.namespaces().first { it.label == "INFORMATION_SCHEMA" }).any { it.name == "TABLES" })
+    }
+
+
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE, ns: Namespace = app) = DbObject(ns, name, kind)
 

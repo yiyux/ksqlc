@@ -33,6 +33,18 @@ class PostgresIntrospectionTest {
     }
 
     private val app = Namespace(null, "app")
+    @Test fun systemSchemasAppearOnlyWhenAsked() = intro().use { i ->
+        assertTrue(i.namespaces().none { it.label == "pg_catalog" || it.label == "information_schema" })
+        i.includeSystem = true
+        val names = i.namespaces().map { it.label }
+        assertTrue("pg_catalog" in names && "information_schema" in names, names.toString())
+        assertTrue(names.none { it.startsWith("pg_toast") || it.startsWith("pg_temp") }, names.toString())
+        val ns = i.namespaces().first { it.label == "pg_catalog" }
+        assertTrue(i.objects(ns).any { it.name == "pg_class" })
+        assertTrue(i.details(i.objects(ns).first { it.name == "pg_class" }).columns.any { it.name == "relname" })
+    }
+
+
     private fun intro() = Introspector(fx.ds, fx.password)
 
     @Test fun namespacesHideSystemSchemas() {

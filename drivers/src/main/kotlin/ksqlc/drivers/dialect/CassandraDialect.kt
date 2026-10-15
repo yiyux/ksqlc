@@ -38,11 +38,11 @@ object CassandraDialect : MetaDialect() {
 
     override fun emptyInsert(table: String, firstColumn: String) = "insert into $table ($firstColumn) values (null)"
 
-    override fun namespaces(conn: Connection): List<Namespace> =
+    override fun namespaces(conn: Connection, includeSystem: Boolean): List<Namespace> =
         conn.query("select keyspace_name from system_schema.keyspaces") { Namespace(null, it.getString(1)) }
-            .filterNot { it.label in system }.sortedBy { it.label.lowercase() }
+            .filter { includeSystem || it.label !in system }.sortedBy { it.label.lowercase() }
 
-    override fun objects(conn: Connection, ns: Namespace): List<DbObject> {
+    override fun objects(conn: Connection, ns: Namespace, includeSystem: Boolean): List<DbObject> {
         val tables = conn.query("select table_name, comment from system_schema.tables where keyspace_name = ?", ns.schema) { DbObject(ns, it.getString(1), DbObjectKind.TABLE, it.getString(2)?.ifBlank { null }) }
         val views = conn.query("select view_name, comment from system_schema.views where keyspace_name = ?", ns.schema) { DbObject(ns, it.getString(1), DbObjectKind.MATERIALIZED_VIEW, it.getString(2)?.ifBlank { null }) }
         val functions = conn.query("select function_name from system_schema.functions where keyspace_name = ?", ns.schema) { it.getString(1) }.distinct()

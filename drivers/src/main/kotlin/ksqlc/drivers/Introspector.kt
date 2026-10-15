@@ -16,8 +16,11 @@ class Introspector(private val ds: DataSource, private val password: String?) : 
     @Synchronized private fun connection(): Connection =
         conn?.takeIf { !it.isClosed } ?: openConnection(ds, password).also { conn = it }
 
-    @Synchronized override fun namespaces(): List<Namespace> = dialect.namespaces(connection())
-    @Synchronized override fun objects(ns: Namespace): List<DbObject> = dialect.objects(connection(), ns)
+    /** Also list the engine's own schemas and objects; takes effect on the next read. */
+    @Volatile var includeSystem = false
+
+    @Synchronized override fun namespaces(): List<Namespace> = dialect.namespaces(connection(), includeSystem)
+    @Synchronized override fun objects(ns: Namespace): List<DbObject> = dialect.objects(connection(), ns, includeSystem)
     @Synchronized override fun details(o: DbObject): TableDetails = dialect.details(connection(), o)
     @Synchronized override fun ddl(o: DbObject): String = dialect.ddl(connection(), o)
 

@@ -11,19 +11,20 @@ import java.sql.Connection
 object SqlServerDialect : MetaDialect() {
     override fun quote(ident: String) = "[" + ident.replace("]", "]]") + "]"
 
-    override fun namespaces(conn: Connection): List<Namespace> =
+    override fun namespaces(conn: Connection, includeSystem: Boolean): List<Namespace> =
         conn.query(
-            """select name from sys.schemas
-               where name not in ('sys', 'INFORMATION_SCHEMA', 'guest') and name not like 'db[_]%' order by name""",
+            "select name from sys.schemas where name not in (${if (includeSystem) "'guest'" else "'sys', 'INFORMATION_SCHEMA', 'guest'"}) and name not like 'db[_]%' order by name",
         ) { Namespace(null, it.getString(1)) }
 
-    override fun objects(conn: Connection, ns: Namespace): List<DbObject> =
-        conn.query(
+    override fun objects(conn: Connection, ns: Namespace, includeSystem: Boolean): List<DbObject> {
+        // the engine's own schemas hold shipped objects, which only sys.all_objects lists
+        val system = ns.schema == "sys" || ns.schema == "INFORMATION_SCHEMA"
+        return conn.query(
             """select o.name, o.type, cast(ep.value as nvarchar(4000))
-               from sys.objects o
+               from ${if (system) "sys.all_objects" else "sys.objects"} o
                join sys.schemas s on s.schema_id = o.schema_id
                left join sys.extended_properties ep on ep.class = 1 and ep.major_id = o.object_id and ep.minor_id = 0 and ep.name = 'MS_Description'
-               where s.name = ? and o.is_ms_shipped = 0 and o.type in ('U','V','SO','P','PC','FN','IF','TF','FS','FT')
+               where s.name = ? ${if (system) "" else "and o.is_ms_shipped = 0 "}and o.type in ('U','V','SO','P','PC','FN','IF','TF','FS','FT')
                order by o.name""",
             ns.schema,
         ) {
@@ -35,6 +36,7 @@ object SqlServerDialect : MetaDialect() {
             }
             DbObject(ns, it.getString(1), kind, it.getString(3)?.ifBlank { null })
         }
+    }
 
     /** A column as the catalog has it; [details] and [ddl] both start from this. */
     private class Col(
@@ -48,7 +50,7 @@ object SqlServerDialect : MetaDialect() {
             """select c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable, c.is_identity,
                       cast(ic.seed_value as nvarchar(40)), cast(ic.increment_value as nvarchar(40)),
                       dc.definition, cc.definition, cc.is_persisted, c.collation_name
-               from sys.columns c
+               from sys.all_columns c
                join sys.types t on t.user_type_id = c.user_type_id
                left join sys.identity_columns ic on ic.object_id = c.object_id and ic.column_id = c.column_id
                left join sys.default_constraints dc on dc.object_id = c.default_object_id

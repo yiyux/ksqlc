@@ -20,6 +20,8 @@ data class Settings(
     val resultsRatio: Float = 0.5f,
     /** Executables the user pointed dump/restore at, by the tool's usual name (e.g. `pg_dump`). */
     val toolPaths: Map<String, String> = emptyMap(),
+    /** List the engine's own schemas (`pg_catalog`, `sys`, `mysql`…) in the explorer. */
+    val showSystemSchemas: Boolean = false,
 )
 
 /** `settings.json` in [dir]. A missing or unreadable file yields the defaults instead of an error. */

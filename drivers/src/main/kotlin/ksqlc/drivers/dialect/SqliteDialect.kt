@@ -5,14 +5,14 @@ import java.sql.Connection
 
 /** SQLite has no useful `DatabaseMetaData`; everything comes from `sqlite_master` and PRAGMAs. */
 object SqliteDialect : MetaDialect() {
-    override fun namespaces(conn: Connection): List<Namespace> =
+    override fun namespaces(conn: Connection, includeSystem: Boolean): List<Namespace> =
         conn.createStatement().use { st ->
             st.executeQuery("pragma database_list").list { Namespace(null, it.getString("name")) }
-        }.filter { it.schema != "temp" }
+        }.filter { includeSystem || it.schema != "temp" }
 
-    override fun objects(conn: Connection, ns: Namespace): List<DbObject> =
+    override fun objects(conn: Connection, ns: Namespace, includeSystem: Boolean): List<DbObject> =
         conn.query(
-            "select name, type from ${quote(ns.schema!!)}.sqlite_master where type in ('table','view') and name not like 'sqlite\\_%' escape '\\' order by name collate nocase",
+            "select name, type from ${quote(ns.schema!!)}.sqlite_master where type in ('table','view')" + (if (includeSystem) "" else " and name not like 'sqlite\\_%' escape '\\'") + " order by name collate nocase",
         ) { DbObject(ns, it.getString(1), if (it.getString(2) == "view") DbObjectKind.VIEW else DbObjectKind.TABLE) }
 
     override fun details(conn: Connection, o: DbObject): TableDetails {

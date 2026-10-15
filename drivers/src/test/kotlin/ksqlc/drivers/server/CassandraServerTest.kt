@@ -50,6 +50,13 @@ class CassandraServerTest {
     private fun intro() = Introspector(fx.ds, fx.password)
     private fun obj(name: String, kind: DbObjectKind = DbObjectKind.TABLE) = DbObject(ns, name, kind)
 
+    @Test fun systemKeyspacesAppearOnlyWhenAsked() = intro().use { i ->
+        i.includeSystem = true
+        val names = i.namespaces().map { it.label }
+        assertTrue("system_schema" in names && "system" in names && "ksqlc" in names, names.toString())
+        assertTrue(i.objects(i.namespaces().first { it.label == "system_schema" }).any { it.name == "tables" })
+    }
+
     @Test fun usesTheNativeDialect() = assertSame(CassandraDialect, Dialect.of(DbKind.CASSANDRA))
 
     @Test fun keyspacesAreNamespacesWithoutTheSystemOnes() = intro().use { i ->

@@ -4,12 +4,15 @@ import ksqlc.core.*
 import java.sql.Connection
 
 object PostgresDialect : MetaDialect() {
-    override fun namespaces(conn: Connection): List<Namespace> =
-        conn.query("select nspname from pg_namespace where nspname !~ '^pg_' and nspname <> 'information_schema' order by 1") {
+    override fun namespaces(conn: Connection, includeSystem: Boolean): List<Namespace> =
+        conn.query(
+            if (includeSystem) "select nspname from pg_namespace where nspname !~ '^pg_(toast|temp_|toast_temp_)' order by 1"
+            else "select nspname from pg_namespace where nspname !~ '^pg_' and nspname <> 'information_schema' order by 1",
+        ) {
             Namespace(null, it.getString(1))
         }
 
-    override fun objects(conn: Connection, ns: Namespace): List<DbObject> {
+    override fun objects(conn: Connection, ns: Namespace, includeSystem: Boolean): List<DbObject> {
         val relations = conn.query(
             """select c.relname, c.relkind, obj_description(c.oid, 'pg_class')
                from pg_class c join pg_namespace n on n.oid = c.relnamespace
