@@ -1,5 +1,7 @@
 package ksqlc.app.ui
 
+import androidx.compose.foundation.DefaultContextMenuRepresentation
+import androidx.compose.foundation.LocalContextMenuRepresentation
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -148,7 +150,9 @@ fun KsqlcTheme(mode: ThemeMode, content: @Composable () -> Unit) {
         surface = c.editorBg, onSurface = c.text, surfaceVariant = c.headerBg, onSurfaceVariant = c.textSecondary,
         outline = c.border, outlineVariant = c.divider, error = c.error, secondaryContainer = c.selection, onSecondaryContainer = c.text,
     )
-    CompositionLocalProvider(LocalKsqlcColors provides c) {
+    // the right-click menu would otherwise follow the operating system's theme, not the app's
+    val menu = DefaultContextMenuRepresentation(backgroundColor = c.dialogBg, textColor = c.text, itemHoverColor = c.selection)
+    CompositionLocalProvider(LocalKsqlcColors provides c, LocalContextMenuRepresentation provides menu) {
         MaterialTheme(colorScheme = scheme, typography = compactTypography(), content = content)
     }
 }
