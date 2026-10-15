@@ -123,6 +123,8 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
         val activeId = state.form.currentId
         var collapsed by remember(activeId) { mutableStateOf(false) }
         val activeSaved = state.saved.any { it.id == activeId }
+        var closedFolders by remember { mutableStateOf(emptySet<String>()) }
+        val connRows = connectionRows(state.saved, closedFolders)
         // "go to declaration" from the editor: show everything again and bring the selected row into view
         LaunchedEffect(state.revealTick) {
             if (state.revealTick == 0 || model == null) return@LaunchedEffect
@@ -130,28 +132,37 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
             val all = visibleRows(model.roots, "")
             val at = all.indexOfFirst { it.node.id == state.explorerSelectedId }
             if (at >= 0) {
-                val rowsBefore = state.saved.takeWhile { it.id != activeId }.size + 1   // connection rows above, plus the active one
+                val rowsBefore = connRows.takeWhile { !(it is ConnectionRow.Item && it.ds.id == activeId) }.size + 1   // connection and folder rows above, plus the active one
                 val visible = list.layoutInfo.visibleItemsInfo
                 if (visible.isEmpty() || at + rowsBefore < visible.first().index || at + rowsBefore > visible.last().index - 1) list.scrollToItem((at + rowsBefore - 3).coerceAtLeast(0))
             }
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             LazyColumn(Modifier.fillMaxSize().padding(top = 4.dp), state = list) {
-                for (ds in state.saved) {
-                    val active = ds.id == activeId
-                    item(key = "ds:${ds.id}") {
-                        Column(Modifier.testTag("ds-node:${ds.name}").clickable {
-                            when {
-                                !active -> { collapsed = false; state.selectAndConnect(ds) }
-                                model != null -> collapsed = !collapsed
-                                else -> state.connect()
-                            }
-                        }) {
-                            TreeLine(0, expandable = true, expanded = active && model != null && !collapsed, icon = IconKind.Database,
-                                label = ds.name, detail = ds.kind.label(), selected = false, loading = active && state.connecting, iconTint = if (active) c.accentIcon else c.textSecondary)
+                for (r in connRows) when (r) {
+                    is ConnectionRow.Folder -> item(key = "folder:${r.name}") {
+                        Column(Modifier.testTag("folder:${r.name}").clickable { closedFolders = if (r.open) closedFolders + r.name else closedFolders - r.name }) {
+                            TreeLine(0, expandable = true, expanded = r.open, icon = IconKind.Folder, label = r.name, detail = "(${r.count})", selected = false)
                         }
                     }
-                    if (active && model != null && !collapsed) nodeItems(state, model, rows, filter, 1, scope, clipboard)
+                    is ConnectionRow.Item -> {
+                        val ds = r.ds
+                        val active = ds.id == activeId
+                        val depth = if (r.inFolder) 1 else 0
+                        item(key = "ds:${ds.id}") {
+                            Column(Modifier.testTag("ds-node:${ds.name}").clickable {
+                                when {
+                                    !active -> { collapsed = false; state.selectAndConnect(ds) }
+                                    model != null -> collapsed = !collapsed
+                                    else -> state.connect()
+                                }
+                            }) {
+                                TreeLine(depth, expandable = true, expanded = active && model != null && !collapsed, icon = IconKind.Database,
+                                    label = ds.name, detail = ds.kind.label(), selected = false, loading = active && state.connecting, iconTint = connectionTint(ds.color, active))
+                            }
+                        }
+                        if (active && model != null && !collapsed) nodeItems(state, model, rows, filter, depth + 1, scope, clipboard)
+                    }
                 }
                 if (!activeSaved && model != null) {
                     item(key = "connection-root") {

@@ -108,7 +108,7 @@ private fun TopBar(state: AppState) {
                     Modifier.height(28.dp).clip(RoundedCornerShape(8.dp)).clickable { menu = true }.padding(horizontal = 8.dp).testTag("connection-selector"),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    KIcon(IconKind.Database, tint = c.accentIcon)
+                    KIcon(IconKind.Database, tint = CONNECTION_COLORS[state.form.color] ?: c.accentIcon)
                     Text(state.form.name, fontSize = 13.sp, color = c.text, maxLines = 1)
                     KIcon(IconKind.ChevronDown, tint = c.textSecondary, size = 12.dp)
                 }

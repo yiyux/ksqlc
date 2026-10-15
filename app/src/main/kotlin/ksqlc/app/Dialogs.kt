@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -274,9 +275,9 @@ fun DataSourceDialog(state: AppState) {
                     }
                     Text("Data sources del proyecto", Modifier.padding(start = 12.dp, top = 6.dp, bottom = 4.dp), fontSize = 12.sp, color = c.textSecondary)
                     LazyColumn(Modifier.fillMaxSize()) {
-                        if (draft.currentId == null) item(key = "new") { DsRow(draft.name, draft.effectiveKind.label(), selected = true) {} }
+                        if (draft.currentId == null) item(key = "new") { DsRow(draft.name, draft.effectiveKind.label(), draft.color, selected = true) {} }
                         items(state.saved, key = { it.id }) { ds ->
-                            DsRow(ds.name, ds.kind.label(), selected = ds.id == draft.currentId) {
+                            DsRow(ds.name, ds.kind.label(), ds.color, selected = ds.id == draft.currentId) {
                                 draft.load(ds); test = null
                                 scope.launch {
                                     draft.password = withContext(Dispatchers.IO) { state.storedPassword(ds.id) }.orEmpty()
@@ -306,6 +307,19 @@ fun DataSourceDialog(state: AppState) {
                     else if (tab == 2) SshSslTab(draft, Modifier.weight(1f))
                     else if (tab == 3) SchemasTab(state, draft, Modifier.weight(1f))
                     else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Field("Carpeta:") { CompactTextField(draft.folder, { draft.folder = it }, Modifier.weight(1f), placeholder = "ninguna", testTag = "ds-folder", height = 28.dp) }
+                        Field("Color:") {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                (listOf<String?>(null) + CONNECTION_COLORS.keys).forEach { key ->
+                                    val on = draft.color == key
+                                    Box(
+                                        Modifier.size(20.dp).clip(CircleShape).background(CONNECTION_COLORS[key] ?: Color.Transparent)
+                                            .border(if (on) 2.dp else 1.dp, if (on) c.text else c.textMuted, CircleShape)
+                                            .clickable { draft.color = key }.testTag("ds-color:${key ?: "none"}"),
+                                    )
+                                }
+                            }
+                        }
                         Field("Motor:") {
                             Box(Modifier.weight(1f)) {
                                 DropdownField(draft.kind.label(), { kindMenu = true }, Modifier.fillMaxWidth().testTag("ds-kind"), icon = IconKind.Database, enabled = !draft.customUrl)
@@ -370,14 +384,14 @@ fun DataSourceDialog(state: AppState) {
 }
 
 @Composable
-private fun DsRow(name: String, kind: String, selected: Boolean, onClick: () -> Unit) {
+private fun DsRow(name: String, kind: String, color: String?, selected: Boolean, onClick: () -> Unit) {
     val c = Ksqlc.colors
     Row(
         Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 6.dp).clip(RoundedCornerShape(4.dp))
             .background(if (selected) c.selection else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 8.dp).testTag("ds-row:$name"),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        KIcon(IconKind.Database, tint = c.accentIcon)
+        KIcon(IconKind.Database, tint = CONNECTION_COLORS[color] ?: c.accentIcon)
         Text(name, fontSize = 13.sp, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         Text(kind, fontSize = 12.sp, color = c.textMuted, maxLines = 1)
     }

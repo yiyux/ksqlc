@@ -94,6 +94,10 @@ data class DataSource(
     val schemas: SchemaFilter = SchemaFilter(),
     /** The SSH password or key passphrase, carried with the connection while it is open; never written to connections.json. */
     @kotlinx.serialization.Transient val sshSecret: String? = null,
+    /** The folder it is listed under in the explorer; blank = none. One level only. */
+    val folder: String = "",
+    /** A key of the app's connection colour palette; null = none. */
+    val color: String? = null,
 )
 
 data class Column(val name: String, val typeName: String, val nullable: Boolean = true)

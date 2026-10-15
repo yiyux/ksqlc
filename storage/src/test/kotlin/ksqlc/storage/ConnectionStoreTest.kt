@@ -46,6 +46,13 @@ class ConnectionStoreTest {
         assertFalse(ConnectionStore(dir, secrets).list().single().ssh.enabled)
     }
 
+    @Test fun folderAndColourSurviveARestartAndOldFilesHaveNone() {
+        store.save(pg.copy(folder = "Producción", color = "rojo"), "")
+        ConnectionStore(dir, secrets).list().single().let { assertEquals("Producción", it.folder); assertEquals("rojo", it.color) }
+        dir.resolve("connections.json").toFile().writeText("""{"version":1,"connections":[{"id":"9","name":"viejo","kind":"SQLITE","url":"jdbc:sqlite:x"}]}""")
+        ConnectionStore(dir, secrets).list().single().let { assertEquals("", it.folder); assertNull(it.color) }
+    }
+
     @Test fun saveReplacesById() {
         store.save(pg, "a")
         store.save(pg.copy(name = "renamed"), "b")

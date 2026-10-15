@@ -19,6 +19,8 @@ import ksqlc.drivers.supportsTimeZone
 class ConnectionForm {
     var currentId by mutableStateOf<String?>(null)
     var name by mutableStateOf("local")
+    var folder by mutableStateOf("")
+    var color by mutableStateOf<String?>(null)
     var kind by mutableStateOf(DbKind.SQLITE)
     var host by mutableStateOf("localhost")
     var portText by mutableStateOf("")
@@ -115,10 +117,10 @@ class ConnectionForm {
     val effectiveKind: DbKind get() = if (customUrl) JdbcUrl.kindOf(url) else kind
     val passwordOrNull: String? get() = password.ifBlank { null }
 
-    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && effectiveKind != DbKind.CASSANDRA, options, ssh, sslSettings, schemas, sshSecret.ifBlank { null })
+    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && effectiveKind != DbKind.CASSANDRA, options, ssh, sslSettings, schemas, sshSecret.ifBlank { null }, folder.trim(), color)
 
     fun copyFrom(o: ConnectionForm) {
-        currentId = o.currentId; name = o.name; kind = o.kind; host = o.host; portText = o.portText; database = o.database
+        currentId = o.currentId; name = o.name; folder = o.folder; color = o.color; kind = o.kind; host = o.host; portText = o.portText; database = o.database
         ssl = o.ssl; trustCert = o.trustCert; datacenter = o.datacenter; user = o.user; password = o.password; customUrl = o.customUrl; urlText = o.urlText; manualTx = o.manualTx
         readOnly = o.readOnly; timeZone = o.timeZone; keepAliveOn = o.keepAliveOn; keepAliveText = o.keepAliveText; autoDisconnectOn = o.autoDisconnectOn
         autoDisconnectText = o.autoDisconnectText; singleDatabase = o.singleDatabase; startupScript = o.startupScript; autoSync = o.autoSync; introspectionText = o.introspectionText
@@ -132,7 +134,7 @@ class ConnectionForm {
      * port and database come back as fields; any other URL opens in manual-URL mode.
      */
     fun load(c: DataSource) {
-        currentId = c.id; name = c.name; user = c.user.orEmpty(); password = ""; manualTx = c.manualTx; loadOptions(c.options); loadSsh(c.ssh); schemasAll = c.schemas.all; schemasSelected = c.schemas.selected; schemaPattern = c.schemas.pattern; sshSecret = ""
+        currentId = c.id; name = c.name; folder = c.folder; color = c.color; user = c.user.orEmpty(); password = ""; manualTx = c.manualTx; loadOptions(c.options); loadSsh(c.ssh); schemasAll = c.schemas.all; schemasSelected = c.schemas.selected; schemaPattern = c.schemas.pattern; sshSecret = ""
         val p = JdbcUrl.parse(c.url)
         if (p != null) {
             kind = p.kind; host = p.host.ifBlank { "localhost" }; portText = (p.port ?: JdbcUrl.defaultPort(p.kind))?.toString().orEmpty()
