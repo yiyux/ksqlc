@@ -773,17 +773,21 @@ class AppState(
     var modifyError by mutableStateOf<String?>(null)
     var modifyBusy by mutableStateOf(false)
 
+    /** Where the open Modify dialog applies its changes, fixed when it opens so a later connection switch cannot redirect them. */
+    private var modifyTarget: Pair<DataSource, String?>? = null
+
     fun openModify(o: DbObject) {
         val m = explorer ?: return
+        val target = form.toDataSource() to form.passwordOrNull
         status = "Leyendo ${o.name}…"
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { m.source.tableModel(o) ?: error("Este motor todavía no permite modificar tablas") } }
-                .onSuccess { modifyError = null; modifyDraft = ModifyDraft(o, it, m.source.dialect) }
+                .onSuccess { modifyError = null; modifyTarget = target; modifyDraft = ModifyDraft(o, it, m.source.dialect) }
                 .onFailure { status = "No se pudo leer ${o.name}: ${it.message}" }
         }
     }
 
-    fun closeModify() { modifyDraft = null; modifyError = null }
+    fun closeModify() { if (modifyBusy) return; modifyDraft = null; modifyError = null }
 
     /** OK in the Modify dialog: asks first when something loses data, then runs every statement in one transaction. */
     fun applyModify() {
@@ -796,15 +800,18 @@ class AppState(
     }
 
     private fun runModify(statements: List<String>) {
-        val target = form.toDataSource(); val pw = form.passwordOrNull
+        val d = modifyDraft ?: return
+        val (target, pw) = modifyTarget ?: return
+        if (modifyBusy) return
         modifyBusy = true; modifyError = null
         scope.launch {
             val error = withContext(Dispatchers.IO) { runCatching { runAtomically(target, pw, statements) }.getOrElse { it.message ?: it.toString() } }
             val now = System.currentTimeMillis()
             record(target.id, statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) })
             modifyBusy = false
-            if (error != null) { modifyError = error; return@launch }
-            closeModify()
+            val open = modifyDraft === d
+            if (error != null) { if (open) modifyError = error else status = "No se pudo modificar la tabla: $error"; return@launch }
+            if (open) closeModify()
             status = "Tabla modificada"
             refreshExplorer()
         }

@@ -18,7 +18,8 @@ import androidx.compose.ui.unit.sp
 import ksqlc.app.ui.*
 import ksqlc.core.*
 
-private fun String.orNull() = trim().ifEmpty { null }
+// Not trimmed: the field is controlled, so trimming would eat the space as it is typed.
+private fun String.orNull() = ifBlank { null }
 private val ACTIONS = listOf("NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT")
 private val METHODS = listOf("btree", "hash", "gist", "spgist", "gin", "brin")
 
@@ -29,7 +30,7 @@ fun ModifyDialog(state: AppState) {
     val c = Ksqlc.colors
     val sql = draft.statements
     val preview = draft.problem ?: if (sql.isEmpty()) "-- sin cambios" else sql.joinToString("\n") { "$it;" }
-    ModalOverlay(state::closeModify, Modifier.testTag("modify-dialog"), width = 920.dp, height = 720.dp) {
+    ModalOverlay({ if (!state.modifyBusy) state.closeModify() }, Modifier.testTag("modify-dialog"), width = 920.dp, height = 720.dp) {
         Column(Modifier.fillMaxSize().background(c.dialogBg)) {
             Box(Modifier.fillMaxWidth().height(29.dp), contentAlignment = Alignment.Center) {
                 Text("Modificar ${draft.obj.name}", fontSize = 13.sp, color = c.textSecondary)
@@ -47,7 +48,7 @@ fun ModifyDialog(state: AppState) {
             }
             state.modifyError?.let { Text(it, Modifier.padding(horizontal = 12.dp).testTag("modify-error"), fontSize = 12.sp, color = c.error) }
             Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                TextAction("Cancelar", state::closeModify, Modifier.testTag("modify-cancel"))
+                TextAction("Cancelar", state::closeModify, Modifier.testTag("modify-cancel"), enabled = !state.modifyBusy)
                 TextAction("OK", state::applyModify, Modifier.testTag("modify-ok"), enabled = sql.isNotEmpty() && !state.modifyBusy, primary = true)
             }
         }

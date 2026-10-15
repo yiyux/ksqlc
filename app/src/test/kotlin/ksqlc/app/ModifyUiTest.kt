@@ -99,4 +99,20 @@ class ModifyUiTest {
         rule.onNodeWithTag("modify-cancel").performClick()
         until { state.modifyDraft == null }
     }
+
+    @Test fun spacesTypedInATextFieldAreKept() {
+        open()
+        rule.onNodeWithTag("modify:columns:1").performClick(); frames()
+        rule.onNodeWithTag("modify-col-default").performTextReplacement("a b "); frames()
+        rule.onNodeWithTag("modify-preview").assertTextContains("default a b ", substring = true)
+    }
+
+    @Test fun cancelIsDisabledWhileApplying() {
+        open()
+        state.modifyBusy = true; frames()
+        rule.onNodeWithTag("modify-cancel").assertIsNotEnabled()
+        state.closeModify(); frames()
+        assertEquals(true, state.modifyDraft != null)
+        state.modifyBusy = false
+    }
 }
