@@ -756,6 +756,22 @@ class AppState(
         }
     }
 
+    /** Asks to run the alteration [sql] (shown as is), runs it on the console's connection, logs it and reloads the explorer. */
+    fun alter(title: String, sql: String) {
+        confirmation = Confirmation(title, sql, "Ejecutar") {
+            confirmation = null
+            val target = form.toDataSource(); val pw = form.passwordOrNull
+            status = "Ejecutando…"
+            scope.launch {
+                val r = runCatching { withContext(Dispatchers.IO) { sessions.get(target, pw).runScript(listOf(sql)).single() } }
+                    .getOrElse { StatementResult.Failed(sql, 0, it.message ?: it.toString()) }
+                record(target.id, listOf(r.toHistory(null)))
+                status = if (r is StatementResult.Failed) "Error: ${r.message}" else "Hecho: $sql"
+                refreshExplorer()   // not only on success: a failed batch may still have changed something, and changesSchema misses TRUNCATE and REFRESH
+            }
+        }
+    }
+
     /** Adds [text] after the current editor content, leaving the caret at the end. */
     fun appendToEditor(text: String) {
         val joined = editor.text.trimEnd().let { if (it.isEmpty()) text else "$it\n\n$text" }

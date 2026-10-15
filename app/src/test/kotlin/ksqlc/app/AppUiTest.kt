@@ -59,6 +59,33 @@ class AppUiTest {
     private fun setEditor(sql: String) = state.onEditorChange(TextFieldValue(sql, TextRange(sql.length)))
     private fun runAll() { rule.onNodeWithContentDescription("Ejecutar script", substring = true).performClick() }
 
+    @Test fun truncateAndDropFromTheExplorerAskFirstThenRefreshTheTree() {
+        rule.setContent { App(state) }
+        state.form.database = tempDb()
+        setEditor("create table customers(id integer primary key, name text); insert into customers values (1, 'Ada');")
+        runAll()
+        until { !state.running && state.explorer != null }
+        untilTag("tree:ns:.main")
+        rule.onNodeWithTag("tree:ns:.main").performClick()
+        untilTag("tree:ns:.main/Tablas")
+        rule.onNodeWithTag("tree:ns:.main/Tablas").performClick()
+        untilTag("tree:ns:.main/Tablas/customers")
+
+        state.alter("Vaciar customers", "delete from \"main\".\"customers\"")
+        untilTag("confirm-ok")
+        rule.onNodeWithTag("confirm-ok").performClick()
+        until { state.status.startsWith("Hecho") }
+        setEditor("select count(*) from customers")
+        runAll()
+        until { !state.running && state.tabs.isNotEmpty() }
+        assertEquals("0", state.tabs.first().rows.single().single().toString())
+
+        state.alter("Eliminar customers", "drop table \"main\".\"customers\"")
+        untilTag("confirm-ok")
+        rule.onNodeWithTag("confirm-ok").performClick()
+        until { rule.onAllNodesWithTag("tree:ns:.main/Tablas/customers").fetchSemanticsNodes().isEmpty() }
+    }
+
     @Test fun runScriptThenBrowseSchemaAndOpenTableData() {
         rule.setContent { App(state) }
         state.form.database = tempDb()

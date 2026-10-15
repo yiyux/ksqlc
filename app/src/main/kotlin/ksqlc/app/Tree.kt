@@ -22,6 +22,8 @@ class TreeNode(
     val obj: DbObject? = null,
     val ns: Namespace? = null,
     val detail: String? = null,
+    /** For an index or foreign key: its real name in the database (a foreign key may have none, and then [label] is its columns). */
+    val dbName: String? = null,
     internal val loader: (() -> List<TreeNode>)? = null,
     preset: List<TreeNode>? = null,
 ) {
@@ -138,14 +140,14 @@ class TreeModel(val source: SchemaSource, private val io: CoroutineDispatcher = 
         if (d.indexes.isNotEmpty()) {
             val gid = "$parentId/idx"
             add(TreeNode(gid, "Índices (${d.indexes.size})", NodeKind.GROUP, obj = o, preset = d.indexes.map { ix ->
-                TreeNode("$gid/${ix.name}", ix.name, NodeKind.INDEX, obj = o,
+                TreeNode("$gid/${ix.name}", ix.name, NodeKind.INDEX, obj = o, dbName = ix.name,
                     detail = "(${ix.columns.joinToString()})" + if (ix.unique) " unique" else "")
             }))
         }
         if (d.foreignKeys.isNotEmpty()) {
             val gid = "$parentId/fks"
             add(TreeNode(gid, "Claves foráneas (${d.foreignKeys.size})", NodeKind.GROUP, obj = o, preset = d.foreignKeys.mapIndexed { n, fk ->
-                TreeNode("$gid/${fk.name ?: n}", fk.name ?: fk.columns.joinToString(), NodeKind.FOREIGN_KEY, obj = o,
+                TreeNode("$gid/${fk.name ?: n}", fk.name ?: fk.columns.joinToString(), NodeKind.FOREIGN_KEY, obj = o, dbName = fk.name,
                     detail = "(${fk.columns.joinToString()}) → ${fk.refTable}(${fk.refColumns.joinToString()})")
             }))
         }

@@ -30,6 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import ksqlc.app.ui.*
+import ksqlc.drivers.dropForeignKeySql
+import ksqlc.drivers.dropIndexSql
+import ksqlc.drivers.dropSql
+import ksqlc.drivers.refreshMatViewSql
+import ksqlc.drivers.truncateSql
 
 private fun iconOf(k: NodeKind) = when (k) {
     NodeKind.NAMESPACE -> IconKind.Schema
@@ -187,6 +192,19 @@ private fun LazyListScope.nodeItems(
                     add(ContextMenuItem("Comparar esquema con…") { state.openDiff(o.ns, o.name) })
                     add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
                     add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
+                    if (!state.form.options.readOnly) {
+                        val k = state.form.effectiveKind
+                        when (node.kind) {
+                            NodeKind.INDEX -> node.dbName?.let { n -> add(ContextMenuItem("Eliminar índice…") { state.alter("Eliminar el índice $n", dropIndexSql(k, o, n)) }) }
+                            NodeKind.FOREIGN_KEY -> node.dbName?.let { n -> dropForeignKeySql(k, o, n)?.let { sql -> add(ContextMenuItem("Eliminar clave foránea…") { state.alter("Eliminar la clave foránea $n", sql) }) } }
+                            NodeKind.COLUMN -> {}
+                            else -> {
+                                truncateSql(k, o)?.let { sql -> add(ContextMenuItem("Vaciar tabla…") { state.alter("Vaciar ${o.name}", sql) }) }
+                                refreshMatViewSql(k, o)?.let { sql -> add(ContextMenuItem("Refrescar vista materializada") { state.alter("Refrescar ${o.name}", sql) }) }
+                                dropSql(k, o)?.let { sql -> add(ContextMenuItem("Eliminar…") { state.alter("Eliminar ${o.name}", sql) }) }
+                            }
+                        }
+                    }
                 }
                 if (node.kind == NodeKind.NAMESPACE) {
                     add(ContextMenuItem("Dump con la herramienta del motor…") { state.openNative(false, null, node.ns) })
