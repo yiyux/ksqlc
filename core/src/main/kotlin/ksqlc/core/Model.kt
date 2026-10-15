@@ -3,7 +3,7 @@ package ksqlc.core
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class DbKind { POSTGRES, MYSQL, MARIADB, SQLITE, MSSQL, ORACLE }
+enum class DbKind { POSTGRES, MYSQL, MARIADB, SQLITE, MSSQL, ORACLE, CASSANDRA }
 
 @Serializable
 data class DataSource(

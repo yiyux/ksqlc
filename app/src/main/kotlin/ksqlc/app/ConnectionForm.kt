@@ -17,21 +17,23 @@ class ConnectionForm {
     var database by mutableStateOf("")
     var ssl by mutableStateOf(false)
     var trustCert by mutableStateOf(false)
+    /** Cassandra only: the local datacenter its driver routes requests to. */
+    var datacenter by mutableStateOf(JdbcUrl.DEFAULT_DATACENTER)
     var user by mutableStateOf("")
     var password by mutableStateOf("")
     var customUrl by mutableStateOf(false)
     var urlText by mutableStateOf("")
     var manualTx by mutableStateOf(false)
 
-    val url: String get() = if (customUrl) urlText else JdbcUrl.build(kind, host, portText.toIntOrNull(), database, ssl, trustCert)
+    val url: String get() = if (customUrl) urlText else JdbcUrl.build(kind, host, portText.toIntOrNull(), database, ssl, trustCert, datacenter)
     val effectiveKind: DbKind get() = if (customUrl) JdbcUrl.kindOf(url) else kind
     val passwordOrNull: String? get() = password.ifBlank { null }
 
-    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx)
+    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && effectiveKind != DbKind.CASSANDRA)
 
     fun copyFrom(o: ConnectionForm) {
         currentId = o.currentId; name = o.name; kind = o.kind; host = o.host; portText = o.portText; database = o.database
-        ssl = o.ssl; trustCert = o.trustCert; user = o.user; password = o.password; customUrl = o.customUrl; urlText = o.urlText; manualTx = o.manualTx
+        ssl = o.ssl; trustCert = o.trustCert; datacenter = o.datacenter; user = o.user; password = o.password; customUrl = o.customUrl; urlText = o.urlText; manualTx = o.manualTx
     }
 
     /**
@@ -43,7 +45,7 @@ class ConnectionForm {
         val p = JdbcUrl.parse(c.url)
         if (p != null) {
             kind = p.kind; host = p.host.ifBlank { "localhost" }; portText = (p.port ?: JdbcUrl.defaultPort(p.kind))?.toString().orEmpty()
-            database = p.database; ssl = p.ssl; trustCert = p.trustCert; customUrl = false; urlText = ""
+            database = p.database; ssl = p.ssl; trustCert = p.trustCert; datacenter = p.datacenter.ifBlank { JdbcUrl.DEFAULT_DATACENTER }; customUrl = false; urlText = ""
         } else {
             kind = c.kind; customUrl = true; urlText = c.url
         }
@@ -58,4 +60,5 @@ fun DbKind.label(): String = when (this) {
     DbKind.SQLITE -> "SQLite"
     DbKind.MSSQL -> "SQL Server"
     DbKind.ORACLE -> "Oracle"
+    DbKind.CASSANDRA -> "Apache Cassandra"
 }

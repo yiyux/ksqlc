@@ -2,6 +2,7 @@ package ksqlc.drivers.server
 
 import ksqlc.core.DataSource
 import ksqlc.core.DbKind
+import ksqlc.drivers.openConnection
 import org.junit.Assume.assumeTrue
 import org.testcontainers.DockerClientFactory
 import java.sql.DriverManager
@@ -12,6 +13,6 @@ fun assumeDocker() = assumeTrue("Docker no disponible: se omiten los tests de in
 class ServerFixture(val ds: DataSource, val password: String?)
 
 fun fixture(kind: DbKind, url: String, user: String, password: String, setup: List<String>): ServerFixture {
-    DriverManager.getConnection(url, user, password).use { c -> c.createStatement().use { st -> setup.forEach { st.execute(it) } } }
+    openConnection(DataSource("it", "it", kind, url, user), password).use { c -> c.createStatement().use { st -> setup.forEach { st.execute(it) } } }
     return ServerFixture(DataSource("it", "it", kind, url, user), password)
 }

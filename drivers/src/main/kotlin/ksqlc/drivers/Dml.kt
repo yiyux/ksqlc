@@ -38,6 +38,7 @@ class DmlException(val column: String, message: String) : IllegalArgumentExcepti
 private val INTEGER_TYPES = setOf("INT", "INTEGER", "INT2", "INT4", "INT8", "SMALLINT", "TINYINT", "MEDIUMINT", "BIGINT", "SERIAL", "SMALLSERIAL", "BIGSERIAL", "YEAR")
 private val DECIMAL_TYPES = setOf("NUMERIC", "DECIMAL", "NUMBER", "DEC", "MONEY", "SMALLMONEY")
 private val FLOAT_TYPES = setOf("FLOAT", "FLOAT4", "FLOAT8", "DOUBLE", "DOUBLE PRECISION", "REAL", "BINARY_FLOAT", "BINARY_DOUBLE")
+private val CQL_COLLECTIONS = listOf("LIST<", "SET<", "MAP<", "FROZEN<", "TUPLE<", "VECTOR<")
 private val BOOLEAN_TYPES = setOf("BOOL", "BOOLEAN")
 private val BINARY_WORDS = listOf("BLOB", "BYTEA", "BINARY", "VARBINARY", "IMAGE", "RAW", "BFILE")
 private val TEXT_WORDS = listOf("CHAR", "TEXT", "CLOB", "STRING", "NAME", "CITEXT", "LONG", "ROWID", "INTERVAL")
@@ -57,6 +58,7 @@ fun parseParam(text: String, typeName: String, kind: DbKind): Any? {
     val t = baseType(typeName)
     val isText = TEXT_WORDS.any { it in t }
     if (isBinaryType(typeName)) throw IllegalArgumentException("las columnas binarias no se pueden editar")
+    if (kind == DbKind.CASSANDRA && CQL_COLLECTIONS.any { t.startsWith(it) }) throw IllegalArgumentException("las colecciones, tuplas y tipos de usuario no se pueden editar aquí; usa una sentencia CQL")
     if (isText) return text
     if (text.isBlank()) return null
     val s = text.trim()
@@ -83,6 +85,9 @@ fun parseParam(text: String, typeName: String, kind: DbKind): Any? {
                 ?: runCatching { Timestamp.valueOf(LocalDate.parse(s).atStartOfDay()) }.getOrNull() ?: bad("una fecha y hora (aaaa-mm-dd hh:mm:ss)")
         t == "TIMESTAMPTZ" || t == "TIMESTAMP WITH TIME ZONE" || t == "DATETIMEOFFSET" ->
             runCatching { OffsetDateTime.parse(s.replace(' ', 'T')) }.getOrNull() ?: bad("una fecha y hora con zona (2026-01-31 10:00:00+01:00)")
+        kind == DbKind.CASSANDRA && (t == "UUID" || t == "TIMEUUID") -> runCatching { java.util.UUID.fromString(s) }.getOrNull() ?: bad("un UUID")
+        kind == DbKind.CASSANDRA && t == "VARINT" -> s.toBigIntegerOrNull() ?: bad("un entero")
+        kind == DbKind.CASSANDRA && t == "INET" -> runCatching { java.net.InetAddress.getByName(s) }.getOrNull()?.takeIf { s.any { it == '.' || it == ':' } } ?: bad("una dirección IP")
         kind == DbKind.POSTGRES -> UntypedParam(text)
         else -> text
     }

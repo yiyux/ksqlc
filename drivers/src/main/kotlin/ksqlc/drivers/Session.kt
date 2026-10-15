@@ -14,7 +14,9 @@ import java.sql.Statement
  */
 class Session(private val ds: DataSource, private val password: String?, autoCommit: Boolean = !ds.manualTx) : AutoCloseable {
     private var conn: Connection? = null
-    @Volatile var autoCommit: Boolean = autoCommit
+    // Cassandra only has auto-commit: no transactions, so no manual mode
+    private val noTransactions = ds.kind == DbKind.CASSANDRA
+    @Volatile var autoCommit: Boolean = autoCommit || noTransactions
         private set
     /** In manual mode: something that is not a plain read has run since the last commit or rollback. */
     @Volatile var pending: Boolean = false
@@ -24,10 +26,11 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
     @Volatile private var activeCursor: JdbcCursor? = null
 
     @Synchronized private fun connection(): Connection =
-        conn?.takeIf { !it.isClosed } ?: DriverManager.getConnection(ds.url, ds.user, password).also { it.autoCommit = autoCommit; conn = it }
+        conn?.takeIf { !it.isClosed } ?: openConnection(ds, password).also { it.autoCommit = autoCommit; conn = it }
 
     /** Switches between confirming every statement and confirming by hand. Resolve [pending] work first: JDBC commits it when going back to auto. */
     @Synchronized fun setAutoCommit(auto: Boolean) {
+        if (noTransactions) return
         autoCommit = auto
         conn?.takeIf { !it.isClosed }?.let { it.autoCommit = auto }
         if (auto) pending = false
@@ -47,7 +50,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
             var total = 0L
             for (d in statements) {
                 current = d.preview
-                c.prepareStatement(d.sql).use { ps -> bindParams(ps, d.params); total += ps.executeLargeUpdate() }
+                c.prepareStatement(d.sql).use { ps -> bindParams(ps, d.params); total += ps.updateCountOfExecution() }
             }
             total
         }
@@ -135,7 +138,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
             }
             val hasRows = st.execute(sql)
             if (!autoCommit && !isReadOnly(sql)) pending = true
-            if (!hasRows) return StatementResult.Updated(sql, ms(), st.largeUpdateCount.coerceAtLeast(0)).also { st.close() }
+            if (!hasRows) return StatementResult.Updated(sql, ms(), st.largeUpdateCountOrZero()).also { st.close() }
             val rs = st.resultSet
             val md = rs.metaData
             val cols = (1..md.columnCount).map { Column(md.getColumnLabel(it), md.getColumnTypeName(it)) }
@@ -212,3 +215,10 @@ private val READ_ONLY = setOf("SELECT", "SHOW", "EXPLAIN", "DESCRIBE", "DESC", "
 
 /** Plain reads do not leave work to confirm; anything else (including WITH, which may wrap a write) does. */
 private fun isReadOnly(sql: String) = firstKeyword(sql) in READ_ONLY
+
+// Some drivers (Cassandra's) do not implement the "large" counters; their plain counters are fine for what a console shows.
+private inline fun <T> countOr(large: () -> T, plain: () -> T): T =
+    try { large() } catch (e: java.sql.SQLFeatureNotSupportedException) { plain() } catch (e: UnsupportedOperationException) { plain() }
+
+private fun java.sql.PreparedStatement.updateCountOfExecution(): Long = countOr({ executeLargeUpdate() }, { executeUpdate().toLong() })
+private fun Statement.largeUpdateCountOrZero(): Long = countOr({ largeUpdateCount }, { updateCount.toLong() }).coerceAtLeast(0)

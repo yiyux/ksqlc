@@ -290,6 +290,9 @@ class AppState(
     // --- running SQL -------------------------------------------------------------------
 
     /** Oracle scripts keep PL/SQL blocks whole (they end at a `/` line) instead of cutting them at every `;`. */
+    /** False for engines without transactions (Cassandra): the Tx controls are hidden. */
+    val hasTransactions: Boolean get() = form.effectiveKind != DbKind.CASSANDRA
+
     /** The SQL dialect the editor's text follows: null = that of the connection. Decides how a script is split and what counts as a parameter. */
     var editorDialect by mutableStateOf<DbKind?>(null)
     private val editorKind: DbKind get() = editorDialect ?: form.effectiveKind

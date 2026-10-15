@@ -16,5 +16,6 @@ fun explainScript(kind: DbKind, sql: String, analyze: Boolean): ExplainScript? =
     DbKind.SQLITE -> if (analyze) null else ExplainScript(listOf("explain query plan $sql"))
     // SHOWPLAN makes the server describe statements instead of running them; it has to be switched off again even after an error
     DbKind.MSSQL -> if (analyze) null else ExplainScript(listOf("set showplan_text on", sql), cleanup = listOf("set showplan_text off"))
+    DbKind.CASSANDRA -> null      // CQL has no EXPLAIN; use TRACING in cqlsh
     DbKind.ORACLE -> if (analyze) null else ExplainScript(listOf("explain plan for $sql", "select plan_table_output from table(dbms_xplan.display())"))
 }

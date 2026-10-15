@@ -14,7 +14,7 @@ class Introspector(private val ds: DataSource, private val password: String?) : 
     private var conn: Connection? = null
 
     @Synchronized private fun connection(): Connection =
-        conn?.takeIf { !it.isClosed } ?: DriverManager.getConnection(ds.url, ds.user, password).also { conn = it }
+        conn?.takeIf { !it.isClosed } ?: openConnection(ds, password).also { conn = it }
 
     @Synchronized override fun namespaces(): List<Namespace> = dialect.namespaces(connection())
     @Synchronized override fun objects(ns: Namespace): List<DbObject> = dialect.objects(connection(), ns)

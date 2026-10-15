@@ -42,6 +42,7 @@ clickhouse, bigquery, cassandra, hive/spark, exasol, mongo, redis, generic/sql92
 | Exportar datos | hecho | CSV, TSV, JSON y SQL INSERT a archivo o portapapeles desde pestañas de tabla, resultados y explorador. |
 | Importar CSV | hecho | Asignación de columnas, vista previa, transacción única, error con fila y columna; «Abrir archivo SQL…» en la consola. |
 | Dump y restauración nativos | hecho | pg_dump/psql/pg_restore, mysqldump/mysql (y variantes MariaDB) y sqlite3, con la contraseña por entorno; SQL Server y Oracle no. |
+| Apache Cassandra | implementado | Motor nuevo (driver JDBC `cassandra-jdbc-wrapper`, URL `jdbc:cassandra://host:puerto/keyspace?localdatacenter=…`; el formulario pide keyspace y datacenter local). Explorador sobre `system_schema`: keyspaces (sin los de sistema), tablas, vistas materializadas y funciones, con clave = partición + clustering e índices. DDL reconstruido (CQL no tiene `SHOW CREATE`). Edición de filas como upsert/delete por clave primaria; las colecciones, tuplas y UDT no se editan desde la rejilla. Sin transacciones (no hay Tx Auto/Manual, un lote no es atómico), sin Explain ni dump nativo. En tablas, ordenar o filtrar por columnas que no son clave exige `ALLOW FILTERING` / clustering y lo rechaza el servidor. |
 | Comparar esquemas | hecho | DDL de dos esquemas (de la conexión activa o de cualquier data source guardado), emparejado por tipo y nombre, normalizado sin el nombre del esquema. |
 | Diff de contenido de tablas | pendiente | fuera de la fase 5 (el diagrama ER se descartó) |
 

@@ -159,7 +159,7 @@ private fun EditorIsland(state: AppState) {
             ToolButton(IconKind.Folder, "Abrir archivo SQL…", state::openSqlFile)
             ToolButton(IconKind.History, "Historial (⌥⌘E)", state::openHistory, Modifier.testTag("history-open"))
             VSeparator()
-            TxControls(state.form.manualTx, state.consolePending, state::setTxManual, state::commitConsole, state::rollbackConsole, "console")
+            if (state.hasTransactions) TxControls(state.form.manualTx, state.consolePending, state::setTxManual, state::commitConsole, state::rollbackConsole, "console")
             if (state.running) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
             Spacer(Modifier.weight(1f))
             DialectMenu(state)
@@ -273,7 +273,7 @@ internal fun RowScope.EditButtons(state: AppState, data: DataTab) {
 @Composable
 internal fun RowScope.EditStatus(state: AppState, data: DataTab, scope: String) {
     val c = Ksqlc.colors
-    TxControls(state.form.manualTx, data.pending, state::setTxManual, { state.commitTab(data) }, { state.rollbackTab(data) }, scope)
+    if (state.hasTransactions) TxControls(state.form.manualTx, data.pending, state::setTxManual, { state.commitTab(data) }, { state.rollbackTab(data) }, scope)
     if (data.editor.hasChanges) Text("${data.editor.changeCount} cambio(s) sin enviar", fontSize = 12.sp, color = c.textSecondary, modifier = Modifier.padding(start = 8.dp).testTag(if (scope == "tab") "pending-count" else "pending-count:$scope"))
     if (data.loading) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
 }

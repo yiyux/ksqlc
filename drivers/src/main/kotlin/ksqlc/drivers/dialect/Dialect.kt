@@ -27,6 +27,7 @@ interface Dialect {
             DbKind.SQLITE -> SqliteDialect
             DbKind.MSSQL -> SqlServerDialect
             DbKind.ORACLE -> OracleDialect
+            DbKind.CASSANDRA -> CassandraDialect
         }
     }
 }

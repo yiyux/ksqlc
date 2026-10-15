@@ -127,8 +127,11 @@ fun DataSourceDialog(state: AppState) {
                         }
                         Field("Usuario:") { CompactTextField(draft.user, { draft.user = it }, Modifier.weight(1f), testTag = "ds-user", height = 28.dp) }
                         Field("Contraseña:") { CompactTextField(draft.password, { draft.password = it }, Modifier.weight(1f), password = true, placeholder = "<oculta>", testTag = "ds-pass", height = 28.dp) }
-                        Field(if (network) "Base de datos:" else "Archivo:") {
+                        Field(if (draft.kind == DbKind.CASSANDRA) "Keyspace:" else if (network) "Base de datos:" else "Archivo:") {
                             CompactTextField(draft.database, { draft.database = it }, Modifier.weight(1f), enabled = !draft.customUrl, placeholder = if (network) null else "vacío = memoria compartida", testTag = "ds-db", height = 28.dp)
+                        }
+                        if (draft.kind == DbKind.CASSANDRA) Field("Datacenter local:") {
+                            CompactTextField(draft.datacenter, { draft.datacenter = it.trim() }, Modifier.weight(1f), enabled = !draft.customUrl, testTag = "ds-dc", height = 28.dp)
                         }
                         Field("SSL:") { KCheckbox(draft.ssl, { draft.ssl = it }, label = "Exigir conexión cifrada", enabled = network && !draft.customUrl, modifier = Modifier.testTag("ds-ssl")) }
                         if (draft.kind == DbKind.MSSQL) Field("") {
