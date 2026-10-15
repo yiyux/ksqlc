@@ -30,6 +30,7 @@ class TableModelServerTest {
                      constraint t_email_key unique (email) deferrable initially deferred,
                      constraint t_parent_fk foreign key (parent_id) references mt.parent(id) on delete cascade,
                      constraint t_price_ck check (price > 0))""",
+                "create table mt.inc(a int, b int, c int, d int, primary key (a, b) include (c), unique (d) include (a))",
                 "create index t_name_idx on mt.t (lower(name), email desc) include (price) where price > 1",
                 "comment on table mt.t is 'hola'",
                 "comment on column mt.t.name is 'nombre'",
@@ -74,6 +75,11 @@ class TableModelServerTest {
         assertTrue(ix.columns[0].expression && ix.columns[0].name.startsWith("lower("), ix.columns[0].name)
         assertEquals(IndexColumn("email", order = "DESC"), ix.columns[1])
         assertEquals(listOf("price"), ix.include); assertTrue(ix.condition!!.contains("price > (1)"), ix.condition)
+    }
+
+    @Test fun keyIncludeColumnsAreNotKeyColumns() {
+        val m = Introspector(fx.ds, fx.password).use { it.tableModel(DbObject(Namespace(null, "mt"), "inc", DbObjectKind.TABLE))!! }
+        assertEquals(listOf(listOf("a", "b"), listOf("d")), m.keys.map { it.columns })
     }
 
     @Test fun aMissingTableIsAnError() {
