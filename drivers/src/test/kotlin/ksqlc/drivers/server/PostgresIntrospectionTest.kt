@@ -62,6 +62,20 @@ class PostgresIntrospectionTest {
         }
     }
 
+    @Test fun theSchemaFilterNarrowsTheTreeAndReachesSystemSchemasWhenChosen() = intro().use { i ->
+        val all = i.namespaces().map { it.label }
+        assertTrue("app" in all && "public" in all)
+        i.schemaFilter = SchemaFilter(false, listOf("app"))
+        assertEquals(listOf("app"), i.namespaces().map { it.label })
+        i.schemaFilter = SchemaFilter(false, listOf("app", "pg_catalog"))      // a system schema, though system ones are off
+        assertEquals(listOf("app", "pg_catalog"), i.namespaces().map { it.label })
+        i.schemaFilter = SchemaFilter(pattern = "ap*")
+        assertEquals(listOf("app"), i.namespaces().map { it.label })
+        assertTrue(i.allNamespaces().map { it.label }.containsAll(listOf("app", "public", "pg_catalog", "information_schema")))
+        i.schemaFilter = SchemaFilter(); i.onlyNamespace = "app"
+        assertEquals(listOf("app"), i.namespaces().map { it.label })
+    }
+
     private fun intro() = Introspector(fx.ds, fx.password)
 
     @Test fun namespacesHideSystemSchemas() {

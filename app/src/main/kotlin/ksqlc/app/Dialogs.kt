@@ -115,6 +115,47 @@ private fun OptionsTab(draft: ConnectionForm, modifier: Modifier) {
     }
 }
 
+/**
+ * The "Esquemas" tab: which schemas (databases, users, keyspaces) the explorer lists. The list to choose from is read from the server
+ * on demand with the connection as it is in the form. Tags `ds-schemas-mode:i`, `ds-schema-pattern`, `ds-schemas-load`, `ds-schemas-error`, `ds-schema:<name>`.
+ */
+@Composable
+private fun SchemasTab(state: AppState, draft: ConnectionForm, modifier: Modifier) {
+    val c = Ksqlc.colors
+    var loaded by remember { mutableStateOf<List<String>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val chosen = draft.schemasSelected
+    val names = (loaded + chosen).distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
+    val picking = !draft.schemasAll
+    Column(modifier.padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OField("Mostrar:") { SegmentedControl(listOf("Todos", "Solo los elegidos"), if (draft.schemasAll) 0 else 1, { draft.schemasAll = it == 0 }, tag = "ds-schemas-mode") }
+        OField("Patrón:") {
+            CompactTextField(draft.schemaPattern, { draft.schemaPattern = it }, Modifier.weight(1f), placeholder = "p. ej. app_*, ventas (con * y ?; vacío = ninguno)", testTag = "ds-schema-pattern", height = 28.dp)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextAction(if (loading) "Leyendo…" else "Leer esquemas del servidor", {
+                loading = true; error = null
+                state.loadNamespaces(draft) { r -> loading = false; r.onSuccess { loaded = it }.onFailure { error = it.message ?: it.toString() } }
+            }, Modifier.testTag("ds-schemas-load"), enabled = !loading)
+            if (picking) Text("${chosen.size} elegidos", fontSize = 12.sp, color = c.textSecondary)
+        }
+        error?.let { Text(it, fontSize = 12.sp, color = c.error, modifier = Modifier.testTag("ds-schemas-error")) }
+        if (names.isEmpty()) Text("Lee los esquemas del servidor para elegir cuáles mostrar; los de sistema también salen en la lista.", fontSize = 12.sp, color = c.textMuted)
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(4.dp)).border(1.dp, c.border, RoundedCornerShape(4.dp))) {
+            items(names, key = { it }) { name ->
+                Row(Modifier.fillMaxWidth().height(26.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    KCheckbox(
+                        chosen.any { it.equals(name, true) },
+                        { on -> draft.schemasSelected = if (on) chosen + name else chosen.filterNot { it.equals(name, true) } },
+                        label = name, enabled = picking, modifier = Modifier.testTag("ds-schema:$name"),
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** Which of the four SSL modes (off, encrypted, verify CA, verify CA and name) an engine offers. */
 private fun sslModesFor(kind: DbKind): List<String> = when (kind) {
     DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.MSSQL -> listOf("Desactivado", "Cifrado", "Verificar CA", "CA y host")
@@ -250,7 +291,7 @@ fun DataSourceDialog(state: AppState) {
                     Field("Nombre:") { CompactTextField(draft.name, { draft.name = it }, Modifier.weight(1f), testTag = "ds-name", height = 28.dp) }
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("General", "Opciones", "SSH/SSL").forEachIndexed { i, label ->
+                        listOf("General", "Opciones", "SSH/SSL", "Esquemas").forEachIndexed { i, label ->
                             val on = tab == i
                             Box(
                                 Modifier.height(26.dp).clip(RoundedCornerShape(6.dp)).then(if (on) Modifier.background(c.selection).border(1.dp, c.accent.copy(alpha = 0.45f), RoundedCornerShape(6.dp)) else Modifier)
@@ -263,6 +304,7 @@ fun DataSourceDialog(state: AppState) {
                     Separator()
                     if (tab == 1) OptionsTab(draft, Modifier.weight(1f))
                     else if (tab == 2) SshSslTab(draft, Modifier.weight(1f))
+                    else if (tab == 3) SchemasTab(state, draft, Modifier.weight(1f))
                     else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Field("Motor:") {
                             Box(Modifier.weight(1f)) {

@@ -56,6 +56,29 @@ data class SslSettings(
     val clientKeyFile: String = "",
 )
 
+/**
+ * Which schemas (databases, users, keyspaces) the explorer lists. By default every one the engine shows; with [all] off only the
+ * [selected] ones, system schemas included if chosen. A [pattern] (names with `*` and `?`, separated by commas or spaces) also lets
+ * matching schemas in, or, with [all] on, restricts the list to them.
+ */
+@Serializable
+data class SchemaFilter(val all: Boolean = true, val selected: List<String> = emptyList(), val pattern: String = "") {
+    /** No narrowing at all: the plain listing. */
+    val isDefault: Boolean get() = all && pattern.isBlank()
+
+    private val globs: List<Regex> get() = pattern.split(',', ' ', ';').map { it.trim() }.filter { it.isNotEmpty() }
+        .map { g -> Regex(g.split('*').joinToString(".*") { part -> part.split('?').joinToString(".") { Regex.escape(it) } }, RegexOption.IGNORE_CASE) }
+
+    /** Whether the schema called [label] is listed. */
+    fun accepts(label: String): Boolean {
+        val byPattern = pattern.isNotBlank() && globs.any { it.matches(label) }
+        return when {
+            all -> pattern.isBlank() || byPattern
+            else -> selected.any { it.equals(label, true) } || byPattern
+        }
+    }
+}
+
 @Serializable
 data class DataSource(
     val id: String,
@@ -68,6 +91,7 @@ data class DataSource(
     val options: ConnectionOptions = ConnectionOptions(),
     val ssh: SshSettings = SshSettings(),
     val ssl: SslSettings = SslSettings(),
+    val schemas: SchemaFilter = SchemaFilter(),
     /** The SSH password or key passphrase, carried with the connection while it is open; never written to connections.json. */
     @kotlinx.serialization.Transient val sshSecret: String? = null,
 )

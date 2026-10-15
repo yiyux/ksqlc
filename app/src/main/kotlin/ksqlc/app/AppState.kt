@@ -56,7 +56,7 @@ class Holder<T : AutoCloseable>(private val create: (DataSource, String?) -> T) 
     @Synchronized fun close() { value?.close(); value = null; key = null }
 }
 
-fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password, ds.options.toString(), ds.ssh.toString(), ds.sshSecret, ds.ssl.toString())
+fun keyOf(ds: DataSource, password: String?): List<String?> = listOf(ds.url, ds.user, password, ds.options.toString(), ds.ssh.toString(), ds.sshSecret, ds.ssl.toString(), ds.schemas.toString())
 
 /** A read-only text dialog: a table's DDL, or the SQL a submit would run ([heading] says which). */
 class DdlView(val title: String, val text: String, val heading: String = "DDL")
@@ -275,7 +275,7 @@ class AppState(
     /** Saves [draft] (new or existing), makes it the active connection and reads its schema. */
     fun applyDraft(draft: ConnectionForm) {
         val id = draft.currentId ?: UUID.randomUUID().toString().also { draft.currentId = it }
-        val changed = form.toDataSource().url != draft.toDataSource().url || form.user != draft.user || form.password != draft.password || form.options != draft.options || form.ssh != draft.ssh || form.sshSecret != draft.sshSecret
+        val changed = form.toDataSource().url != draft.toDataSource().url || form.user != draft.user || form.password != draft.password || form.options != draft.options || form.schemas != draft.schemas || form.ssh != draft.ssh || form.sshSecret != draft.sshSecret
         persist({ store.save(draft.toDataSource().copy(id = id), draft.password) }, "Conexión \"${draft.name}\" guardada")
         form.copyFrom(draft)
         if (changed || explorer == null) { disconnect(); connect() }
@@ -300,6 +300,14 @@ class AppState(
     fun testConnection(draft: ConnectionForm, onResult: (Result<String>) -> Unit) {
         val ds = draft.toDataSource(); val pw = draft.passwordOrNull
         scope.launch { onResult(runCatching { withContext(Dispatchers.IO) { testConnection(ds, pw) } }) }
+    }
+
+    /** Reads every schema [draft]'s server has, to choose from in the Schemas tab; [onResult] gets the names or the error, on the UI thread. */
+    fun loadNamespaces(draft: ConnectionForm, onResult: (Result<List<String>>) -> Unit) {
+        val ds = draft.toDataSource().copy(schemas = ksqlc.core.SchemaFilter()); val pw = draft.passwordOrNull
+        scope.launch {
+            onResult(runCatching { withContext(Dispatchers.IO) { Introspector(ds, pw).use { i -> i.allNamespaces().map { it.label } } } })
+        }
     }
 
     // --- running SQL -------------------------------------------------------------------
@@ -508,7 +516,7 @@ class AppState(
         connecting = true
         val ds = form.toDataSource(); val pw = form.passwordOrNull
         scope.launch {
-            runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw).also { it.includeSystem = settings.showSystemSchemas; it.onlyNamespace = singleDatabaseName(ds) }).also { it.load() } } }
+            runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw).also { it.includeSystem = settings.showSystemSchemas; it.onlyNamespace = singleDatabaseName(ds); it.schemaFilter = ds.schemas }).also { it.load() } } }
                 .onSuccess { explorer = it; explorerKey = keyOf(ds, pw); if (announce) status = "Esquema cargado: ${ds.name}"; loadCatalog(it) }
                 .onFailure {
                     explorer = null; explorerKey = null; catalog = null

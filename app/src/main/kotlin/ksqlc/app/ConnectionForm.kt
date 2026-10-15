@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import ksqlc.core.ConnectionOptions
 import ksqlc.core.DataSource
 import ksqlc.core.DbKind
+import ksqlc.core.SchemaFilter
 import ksqlc.core.SshAuth
 import ksqlc.core.SslSettings
 import ksqlc.core.SslVerify
@@ -33,6 +34,13 @@ class ConnectionForm {
     var manualTx by mutableStateOf(false)
 
     // the "Options" tab; each switch has its number beside it, kept as text while it is being typed
+    // the "Esquemas" tab: which schemas the explorer lists
+    var schemasAll by mutableStateOf(true)
+    var schemasSelected by mutableStateOf<List<String>>(emptyList())
+    var schemaPattern by mutableStateOf("")
+
+    val schemas: SchemaFilter get() = SchemaFilter(schemasAll, schemasSelected, schemaPattern.trim())
+
     // the SSL section of the "SSH/SSL" tab; `ssl` and `trustCert` above are what ends up in the URL
     var sslVerify by mutableStateOf(SslVerify.NONE)
     var sslCa by mutableStateOf("")
@@ -107,13 +115,14 @@ class ConnectionForm {
     val effectiveKind: DbKind get() = if (customUrl) JdbcUrl.kindOf(url) else kind
     val passwordOrNull: String? get() = password.ifBlank { null }
 
-    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && effectiveKind != DbKind.CASSANDRA, options, ssh, sslSettings, sshSecret.ifBlank { null })
+    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && effectiveKind != DbKind.CASSANDRA, options, ssh, sslSettings, schemas, sshSecret.ifBlank { null })
 
     fun copyFrom(o: ConnectionForm) {
         currentId = o.currentId; name = o.name; kind = o.kind; host = o.host; portText = o.portText; database = o.database
         ssl = o.ssl; trustCert = o.trustCert; datacenter = o.datacenter; user = o.user; password = o.password; customUrl = o.customUrl; urlText = o.urlText; manualTx = o.manualTx
         readOnly = o.readOnly; timeZone = o.timeZone; keepAliveOn = o.keepAliveOn; keepAliveText = o.keepAliveText; autoDisconnectOn = o.autoDisconnectOn
         autoDisconnectText = o.autoDisconnectText; singleDatabase = o.singleDatabase; startupScript = o.startupScript; autoSync = o.autoSync; introspectionText = o.introspectionText
+        schemasAll = o.schemasAll; schemasSelected = o.schemasSelected; schemaPattern = o.schemaPattern
         sslVerify = o.sslVerify; sslCa = o.sslCa; sslCert = o.sslCert; sslKey = o.sslKey
         sshEnabled = o.sshEnabled; sshHost = o.sshHost; sshPortText = o.sshPortText; sshUser = o.sshUser; sshAuth = o.sshAuth; sshKeyFile = o.sshKeyFile; sshSecret = o.sshSecret
     }
@@ -123,7 +132,7 @@ class ConnectionForm {
      * port and database come back as fields; any other URL opens in manual-URL mode.
      */
     fun load(c: DataSource) {
-        currentId = c.id; name = c.name; user = c.user.orEmpty(); password = ""; manualTx = c.manualTx; loadOptions(c.options); loadSsh(c.ssh); sshSecret = ""
+        currentId = c.id; name = c.name; user = c.user.orEmpty(); password = ""; manualTx = c.manualTx; loadOptions(c.options); loadSsh(c.ssh); schemasAll = c.schemas.all; schemasSelected = c.schemas.selected; schemaPattern = c.schemas.pattern; sshSecret = ""
         val p = JdbcUrl.parse(c.url)
         if (p != null) {
             kind = p.kind; host = p.host.ifBlank { "localhost" }; portText = (p.port ?: JdbcUrl.defaultPort(p.kind))?.toString().orEmpty()
