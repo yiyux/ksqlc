@@ -34,7 +34,10 @@ internal fun postgresAlterTable(d: Dialect, o: DbObject, before: TableModel, aft
 
     val kept = after.columns.mapNotNull { a -> before.columns.find { it.name == a.origin }?.let { a to it } }
     val renamed = kept.filter { (a, b) -> a.name != b.name }.associate { (a, b) -> b.name to a.name }
-    fun mapped(l: List<String>) = l.map { renamed[it] ?: it }
+    val gone = before.columns.map { it.name }.filter { n -> after.columns.none { it.origin == n } }
+    // a dropped column takes its constraints with it, so anything using it must be dropped and created again even if a new column reuses the name
+    fun mapped(l: List<String>) = l.map { if (it in gone) "\u0000$it" else renamed[it] ?: it }
+    fun mentionsGone(text: String?) = text != null && gone.any { Regex("""\b${Regex.escape(it)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(text) }
 
     val keys = changes(before.keys, after.keys, { it.origin }, { it.name }) { y, x ->
         y.copy(origin = null, name = "", columns = mapped(y.columns)) == x.copy(origin = null, name = "")
@@ -42,10 +45,11 @@ internal fun postgresAlterTable(d: Dialect, o: DbObject, before: TableModel, aft
     val foreignKeys = changes(before.foreignKeys, after.foreignKeys, { it.origin }, { it.name }) { y, x ->
         y.copy(origin = null, name = "", columns = mapped(y.columns)) == x.copy(origin = null, name = "")
     }
-    val checks = changes(before.checks, after.checks, { it.origin }, { it.name }) { y, x -> y.expression == x.expression }
+    val checks = changes(before.checks, after.checks, { it.origin }, { it.name }) { y, x -> y.expression == x.expression && !mentionsGone(y.expression) }
     val indexes = changes(before.indexes, after.indexes, { it.origin }, { it.name }) { y, x ->
-        val columns = y.columns.map { if (it.expression) it else it.copy(name = renamed[it.name] ?: it.name) }
-        y.copy(origin = null, name = "", columns = columns, include = mapped(y.include)) == x.copy(origin = null, name = "")
+        val columns = y.columns.map { if (it.expression) it else it.copy(name = mapped(listOf(it.name)).single()) }
+        y.columns.none { it.expression && mentionsGone(it.name) } && !mentionsGone(y.condition) &&
+            y.copy(origin = null, name = "", columns = columns, include = mapped(y.include)) == x.copy(origin = null, name = "")
     }
 
     // 1. what goes away
@@ -74,6 +78,8 @@ internal fun postgresAlterTable(d: Dialect, o: DbObject, before: TableModel, aft
     for ((a, b) in kept) {
         val c = id(a.name)
         if (a.name != b.name) out += alter("rename column ${id(b.name)} to $c")
+        // PostgreSQL refuses not null / default changes on a column that is still identity
+        if (a.identity == null && b.identity != null) out += alter("alter column $c drop identity")
         val retyped = a.type != b.type
         if (retyped && b.default != null) out += alter("alter column $c drop default")
         if (retyped) out += alter("alter column $c type ${a.type} using $c::${a.type}")
@@ -84,7 +90,6 @@ internal fun postgresAlterTable(d: Dialect, o: DbObject, before: TableModel, aft
         val ai = a.identity
         val bi = b.identity
         when {
-            ai == null && bi != null -> out += alter("alter column $c drop identity")
             ai != null && bi == null -> out += alter("alter column $c add generated ${if (ai.always) "always" else "by default"} as identity${identityOptions(ai)}")
             ai != null && bi != null -> {
                 if (ai.always != bi.always) out += alter("alter column $c set generated ${if (ai.always) "always" else "by default"}")

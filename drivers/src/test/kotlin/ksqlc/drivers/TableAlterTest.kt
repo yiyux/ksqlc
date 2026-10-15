@@ -143,4 +143,49 @@ class TableAlterTest {
             "alter table $q add column \"seq\" integer generated always as identity not null",
         ), diff(after))
     }
+
+    private val uniqueA = KeyModel("t_a_key", "t_a_key", false, listOf("a"))
+    private val withA = base.copy(columns = base.columns + col("a") + col("b"), keys = base.keys + uniqueA)
+
+    @Test fun aKeyOnADroppedColumnWhoseNameIsReusedIsRecreated() {
+        val after = withA.copy(columns = withA.columns.filter { it.name != "a" } + ColumnModel(null, "a", "integer"))
+        assertEquals(listOf(
+            "alter table $q drop constraint \"t_a_key\"",
+            "alter table $q drop column \"a\"",
+            "alter table $q add column \"a\" integer",
+            "alter table $q add constraint \"t_a_key\" unique (\"a\")",
+        ), alter(withA, after))
+    }
+
+    @Test fun aKeyOnADroppedColumnWhoseNameIsTakenByARenameIsRecreated() {
+        val after = withA.copy(columns = withA.columns.filter { it.name != "a" }.map { if (it.name == "b") it.copy(name = "a") else it })
+        assertEquals(listOf(
+            "alter table $q drop constraint \"t_a_key\"",
+            "alter table $q drop column \"a\"",
+            "alter table $q rename column \"b\" to \"a\"",
+            "alter table $q add constraint \"t_a_key\" unique (\"a\")",
+        ), alter(withA, after))
+    }
+
+    @Test fun aCheckMentioningADroppedColumnIsRecreated() {
+        val ck = CheckModel("a_ck", "a_ck", "(a > 0)")
+        val before = withA.copy(checks = listOf(ck), keys = base.keys)
+        val after = before.copy(columns = before.columns.filter { it.name != "a" } + ColumnModel(null, "a", "integer"))
+        assertEquals(listOf(
+            "alter table $q drop constraint \"a_ck\"",
+            "alter table $q drop column \"a\"",
+            "alter table $q add column \"a\" integer",
+            "alter table $q add constraint \"a_ck\" check ((a > 0))",
+        ), alter(before, after))
+    }
+
+    @Test fun identityIsDroppedBeforeNotNullAndDefaultChange() {
+        val before = base.copy(columns = listOf(base.columns[0].copy(identity = Identity()), base.columns[1]))
+        val after = base.copy(columns = listOf(base.columns[0].copy(notNull = false, default = "1"), base.columns[1]))
+        assertEquals(listOf(
+            "alter table $q alter column \"id\" drop identity",
+            "alter table $q alter column \"id\" drop not null",
+            "alter table $q alter column \"id\" set default 1",
+        ), alter(before, after))
+    }
 }

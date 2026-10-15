@@ -28,6 +28,7 @@ class TableAlterServerTest {
                      constraint t_price_ck check (price > 0))""",
                 "create index t_name_idx on at.t (name)",
                 "create table at.u(id int)",
+                "create table at.w(id int, a int unique)",
                 "insert into at.t(name, price) values ('a', 1), ('b', 2)",
             ))
         }
@@ -96,5 +97,11 @@ class TableAlterServerTest {
         val error = runAtomically(fx.ds, fx.password, sql)
         assertNotNull(error); assertTrue(error.contains("extra"), error)
         assertEquals(before.columns.map { it.name }, model("parent").columns.map { it.name })
+    }
+
+    @Test fun aUniqueKeyOnADroppedColumnSurvivesWhenANewColumnReusesTheName() {
+        val (_, sql) = statements("w") { m -> m.copy(columns = m.columns.filter { it.name != "a" } + ColumnModel(null, "a", "text")) }
+        assertNull(runAtomically(fx.ds, fx.password, sql), sql.joinToString("\n"))
+        assertEquals(listOf("a"), model("w").keys.single().columns)
     }
 }
