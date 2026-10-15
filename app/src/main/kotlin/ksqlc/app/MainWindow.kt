@@ -158,6 +158,7 @@ private fun EditorIsland(state: AppState) {
             TxControls(state.form.manualTx, state.consolePending, state::setTxManual, state::commitConsole, state::rollbackConsole, "console")
             if (state.running) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
             Spacer(Modifier.weight(1f))
+            DialectMenu(state)
             KIcon(IconKind.Database, tint = c.textSecondary, size = 14.dp)
             Text(state.form.name, fontSize = 12.sp, color = c.textSecondary, maxLines = 1, modifier = Modifier.padding(start = 6.dp, end = 4.dp))
         }
@@ -183,6 +184,21 @@ private fun EditorIsland(state: AppState) {
             Modifier.fillMaxWidth().weight(1f).testTag("editor"),
             support,
         )
+    }
+}
+
+/** Which SQL dialect the console text follows: the connection's (automatic) or any engine's. */
+@Composable
+private fun DialectMenu(state: AppState) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        DropdownField("Dialecto: " + (state.editorDialect?.label() ?: "auto"), { open = true }, Modifier.width(190.dp).testTag("dialect"))
+        DropdownMenu(open, { open = false }) {
+            DropdownMenuItem(text = { Text("Automático (el de la conexión)", fontSize = 13.sp) }, onClick = { open = false; state.editorDialect = null }, modifier = Modifier.testTag("dialect:auto"))
+            ksqlc.core.DbKind.entries.forEach { k ->
+                DropdownMenuItem(text = { Text(k.label(), fontSize = 13.sp) }, onClick = { open = false; state.editorDialect = k }, modifier = Modifier.testTag("dialect:${k.name}"))
+            }
+        }
     }
 }
 

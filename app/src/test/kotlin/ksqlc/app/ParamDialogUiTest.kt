@@ -79,4 +79,22 @@ class ParamDialogUiTest {
         until { !state.running && state.tabs.size == 1 }
         assertEquals(listOf("a", "7"), state.tabs[0].rows.single().map { it.toString() })
     }
+
+    @Test fun theDialectDecidesGoBatchesAndQuestionMarks() {
+        rule.setContent { App(state) }
+        state.form.database = Files.createTempFile("ksqlc-ui", ".db").also { it.toFile().deleteOnExit() }.toString()
+        rule.onNodeWithTag("dialect").assertTextContains("Dialecto: auto", substring = true)
+        rule.onNodeWithTag("dialect").performClick()
+        until { exists("dialect:MSSQL") }
+        rule.onNodeWithTag("dialect:MSSQL").performClick()
+        until { !exists("dialect:MSSQL") }; rule.mainClock.advanceTimeBy(800)
+        rule.onNodeWithTag("dialect").assertTextContains("SQL Server", substring = true)
+        state.onEditorChange(TextFieldValue("select 1 as a\nGO\nselect 2 as b", TextRange(5)))
+        state.runScript()
+        until { !state.running && state.tabs.size == 2 }      // two batches; as plain SQLite text the GO line would be a syntax error
+
+        state.editorDialect = ksqlc.core.DbKind.POSTGRES      // `?` is an operator there, not a parameter
+        state.onEditorChange(TextFieldValue("select 1 as q", TextRange(5)))
+        assertEquals(null, state.paramPrompt)
+    }
 }

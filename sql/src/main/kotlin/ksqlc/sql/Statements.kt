@@ -18,22 +18,24 @@ data class StatementRange(val start: Int, val end: Int, val next: Int) {
  *
  * With [slashBlocks] (Oracle) a PL/SQL block (`begin`, `declare`, or `create [or replace] procedure|function|package|trigger|type`)
  * is not split at its inner semicolons: it ends at a line holding only `/`, which is not part of the statement.
+ *
+ * With [goBatches] (SQL Server) a line holding only `GO` ends the statement before it, and is not part of any statement.
  */
-fun splitStatements(sql: String, slashBlocks: Boolean = false): List<StatementRange> {
+fun splitStatements(sql: String, slashBlocks: Boolean = false, goBatches: Boolean = false): List<StatementRange> {
     val out = mutableListOf<StatementRange>()
     var start = 0
     var hasCode = false
 
-    fun flush(semicolonAt: Int?) {
+    fun flush(semicolonAt: Int?, resumeAt: Int? = semicolonAt?.plus(1)) {
         val endExclusive = semicolonAt ?: sql.length
         if (hasCode) {
             var s = start
             var e = endExclusive
             while (s < e && sql[s].isWhitespace()) s++
             while (e > s && sql[e - 1].isWhitespace()) e--
-            out += StatementRange(s, e, semicolonAt?.plus(1) ?: sql.length)
+            out += StatementRange(s, e, resumeAt ?: sql.length)
         }
-        start = semicolonAt?.plus(1) ?: sql.length
+        start = resumeAt ?: sql.length
         hasCode = false
     }
 
@@ -45,6 +47,7 @@ fun splitStatements(sql: String, slashBlocks: Boolean = false): List<StatementRa
         when {
             block && t.kind == TokenKind.OPERATOR && sql[t.start] == '/' && t.end - t.start == 1 && aloneOnItsLine(sql, t) -> { flush(t.start); block = false }
             block -> if (code) hasCode = true
+            goBatches && code && t.end - t.start == 2 && sql.substring(t.start, t.end).equals("go", true) && aloneOnItsLine(sql, t) -> flush(t.start, t.end)
             t.kind == TokenKind.PUNCT && sql[t.start] == ';' -> flush(t.start)
             code -> hasCode = true
         }
@@ -75,8 +78,8 @@ private fun aloneOnItsLine(sql: String, t: Token): Boolean {
  * The statement the caret belongs to: the one containing [offset] (its ';' counts as inside),
  * otherwise the closest one before it, otherwise the first one after.
  */
-fun statementAt(sql: String, offset: Int, slashBlocks: Boolean = false): StatementRange? {
-    val all = splitStatements(sql, slashBlocks)
+fun statementAt(sql: String, offset: Int, slashBlocks: Boolean = false, goBatches: Boolean = false): StatementRange? {
+    val all = splitStatements(sql, slashBlocks, goBatches)
     all.firstOrNull { offset >= it.start && offset <= it.next }?.let { return it }
     return all.lastOrNull { it.next <= offset } ?: all.firstOrNull()
 }

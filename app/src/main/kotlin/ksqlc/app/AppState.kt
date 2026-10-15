@@ -281,16 +281,20 @@ class AppState(
     // --- running SQL -------------------------------------------------------------------
 
     /** Oracle scripts keep PL/SQL blocks whole (they end at a `/` line) instead of cutting them at every `;`. */
-    private val slashBlocks: Boolean get() = form.effectiveKind == DbKind.ORACLE
+    /** The SQL dialect the editor's text follows: null = that of the connection. Decides how a script is split and what counts as a parameter. */
+    var editorDialect by mutableStateOf<DbKind?>(null)
+    private val editorKind: DbKind get() = editorDialect ?: form.effectiveKind
+    private val slashBlocks: Boolean get() = editorKind == DbKind.ORACLE
+    private val goBatches: Boolean get() = editorKind == DbKind.MSSQL
 
     fun runSelectionOrCurrent() {
         val text = editor.text
         val sel = editor.selection
         if (!sel.collapsed) {
             val part = text.substring(sel.min, sel.max)
-            run(splitStatements(part, slashBlocks).map { it.text(part) })
+            run(splitStatements(part, slashBlocks, goBatches).map { it.text(part) })
         } else {
-            val r = statementAt(text, sel.start, slashBlocks)
+            val r = statementAt(text, sel.start, slashBlocks, goBatches)
             run(listOfNotNull(r?.text(text)), range = r)
         }
     }
@@ -302,7 +306,7 @@ class AppState(
     fun explain(analyze: Boolean) {
         val text = editor.text
         val sel = editor.selection
-        val sql = (if (!sel.collapsed) text.substring(sel.min, sel.max) else statementAt(text, sel.start, slashBlocks)?.text(text))?.trim()?.trimEnd(';')?.trim()
+        val sql = (if (!sel.collapsed) text.substring(sel.min, sel.max) else statementAt(text, sel.start, slashBlocks, goBatches)?.text(text))?.trim()?.trimEnd(';')?.trim()
         if (sql.isNullOrBlank()) { status = "Nada que explicar"; return }
         val kind = form.effectiveKind
         val script = explainScript(kind, sql, analyze) ?: run { status = "${if (analyze) "Explain analyze" else "Explain"} no está disponible para ${kind.label()}"; return }
@@ -312,7 +316,7 @@ class AppState(
         else go()
     }
 
-    fun runScript() = run(splitStatements(editor.text, slashBlocks).map { it.text(editor.text) })
+    fun runScript() = run(splitStatements(editor.text, slashBlocks, goBatches).map { it.text(editor.text) })
 
     fun cancel() { sessions.peek()?.cancel() }
 
@@ -588,7 +592,7 @@ class AppState(
      * filled in. Without parameters [go] runs at once.
      */
     private fun withParams(statements: List<String>, go: (List<String>) -> Unit) {
-        val positional = form.effectiveKind != DbKind.POSTGRES
+        val positional = editorKind != DbKind.POSTGRES
         val refs = statements.map { findParams(it, positional) }
         if (refs.all { it.isEmpty() }) { go(statements); return }
         // one entry per distinct :name, one per `?`, in the order they appear

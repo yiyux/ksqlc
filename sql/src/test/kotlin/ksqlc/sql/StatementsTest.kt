@@ -93,3 +93,20 @@ class StatementsTest {
         assertEquals("begin\n  null;\nend;", r.text(sql))
     }
 }
+
+class GoBatchesTest {
+    private fun texts(sql: String, go: Boolean) = splitStatements(sql, goBatches = go).map { it.text(sql) }
+
+    @kotlin.test.Test fun goLinesSeparateBatchesOnlyWhenAsked() {
+        val sql = "create table t(a int)\nGO\ninsert into t values (1)\ngo\nselect * from t"
+        kotlin.test.assertEquals(listOf("create table t(a int)", "insert into t values (1)", "select * from t"), texts(sql, true))
+        kotlin.test.assertEquals(listOf("create table t(a int)\nGO\ninsert into t values (1)\ngo\nselect * from t"), texts(sql, false))
+    }
+
+    @kotlin.test.Test fun goInsideALineOrAStringIsNotASeparator() {
+        kotlin.test.assertEquals(listOf("select 'x\ngo\ny'"), texts("select 'x\ngo\ny'", true))
+        kotlin.test.assertEquals(listOf("select go from t"), texts("select go from t", true))
+        kotlin.test.assertEquals(listOf("select 1", "select 2"), texts("select 1;\nGO\nselect 2;", true))
+        kotlin.test.assertEquals(listOf("select 1"), texts("GO\nselect 1\nGO", true))
+    }
+}
