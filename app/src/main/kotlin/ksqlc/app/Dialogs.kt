@@ -62,7 +62,7 @@ fun DataSourceDialog(state: AppState) {
         Column(Modifier.fillMaxSize().background(c.dialogBg)) {
             Box(Modifier.fillMaxWidth().height(29.dp).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
                 Text("Data Sources", fontSize = 13.sp, color = c.textSecondary)
-                ToolButton(IconKind.Close, "Cerrar", ::close, Modifier.align(Alignment.CenterEnd))
+                Box(Modifier.align(Alignment.CenterEnd)) { ToolButton(IconKind.Close, "Cerrar", ::close) }
             }
             Separator()
             Row(Modifier.weight(1f)) {

@@ -59,13 +59,14 @@ fun ToolButton(
         hovered -> c.hover
         else -> Color.Transparent
     }
-    Box(
+    // the name appears when the pointer rests on the button
+    Tip(description, null) { Box(
         modifier.size(24.dp).clip(ControlShape).background(bg)
             .hoverable(src, enabled)
             .clickable(src, indication = null, enabled = enabled, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
-    ) { KIcon(icon, tint = tint?.takeIf { enabled } ?: if (enabled) c.textSecondary.let { if (hovered || selected) c.text else it } else c.textMuted) }
+    ) { KIcon(icon, tint = tint?.takeIf { enabled } ?: if (enabled) c.textSecondary.let { if (hovered || selected) c.text else it } else c.textMuted) } }
 }
 
 /** Compact text button: [primary] is the filled accent one (OK, Connect), otherwise a bordered neutral one. */
@@ -342,7 +343,7 @@ fun DropdownField(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun Tip(name: String, detail: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun Tip(name: String, detail: String?, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val c = Ksqlc.colors
     androidx.compose.foundation.TooltipArea(
         tooltip = {
@@ -351,7 +352,7 @@ fun Tip(name: String, detail: String, modifier: Modifier = Modifier, content: @C
                 Text(
                     androidx.compose.ui.text.buildAnnotatedString {
                         pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)); append(name); pop()
-                        append(": "); append(detail)
+                        if (detail != null) { append(": "); append(detail) }
                     },
                     fontSize = 13.sp, color = c.text, maxLines = 1,
                 )

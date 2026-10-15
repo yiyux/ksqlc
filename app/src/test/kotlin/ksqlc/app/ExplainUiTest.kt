@@ -63,4 +63,16 @@ class ExplainUiTest {
         rule.onNodeWithTag("explain-analyze").performClick()
         until { "no está disponible" in state.status }
     }
+
+    @Test fun consoleButtonsShowTheirNameWhenHovered() {
+        rule.setContent { App(state) }
+        rule.mainClock.advanceTimeBy(100)
+        assertEquals(0, rule.onAllNodesWithTag("tip").fetchSemanticsNodes().size)
+        rule.onNodeWithTag("explain").performMouseInput { moveTo(center) }
+        rule.mainClock.advanceTimeBy(1000)
+        rule.onNodeWithTag("tip").assertExists().assert(hasAnyDescendant(hasText("Explain: plan de ejecución")))
+        rule.onNodeWithTag("explain-analyze").performMouseInput { moveTo(center) }
+        rule.mainClock.advanceTimeBy(1000)
+        rule.onNodeWithTag("tip").assert(hasAnyDescendant(hasText("Explain analyze: ejecuta y mide")))
+    }
 }
