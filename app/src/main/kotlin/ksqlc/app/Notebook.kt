@@ -52,9 +52,10 @@ private fun NotebookCell(state: AppState, i: Int, source: String) {
     val shape = RoundedCornerShape(8.dp)
     val run = state.cellRuns[i]
     val selected = state.notebookCell == i
-    // the field keeps its own caret; it takes the text from outside only when that really changed (another edit, a deleted cell)
+    // The field keeps its own text and caret. Statements are trimmed when the text is split, so spaces and line breaks at the ends
+    // exist only here: it takes the text from outside only when more than that changed (another edit, a deleted cell).
     var value by remember { mutableStateOf(TextFieldValue(source, TextRange(source.length))) }
-    if (value.text != source) value = TextFieldValue(source, TextRange(source.length.coerceAtMost(value.selection.end)))
+    if (value.text.trim() != source) value = TextFieldValue(source, TextRange(source.length.coerceAtMost(value.selection.end)))
     val transformation = remember(c) { VisualTransformation { t -> TransformedText(highlight(t.text, c), OffsetMapping.Identity) } }
     Column(
         Modifier.fillMaxWidth().clip(shape).border(1.dp, if (selected) c.accent else c.border, shape).background(c.editorBg).testTag("nb-cell:$i"),
@@ -74,7 +75,7 @@ private fun NotebookCell(state: AppState, i: Int, source: String) {
             ToolButton(IconKind.Close, "Eliminar celda", { state.deleteCell(i) }, Modifier.testTag("nb-delete:$i"), enabled = !state.running)
         }
         BasicTextField(
-            value, { value = it; if (it.text != source) state.editCell(i, it.text) },
+            value, { value = it; if (it.text.trim() != source) state.editCell(i, it.text.trim()) },
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp).testTag("nb-text:$i")
                 .onFocusChanged { if (it.isFocused) state.notebookCell = i }
                 .onPreviewKeyEvent { e ->

@@ -67,6 +67,14 @@ class NotebookUiTest {
         assertTrue(state.editor.text.contains("select 2 as b"), state.editor.text)
         assertEquals("select 1 as a", state.cellRuns[0]!!.source)
 
+        // typing: spaces and line breaks at the end of a cell stay in the field while the text is split (which trims them)
+        rule.onNodeWithTag("nb-text:1").performTextReplacement("select 2 ")
+        frames(); rule.onNodeWithTag("nb-text:1").assertTextEquals("select 2 ")
+        rule.onNodeWithTag("nb-text:1").performTextReplacement("select 2 as b,\n")
+        frames(); rule.onNodeWithTag("nb-text:1").assertTextEquals("select 2 as b,\n")
+        rule.onNodeWithTag("nb-text:1").performTextReplacement("select 2 as b, 3 as c")
+        until { state.editor.text.contains("select 2 as b, 3 as c;") }
+
         // delete and add
         rule.onNodeWithTag("nb-delete:0").performClick()
         until { state.cells().size == 2 }
