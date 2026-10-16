@@ -5,4 +5,5 @@ build/
 .DS_Store
 *.class
 local.properties
-.claude/settings.local.json
+.claude/
+.mcp.json
