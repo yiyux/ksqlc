@@ -1,9 +1,10 @@
 package ksqlc.drivers
 
 import ksqlc.core.*
+import ksqlc.drivers.dialect.ModifyCaps
 
 /** Why [m] cannot be applied yet, or null when it can. */
-fun tableProblem(m: TableModel): String? {
+fun tableProblem(m: TableModel, caps: ModifyCaps = ModifyCaps()): String? {
     if (m.name.isBlank()) return "La tabla necesita un nombre"
     if (m.columns.isEmpty()) return "La tabla necesita al menos una columna"
     for (c in m.columns) {
@@ -38,6 +39,14 @@ fun tableProblem(m: TableModel): String? {
     }
     (m.keys.map { it.name } + m.foreignKeys.map { it.name } + m.checks.map { it.name }).groupBy { it.lowercase() }.entries
         .firstOrNull { it.value.size > 1 }?.let { return "El nombre de restricción ${it.key} está repetido" }
+    if (caps.singleIdentity) {
+        val autos = m.columns.filter { it.identity != null }
+        if (autos.size > 1) return "Solo puede haber una columna auto_increment"
+        autos.singleOrNull()?.let { c ->
+            val leads = m.keys.any { it.columns.firstOrNull() == c.name } || m.indexes.any { it.columns.firstOrNull()?.name == c.name }
+            if (!leads) return "La columna ${c.name} es auto_increment y tiene que ser la primera de una clave o de un índice"
+        }
+    }
     return null
 }
 

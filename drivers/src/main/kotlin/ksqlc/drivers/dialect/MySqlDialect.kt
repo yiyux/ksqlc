@@ -63,6 +63,8 @@ object MySqlDialect : MetaDialect() {
         virtualColumns = true, refInCatalog = true, indexMethods = listOf("btree", "hash"),
     )
 
+    override fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = mysqlAlterTable(this, o, before, after)
+
     override fun tableModel(conn: Connection, o: DbObject): TableModel {
         val db = o.ns.catalog
         val mariaDb = conn.metaData.databaseProductVersion.contains("MariaDB", ignoreCase = true)

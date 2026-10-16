@@ -1,6 +1,7 @@
 package ksqlc.drivers
 
 import ksqlc.core.*
+import ksqlc.drivers.dialect.ModifyCaps
 import kotlin.test.*
 
 class TableModelRulesTest {
@@ -42,5 +43,16 @@ class TableModelRulesTest {
         assertTrue(destructiveChanges(ok, retyped).single().contains("name"))
         val renamed = ok.copy(columns = listOf(ok.columns[0], ok.columns[1].copy(name = "title")))
         assertEquals(emptyList(), destructiveChanges(ok, renamed))
+    }
+
+    @Test fun withASingleIdentityThereCanBeOnlyOneAndItMustLeadAKey() {
+        val caps = ModifyCaps(singleIdentity = true)
+        val id = ColumnModel("a", "a", "int", true, identity = Identity())
+        val ok = TableModel("t", null, columns = listOf(id, ColumnModel("b", "b", "int")), keys = listOf(KeyModel("PRIMARY", "PRIMARY", true, listOf("a"))))
+        assertNull(tableProblem(ok, caps))
+        assertTrue(tableProblem(ok.copy(keys = emptyList()), caps)!!.contains("clave"))
+        assertTrue(tableProblem(ok.copy(keys = listOf(KeyModel("PRIMARY", "PRIMARY", true, listOf("b", "a")))), caps)!!.contains("clave"))
+        assertTrue(tableProblem(ok.copy(columns = ok.columns + id.copy(name = "c", origin = "c")), caps)!!.contains("una"))
+        assertNull(tableProblem(ok.copy(keys = emptyList(), columns = ok.columns), ModifyCaps()))     // PostgreSQL: no such rule
     }
 }
