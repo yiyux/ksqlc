@@ -1,6 +1,6 @@
 # Modificar una tabla en MySQL y MariaDB
 
-Fecha: 2026-10-16 · Estado: pendiente de revisión
+Fecha: 2026-10-16 · Estado: implementado
 
 ## Objetivo
 
@@ -28,7 +28,7 @@ En MySQL y MariaDB el DDL confirma solo, así que no hay «todo o nada». Se apl
 
 Con `information_schema`: `tables` (comentario), `columns` (tipo en `column_type`, `is_nullable`, `column_default`, `extra` para `auto_increment` y `generation_expression`, `column_comment`), `statistics` (índices y claves únicas, orden, método), `table_constraints` + `key_column_usage` + `referential_constraints` (primaria, únicas y foráneas) y `check_constraints` (con `table_constraints` para el nombre de la tabla).
 
-- `type` es `column_type` (por ejemplo `varchar(20)`, `int unsigned`).
+- `type` es `column_type` (por ejemplo `varchar(20)`, `int unsigned`); en MariaDB se quita el ancho de los enteros (`int(11)` pasa a `int`), salvo `tinyint(1)` y `zerofill`.
 - La clave primaria se llama `PRIMARY` en el servidor; el modelo la lee con ese nombre.
 - Los índices que respaldan una clave única o primaria no entran en `indexes`; los que respaldan una clave foránea sí (son índices normales).
 - Los índices fulltext y spatial, y las partes con prefijo, no se modelan: un índice que los tenga se omite del modelo para no recrearlo mal.
