@@ -186,7 +186,7 @@ private fun ModifyForm(draft: ModifyDraft) {
             MField("Nombre:") { FText(x.name, { v -> draft.updateIndex(i) { it.copy(name = v) } }, "modify-ix-name") }
             MField("") { KCheckbox(x.unique, { v -> draft.updateIndex(i) { it.copy(unique = v) } }, label = "Único", modifier = Modifier.testTag("modify-ix-unique")) }
             MField("Método de acceso:") { ChoiceField(x.method, caps.indexMethods, { v -> draft.updateIndex(i) { it.copy(method = v) } }, "modify-ix-method") }
-            MField("Columnas:") { IndexColumnsEditor(x.columns, names, caps.indexExtras) { v -> draft.updateIndex(i) { it.copy(columns = v) } } }
+            MField("Columnas:") { IndexColumnsEditor(x.columns, names, caps.indexColumnOptions) { v -> draft.updateIndex(i) { it.copy(columns = v) } } }
             if (caps.indexExtras) {
                 MField("Incluir columnas:") { StringListEditor(x.include, { v -> draft.updateIndex(i) { it.copy(include = v) } }, names, "modify-ix-inc") }
                 MField("Condición:") { FText(x.condition.orEmpty(), { v -> draft.updateIndex(i) { it.copy(condition = v.orNull()) } }, "modify-ix-cond", "p. ej. (activo)") }
@@ -215,7 +215,7 @@ private fun ColumnForm(draft: ModifyDraft, i: Int) {
     MField("Generada como:") { FText(col.generated.orEmpty(), { v -> edit { it.copy(generated = v.orNull()) } }, "modify-col-generated", "solo al crear la columna", enabled = col.origin == null && ident == null) }
     if (caps.virtualColumns) MField("") { KCheckbox(col.generatedStored, { v -> edit { it.copy(generatedStored = v) } }, label = "Almacenada", enabled = col.origin == null && col.generated != null, modifier = Modifier.testTag("modify-col-stored")) }
     MField("") {
-        KCheckbox(ident != null, { on -> edit { it.copy(identity = if (on) Identity() else null, notNull = it.notNull || on, default = if (on) null else it.default) } }, label = if (caps.singleIdentity) "auto_increment" else "Identity", modifier = Modifier.testTag("modify-col-identity"))
+        KCheckbox(ident != null, { on -> edit { it.copy(identity = if (on) Identity() else null, notNull = it.notNull || on, default = if (on) null else it.default) } }, label = caps.identityName, enabled = !(caps.identityOnCreateOnly && col.origin != null), modifier = Modifier.testTag("modify-col-identity"))
     }
     if (ident != null && caps.identityOptions) {
         MField("") { KCheckbox(ident.always, { v -> editIdentity { it.copy(always = v) } }, label = "Siempre (always)", modifier = Modifier.testTag("modify-col-always")) }

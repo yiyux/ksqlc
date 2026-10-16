@@ -5,6 +5,8 @@ import java.sql.Connection
 import java.sql.ResultSet
 
 object PostgresDialect : MetaDialect() {
+    override val modifyCaps = ModifyCaps(prelude = listOf("set local lock_timeout = '5s'"))
+
     override fun namespaces(conn: Connection, includeSystem: Boolean): List<Namespace> =
         conn.query(
             if (includeSystem) "select nspname from pg_namespace where nspname !~ '^pg_(toast|temp_|toast_temp_)' order by 1"

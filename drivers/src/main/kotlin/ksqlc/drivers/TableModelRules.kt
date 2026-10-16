@@ -41,11 +41,13 @@ fun tableProblem(m: TableModel, caps: ModifyCaps = ModifyCaps()): String? {
         .firstOrNull { it.value.size > 1 }?.let { return "El nombre de restricción ${it.key} está repetido" }
     if (caps.singleIdentity) {
         val autos = m.columns.filter { it.identity != null }
-        if (autos.size > 1) return "Solo puede haber una columna auto_increment"
-        autos.singleOrNull()?.let { c ->
+        if (autos.size > 1) return "Solo puede haber una columna ${caps.identityName}"
+    }
+    if (caps.identityLeadsKey) {
+        m.columns.filter { it.identity != null }.singleOrNull()?.let { c ->
             val leads = m.keys.any { it.columns.firstOrNull().equals(c.name, ignoreCase = true) } ||
                 m.indexes.any { ix -> ix.columns.firstOrNull()?.let { !it.expression && it.name.equals(c.name, ignoreCase = true) } == true }
-            if (!leads) return "La columna ${c.name} es auto_increment y tiene que ser la primera de una clave o de un índice"
+            if (!leads) return "La columna ${c.name} es ${caps.identityName} y tiene que ser la primera de una clave o de un índice"
         }
     }
     return null

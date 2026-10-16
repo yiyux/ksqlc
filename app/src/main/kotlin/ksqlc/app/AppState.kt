@@ -15,7 +15,6 @@ import ksqlc.drivers.DumpScope
 import ksqlc.drivers.destructiveChanges
 import ksqlc.drivers.ApplyResult
 import ksqlc.drivers.runAtomically
-import ksqlc.drivers.mySqlPrelude
 import ksqlc.drivers.runStepwise
 import ksqlc.drivers.Introspector
 import ksqlc.drivers.JdbcUrl
@@ -810,16 +809,15 @@ class AppState(
         modifyBusy = true; modifyError = null
         val atomic = d.caps.atomic
         scope.launch {
-            val mysql = target.kind == DbKind.MYSQL || target.kind == DbKind.MARIADB
             // one by one, an exception is the session itself failing: nothing ran, so nothing is recorded
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    if (atomic) ApplyResult(0, runAtomically(target, pw, if (target.kind == DbKind.POSTGRES) listOf("set local lock_timeout = '5s'") + statements else statements))
-                    else runStepwise(target, pw, statements, if (mysql) mySqlPrelude else emptyList())
+                    if (atomic) ApplyResult(0, runAtomically(target, pw, d.caps.prelude + statements))
+                    else runStepwise(target, pw, statements, d.caps.prelude)
                 }.getOrElse { ApplyResult(0, it.message ?: it.toString(), preludeFailed = !atomic) }
             }
             val error = result.error?.let {
-                if (it.contains("lock timeout", true) || it.contains("Lock wait timeout", true)) "$it\nOtra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla." else it
+                if (it.contains("lock timeout", true) || it.contains("Lock wait timeout", true) || it.contains("Lock request time out", true)) "$it\nOtra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla." else it
             }
             val ran = if (atomic) 0 else result.applied
             val now = System.currentTimeMillis()

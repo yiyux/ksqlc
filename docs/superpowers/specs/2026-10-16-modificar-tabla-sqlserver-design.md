@@ -74,7 +74,7 @@ Reglas:
 
 ## Aplicar
 
-`AppState.applyTableChanges` ya elige `runAtomically` o `runStepwise` por `caps.atomic`. Para SQL Server usa `runAtomically` y añade a su preludio `set lock_timeout 5000` junto al de PostgreSQL. El historial anota las sentencias como en PostgreSQL.
+`AppState.runModify` elige `runAtomically` o `runStepwise` por `caps.atomic`. El preludio de cada motor pasa a ser `ModifyCaps.prelude` en vez de comprobar el tipo de conexión en `AppState`: PostgreSQL `set local lock_timeout = '5s'`, MySQL y MariaDB `mySqlPrelude`, SQL Server `set lock_timeout 5000`. El mensaje de «otra transacción tiene bloqueada la tabla» también reconoce el de SQL Server («Lock request time out period exceeded»). El historial anota las sentencias como en PostgreSQL.
 
 ## Pruebas (Testcontainers, `assumeDocker()` como las demás)
 

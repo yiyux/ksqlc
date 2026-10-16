@@ -62,15 +62,23 @@ class TableModelRulesTest {
     }
 
     @Test fun theAutoIncrementLeadRuleIgnoresCaseAndNeedsARealColumnNotAnExpression() {
-        val caps = ModifyCaps(singleIdentity = true)
+        val caps = ModifyCaps(singleIdentity = true, identityLeadsKey = true, identityName = "auto_increment")
         val id = ColumnModel("a", "a", "int", true, identity = Identity())
         assertNull(tableProblem(TableModel("t", null, columns = listOf(id), keys = listOf(KeyModel("PRIMARY", "PRIMARY", true, listOf("A")))), caps))
         val viaExpression = TableModel("t", null, columns = listOf(id), indexes = listOf(IndexModel(null, "i", false, "btree", listOf(IndexColumn("a", expression = true)))))
         assertTrue(tableProblem(viaExpression, caps)!!.contains("auto_increment"))
     }
 
-    @Test fun withASingleIdentityThereCanBeOnlyOneAndItMustLeadAKey() {
+    @Test fun aSingleIdentityWithoutTheLeadRuleStillAllowsOnlyOneButNeedsNoKey() {
         val caps = ModifyCaps(singleIdentity = true)
+        val id = ColumnModel("a", "a", "int", true, identity = Identity())
+        val ok = TableModel("t", null, columns = listOf(id, ColumnModel("b", "b", "int")))
+        assertNull(tableProblem(ok, caps))
+        assertTrue(tableProblem(ok.copy(columns = ok.columns + id.copy(name = "c", origin = "c")), caps)!!.contains("Identity"))
+    }
+
+    @Test fun withASingleIdentityThereCanBeOnlyOneAndItMustLeadAKey() {
+        val caps = ModifyCaps(singleIdentity = true, identityLeadsKey = true, identityName = "auto_increment")
         val id = ColumnModel("a", "a", "int", true, identity = Identity())
         val ok = TableModel("t", null, columns = listOf(id, ColumnModel("b", "b", "int")), keys = listOf(KeyModel("PRIMARY", "PRIMARY", true, listOf("a"))))
         assertNull(tableProblem(ok, caps))

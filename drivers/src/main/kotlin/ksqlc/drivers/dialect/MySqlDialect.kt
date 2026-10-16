@@ -1,6 +1,7 @@
 package ksqlc.drivers.dialect
 
 import ksqlc.core.*
+import ksqlc.drivers.mySqlPrelude
 import java.sql.Connection
 
 /** MySQL and MariaDB: a "namespace" is a database (catalog), there are no schemas in between. */
@@ -59,7 +60,8 @@ object MySqlDialect : MetaDialect() {
     }
 
     override val modifyCaps = ModifyCaps(
-        atomic = false, deferrable = false, indexExtras = false, identityOptions = false, singleIdentity = true,
+        atomic = false, prelude = mySqlPrelude, deferrable = false, indexColumnOptions = false, indexExtras = false, identityOptions = false,
+        singleIdentity = true, identityLeadsKey = true, identityName = "auto_increment",
         virtualColumns = true, refInCatalog = true, // InnoDB builds a btree whatever is asked and refuses SET DEFAULT
         fkNeedsIndex = true, indexMethods = listOf("btree"), fkActions = listOf("NO ACTION", "RESTRICT", "CASCADE", "SET NULL"),
     )

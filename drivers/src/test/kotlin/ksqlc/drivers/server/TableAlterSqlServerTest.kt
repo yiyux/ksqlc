@@ -173,6 +173,20 @@ class TableAlterSqlServerTest {
         assertNull(none.comment); assertTrue(none.columns.all { it.comment == null })
     }
 
+    @Test fun aTableLockedByAnotherTransactionFailsByTimeoutInsteadOfHanging() {
+        val sql = statements("t") { m -> m.copy(columns = m.columns + ColumnModel(null, "extra", "int")) }
+        openConnection(fx.ds, fx.password).use { other ->
+            other.autoCommit = false
+            other.createStatement().use { it.execute("update at.t set price = price where id = 1") }
+            val started = System.nanoTime()
+            val error = runAtomically(fx.ds, fx.password, SqlServerDialect.modifyCaps.prelude + sql)
+            other.rollback()
+            assertNotNull(error); assertTrue(error.contains("Lock request time out", ignoreCase = true), error)
+            assertTrue((System.nanoTime() - started) / 1_000_000_000 < 30, "the lock timeout of the prelude did not apply")
+        }
+        assertNull(model("t").columns.find { it.name == "extra" })
+    }
+
     @Test fun aFailureInTheMiddleLeavesNothingApplied() {
         val before = model("t")
         val sql = statements("t") { m -> m.copy(columns = m.columns + ColumnModel(null, "extra", "int"), checks = m.checks + CheckModel(null, "ck_bad", "[price] < 0")) }

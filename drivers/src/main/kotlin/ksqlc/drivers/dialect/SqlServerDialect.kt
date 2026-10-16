@@ -150,6 +150,12 @@ object SqlServerDialect : MetaDialect() {
         )
     }
 
+    override val modifyCaps = ModifyCaps(
+        prelude = listOf("set lock_timeout 5000"), deferrable = false, indexColumnOptions = false, identityOptions = false,
+        singleIdentity = true, identityOnCreateOnly = true, virtualColumns = true, // virtual = not persisted
+        indexMethods = listOf("clustered", "nonclustered"), fkActions = listOf("NO ACTION", "CASCADE", "SET NULL", "SET DEFAULT"),
+    )
+
     override fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = sqlServerAlterTable(this, o, before, after)
 
     override fun tableModel(conn: Connection, o: DbObject): TableModel {
