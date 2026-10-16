@@ -34,11 +34,15 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
     val keys = changes(before.keys, after.keys, { it.origin }, { it.name }) { y, x ->
         y.copy(origin = null, name = "", columns = mapped(y.columns)) == x.copy(origin = null, name = "")
     }
-    val foreignKeys = changes(before.foreignKeys, after.foreignKeys, { it.origin }, { it.name }) { y, x ->
+    // MySQL can rename neither a foreign key nor a check, so a name-only change is a drop and a create
+    val fkChanges = changes(before.foreignKeys, after.foreignKeys, { it.origin }, { it.name }) { y, x ->
         y.copy(origin = null, name = "", columns = mapped(y.columns)) == x.copy(origin = null, name = "")
     }
+    val fkDropped = fkChanges.dropped + fkChanges.renamed.map { it.first }
+    val fkCreated = fkChanges.created + fkChanges.renamed.map { it.second }
     val checks = changes(before.checks, after.checks, { it.origin }, { it.name }) { y, x -> y.expression == x.expression && !touched(y.expression) }
-    val checksCreated = checks.created.map { x ->
+    val checksDropped = checks.dropped + checks.renamed.map { it.first }
+    val checksCreated = (checks.created + checks.renamed.map { it.second }).map { x ->
         val y = before.checks.find { it.name == x.origin }
         if (y != null && y.expression == x.expression) x.copy(expression = renamedIn(x.expression)) else x
     }
@@ -52,8 +56,8 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
     val pkChange = keys.dropped.any { it.primary } && keys.created.any { it.primary }
 
     // 1. what goes away
-    foreignKeys.dropped.forEach { out += alter("drop foreign key ${id(it.name)}") }
-    checks.dropped.forEach { out += alter("drop constraint ${id(it.name)}") }
+    fkDropped.forEach { out += alter("drop foreign key ${id(it.name)}") }
+    checksDropped.forEach { out += alter("drop constraint ${id(it.name)}") }
     keys.dropped.filter { !pkChange || !it.primary }.forEach { out += alter(if (it.primary) "drop primary key" else "drop index ${id(it.name)}") }
     indexes.dropped.forEach { out += alter("drop index ${id(it.name)}") }
 
@@ -81,7 +85,7 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
         }
         out += "create ${if (i.unique) "unique " else ""}index ${id(i.name)} using ${i.method} on $q ($columns)"
     }
-    for (f in foreignKeys.created) {
+    for (f in fkCreated) {
         val ref = d.qualified(DbObject(if (f.refNs.catalog == null) o.ns else f.refNs, f.refTable, DbObjectKind.TABLE))
         out += alter("add constraint ${id(f.name)} foreign key (${ids(f.columns)}) references $ref (${ids(f.refColumns)}) on delete ${f.onDelete} on update ${f.onUpdate}")
     }

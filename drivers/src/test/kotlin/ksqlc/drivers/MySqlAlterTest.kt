@@ -127,4 +127,22 @@ class MySqlAlterTest {
         val after = base.copy(columns = base.columns + ColumnModel(null, "we`ird order", "int"))
         assertEquals(listOf("alter table $q add column `we``ird order` int null"), diff(after))
     }
+
+    @Test fun renamingOnlyAForeignKeyDropsAndCreatesIt() {
+        val fk = ForeignKeyModel("t_ref_fk", "t_ref_fk", listOf("price"), Namespace("app", null), "parent", listOf("id"), onDelete = "CASCADE", onUpdate = "SET NULL")
+        val before = base.copy(foreignKeys = listOf(fk))
+        val after = base.copy(foreignKeys = listOf(fk.copy(name = "t_ref2_fk")))
+        assertEquals(listOf(
+            "alter table $q drop foreign key `t_ref_fk`",
+            "alter table $q add constraint `t_ref2_fk` foreign key (`price`) references `app`.`parent` (`id`) on delete CASCADE on update SET NULL",
+        ), diff(after, before))
+    }
+
+    @Test fun renamingOnlyACheckDropsAndCreatesIt() {
+        val after = base.copy(checks = listOf(base.checks[0].copy(name = "t_cost_ck")))
+        assertEquals(listOf(
+            "alter table $q drop constraint `t_price_ck`",
+            "alter table $q add constraint `t_cost_ck` check ((`price` > 0))",
+        ), diff(after))
+    }
 }
