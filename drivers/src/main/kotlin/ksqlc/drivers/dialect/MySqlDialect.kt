@@ -79,7 +79,7 @@ object MySqlDialect : MetaDialect() {
             val extra = rs.getString(5).orEmpty().lowercase()
             val generated = "generated" in extra && "default_generated" !in extra
             ColumnModel(
-                rs.getString(1), rs.getString(1), rs.getString(2), rs.getString(3) == "NO",
+                rs.getString(1), rs.getString(1), columnType(rs.getString(2), mariaDb), rs.getString(3) == "NO",
                 if (generated) null else defaultText(rs.getString(4), extra, rs.getString(8), mariaDb, rs.getString(3) == "YES"),
                 rs.getString(7)?.ifEmpty { null },
                 if ("auto_increment" in extra) Identity() else null,
@@ -133,6 +133,10 @@ object MySqlDialect : MetaDialect() {
     }
 
     // MariaDB gives literals and expressions both as written, MySQL gives plain text plus a DEFAULT_GENERATED flag; either way the result must paste after `default `.
+    // MariaDB reports a display width (bigint(20)) that MySQL 8 no longer does; tinyint(1) stays as the boolean idiom
+    private fun columnType(t: String, mariaDb: Boolean) =
+        if (mariaDb) t.replace(Regex("^(smallint|mediumint|int|bigint|tinyint)\\((\\d+)\\)")) { if (it.value == "tinyint(1)") it.value else it.groupValues[1] } else t
+
     private fun defaultText(raw: String?, extra: String, dataType: String, mariaDb: Boolean, nullable: Boolean): String? {
         if (raw == null) return null
         val ready = Regex("""'.*'|-?\d+(\.\d+)?([eE][-+]?\d+)?|[bBxX]'[01a-fA-F]*'|0[xX][0-9a-fA-F]+|current_timestamp(\(\d*\))?""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))

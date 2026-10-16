@@ -97,6 +97,6 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
 
     // 4. the table itself, last so everything above uses the name it has now
     if (after.comment != before.comment) out += alter("comment = ${lit(after.comment.orEmpty())}")
-    if (after.name != before.name) out += alter("rename to ${id(after.name)}")
+    if (after.name != before.name) out += alter("rename to ${d.qualified(o.copy(name = after.name))}") // unqualified, the server would move the table to the current database
     return out
 }

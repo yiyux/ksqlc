@@ -120,7 +120,7 @@ class MySqlAlterTest {
 
     @Test fun commentAndRenameOfTheTableGoLast() {
         val after = base.copy(name = "t2", comment = "it's")
-        assertEquals(listOf("alter table $q comment = 'it''s'", "alter table $q rename to `t2`"), diff(after))
+        assertEquals(listOf("alter table $q comment = 'it''s'", "alter table $q rename to `app`.`t2`"), diff(after))
     }
 
     @Test fun namesWithBackticksAndReservedWordsAreQuoted() {
