@@ -18,7 +18,8 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
         if (gen != null) append(" generated always as ($gen) ", if (c.generatedStored) "stored" else "virtual")
         append(if (c.notNull) " not null" else " null")
         if (gen == null) {
-            c.default?.let { append(" default ", it) }
+            // a bare `on update …` is a column with no default: `default NULL` would be refused (1067) on a not null one
+            c.default?.let { append(if (it.startsWith("on update", ignoreCase = true)) " " else " default ", it) }
             if (auto && c.identity != null) append(" auto_increment")
         }
         c.comment?.let { append(" comment ", lit(it)) }

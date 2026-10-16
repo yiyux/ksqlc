@@ -85,7 +85,7 @@ object MySqlDialect : MetaDialect() {
             val default = if (generated) null else defaultText(rs.getString(4), extra, rs.getString(8), mariaDb, rs.getString(3) == "YES")
             ColumnModel(
                 rs.getString(1), rs.getString(1), columnType(rs.getString(2), mariaDb) + (collation?.let { " collate $it" } ?: ""), rs.getString(3) == "NO",
-                if (onUpdate != null && !generated) "${default ?: "NULL"} $onUpdate" else default,
+                if (onUpdate != null && !generated) listOfNotNull(default, onUpdate).joinToString(" ") else default,
                 rs.getString(7)?.ifEmpty { null },
                 if ("auto_increment" in extra) Identity() else null,
                 if (generated) rs.getString(6) else null,

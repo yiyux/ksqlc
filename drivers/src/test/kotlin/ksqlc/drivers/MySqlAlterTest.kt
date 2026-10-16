@@ -37,6 +37,11 @@ class MySqlAlterTest {
         assertEquals(listOf("alter table $q add column `note` varchar(20) not null default 'x' comment 'it''s'"), diff(after))
     }
 
+    @Test fun onUpdateWithoutADefaultIsWrittenWithoutTheDefaultKeyword() {
+        val after = base.copy(columns = base.columns + ColumnModel(null, "d", "datetime", true, "on update CURRENT_TIMESTAMP"))
+        assertEquals(listOf("alter table $q add column `d` datetime not null on update CURRENT_TIMESTAMP"), diff(after))
+    }
+
     @Test fun commentsEscapeBackslashesAndQuotes() {
         val after = base.copy(columns = base.columns + ColumnModel(null, "c", "int", comment = "a\\b'c"))
         assertEquals(listOf("alter table $q add column `c` int null comment 'a\\\\b''c'"), diff(after))

@@ -148,15 +148,16 @@ abstract class TableAlterMySqlBase(private val kind: DbKind) {
                  upd timestamp not null default current_timestamp on update current_timestamp,
                  upd6 timestamp(6) not null default current_timestamp(6) on update current_timestamp(6),
                  onlyupd timestamp null on update current_timestamp,
+                 nn datetime not null on update current_timestamp,
                  c varchar(10) character set utf8mb4 collate utf8mb4_bin, unique key keep_c (c)) default charset utf8mb4 collate utf8mb4_general_ci""",
-            "insert into at.keep(id, c) values (1, 'a'), (2, 'A')",
+            "insert into at.keep(id, nn, c) values (1, now(), 'a'), (2, now(), 'A')",
         )
         assertEquals(emptyList(), statements("keep") { it })
         val sqlList = statements("keep") { m -> m.copy(columns = m.columns.map { if (it.name == "id") it else it.copy(comment = "c") }) }
         assertTrue(sqlList.isNotEmpty())
         assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
         fun extra(c: String) = scalar("select lower(extra) from information_schema.columns where table_schema = 'at' and table_name = 'keep' and column_name = '$c'")!!
-        for (c in listOf("upd", "upd6", "onlyupd")) assertTrue("on update" in extra(c), "$c: ${extra(c)}")
+        for (c in listOf("upd", "upd6", "onlyupd", "nn")) assertTrue("on update" in extra(c), "$c: ${extra(c)}")
         assertEquals("utf8mb4_bin", scalar("select collation_name from information_schema.columns where table_schema = 'at' and table_name = 'keep' and column_name = 'c'"))
         assertEquals(emptyList(), statements("keep") { it })
         exec("drop table at.keep")

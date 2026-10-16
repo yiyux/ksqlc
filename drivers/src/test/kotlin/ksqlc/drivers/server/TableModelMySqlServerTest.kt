@@ -36,6 +36,7 @@ private val SETUP = listOf(
          upd timestamp not null default current_timestamp on update current_timestamp,
          upd6 timestamp(6) not null default current_timestamp(6) on update current_timestamp(6),
          onlyupd timestamp null on update current_timestamp,
+         nn datetime not null on update current_timestamp,
          c varchar(10) character set utf8mb4 collate utf8mb4_bin, d varchar(10)) default charset utf8mb4 collate utf8mb4_general_ci""",
     "create table mt.skipped(a int, b varchar(50), c text, primary key (a), index pre_idx (b(10)), fulltext index ft_idx (c))",
 )
@@ -93,7 +94,9 @@ abstract class TableModelMySqlBase {
         fun d(c: String) = m.columns.single { it.name == c }.default!!.lowercase().replace("()", "")   // MariaDB spells current_timestamp()
         assertEquals("current_timestamp on update current_timestamp", d("upd"))
         assertEquals("current_timestamp(6) on update current_timestamp(6)", d("upd6"))
-        assertTrue(d("onlyupd").endsWith("on update current_timestamp"), d("onlyupd"))
+        assertEquals("on update current_timestamp", d("onlyupd"))        // no default: no `NULL` that a not null column would refuse (1067)
+        // MySQL has no default here; MariaDB gives a not null datetime the implicit '0000-00-00 00:00:00'. Neither may produce `NULL`.
+        assertTrue(d("nn").endsWith("on update current_timestamp") && !d("nn").startsWith("null"), d("nn"))
         assertTrue(m.columns.single { it.name == "c" }.type.contains("collate utf8mb4_bin"), m.columns.single { it.name == "c" }.type)
         assertEquals("varchar(10)", m.columns.single { it.name == "d" }.type)
     }
