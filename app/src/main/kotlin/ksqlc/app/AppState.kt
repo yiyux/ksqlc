@@ -12,7 +12,9 @@ import kotlinx.coroutines.withContext
 import ksqlc.core.*
 import ksqlc.drivers.DumpScope
 import ksqlc.drivers.destructiveChanges
+import ksqlc.drivers.ApplyResult
 import ksqlc.drivers.runAtomically
+import ksqlc.drivers.runStepwise
 import ksqlc.drivers.Introspector
 import ksqlc.drivers.JdbcUrl
 import ksqlc.drivers.nativeDumpBlocker
@@ -804,17 +806,45 @@ class AppState(
         val (target, pw) = modifyTarget ?: return
         if (modifyBusy) return
         modifyBusy = true; modifyError = null
+        val atomic = d.caps.atomic
         scope.launch {
-            val error = withContext(Dispatchers.IO) { runCatching { runAtomically(target, pw, if (target.kind == DbKind.POSTGRES) listOf("set local lock_timeout = '5s'") + statements else statements) }.getOrElse { it.message ?: it.toString() } }
-                .let { if (it != null && it.contains("lock timeout")) "$it\nOtra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla." else it }
+            val mysql = target.kind == DbKind.MYSQL || target.kind == DbKind.MARIADB
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (atomic) ApplyResult(0, runAtomically(target, pw, if (target.kind == DbKind.POSTGRES) listOf("set local lock_timeout = '5s'") + statements else statements))
+                    else runStepwise(target, pw, statements, if (mysql) listOf("set session lock_wait_timeout = 5") else emptyList())
+                }.getOrElse { ApplyResult(0, it.message ?: it.toString()) }
+            }
+            val error = result.error?.let {
+                if (it.contains("lock timeout", true) || it.contains("Lock wait timeout", true)) "$it\nOtra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla." else it
+            }
+            val ran = if (atomic) 0 else result.applied
             val now = System.currentTimeMillis()
-            record(target.id, statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) })
+            // all or nothing: every statement shares the outcome; one by one: the ones that ran are ok and the one that failed is not
+            record(target.id, if (atomic) statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) }
+                else statements.take(ran).map { HistoryEntry(now, "$it;", 0, ok = true) } + listOfNotNull(error?.let { statements.getOrNull(ran)?.let { s -> HistoryEntry(now, "$s;", 0, ok = false) } }))
             modifyBusy = false
             val open = modifyDraft === d
-            if (error != null) { if (open) modifyError = error else status = "No se pudo modificar la tabla: $error"; return@launch }
+            if (error != null) {
+                val partial = if (!atomic && ran > 0) "Se aplicaron $ran de ${statements.size} sentencias; el resto no se ejecutó.\n" else ""
+                if (open) modifyError = partial + error else status = "No se pudo modificar la tabla: $partial$error"
+                if (!atomic && ran > 0) { refreshExplorer(); if (open) reloadModify(partial + error) }
+                return@launch
+            }
             if (open) closeModify()
             status = "Tabla modificada"
             refreshExplorer()
+        }
+    }
+
+    /** After a partial apply the dialog starts again from what the server has now, keeping the error on screen. */
+    fun reloadModify(error: String? = null) {
+        val d = modifyDraft ?: return
+        val m = explorer ?: return
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { m.source.tableModel(d.obj) } }
+                .onSuccess { fresh -> if (fresh != null && modifyDraft === d) { modifyDraft = ModifyDraft(d.obj, fresh, m.source.dialect); modifyError = error } }
+                .onFailure { status = "No se pudo releer ${d.obj.name}: ${it.message}" }
         }
     }
 

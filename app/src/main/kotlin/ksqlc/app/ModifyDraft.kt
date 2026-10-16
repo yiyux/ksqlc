@@ -20,7 +20,11 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
         private set
     var selected by mutableStateOf(Sel("table"))
 
-    val problem: String? get() = tableProblem(model)
+    val caps get() = dialect.modifyCaps
+    val problem: String? get() = tableProblem(model, caps)
+
+    /** What the preview says before the SQL when applying is not all or nothing. */
+    val notice: String? get() = if (caps.atomic) null else "MySQL y MariaDB confirman cada sentencia: si una falla, las anteriores quedan aplicadas."
 
     /** The SQL OK would run; empty while there is a [problem] or nothing changed. */
     val statements: List<String> get() = if (problem != null) emptyList() else dialect.alterTable(obj, before, model)

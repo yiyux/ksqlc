@@ -15,6 +15,15 @@ class ModifyDraftTest {
     )
     private fun draft() = ModifyDraft(tbl, before, Dialect.of(DbKind.POSTGRES))
 
+    @Test fun anEngineWithoutTransactionalDdlWarnsInTheNoticeAndChecksAutoIncrement() {
+        val d = ModifyDraft(DbObject(Namespace("app", null), "t", DbObjectKind.TABLE), TableModel("t", null, columns = listOf(ColumnModel("a", "a", "int", true), ColumnModel("b", "b", "int"))), Dialect.of(DbKind.MYSQL))
+        assertTrue(d.notice!!.contains("cada sentencia"))
+        assertNull(ModifyDraft(tbl, before, Dialect.of(DbKind.POSTGRES)).notice)
+        d.updateColumn(0) { it.copy(identity = Identity()) }
+        assertTrue(d.problem!!.contains("auto_increment"))
+        assertEquals(emptyList(), d.statements)
+    }
+
     @Test fun untouchedMeansNoStatements() = draft().let { assertNull(it.problem); assertEquals(emptyList(), it.statements) }
 
     @Test fun renamingAColumnRewritesItsReferencesAndOnlyRenames() {

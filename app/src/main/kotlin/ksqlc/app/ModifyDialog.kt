@@ -21,7 +21,6 @@ import ksqlc.core.*
 // Not trimmed: the field is controlled, so trimming would eat the space as it is typed.
 private fun String.orNull() = ifBlank { null }
 private val ACTIONS = listOf("NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT")
-private val METHODS = listOf("btree", "hash", "gist", "spgist", "gin", "brin")
 
 /** "Modify" for a table: the tree of its parts on the left, the form of the selected one on the right, the SQL it amounts to below. */
 @Composable
@@ -29,7 +28,8 @@ fun ModifyDialog(state: AppState) {
     val draft = state.modifyDraft ?: return
     val c = Ksqlc.colors
     val sql = draft.statements
-    val preview = draft.problem ?: if (sql.isEmpty()) "-- sin cambios" else sql.joinToString("\n") { "$it;" }
+    val body = draft.problem ?: if (sql.isEmpty()) "-- sin cambios" else sql.joinToString("\n") { "$it;" }
+    val preview = if (draft.problem == null && sql.isNotEmpty()) draft.notice?.let { "-- $it\n$body" } ?: body else body
     ModalOverlay({ if (!state.modifyBusy) state.closeModify() }, Modifier.testTag("modify-dialog"), width = 920.dp, height = 720.dp) {
         Column(Modifier.fillMaxSize().background(c.dialogBg)) {
             Box(Modifier.fillMaxWidth().height(29.dp), contentAlignment = Alignment.Center) {
@@ -127,14 +127,16 @@ private fun StringListEditor(items: List<String>, onChange: (List<String>) -> Un
 }
 
 @Composable
-private fun IndexColumnsEditor(cols: List<IndexColumn>, columnNames: List<String>, onChange: (List<IndexColumn>) -> Unit) {
+private fun IndexColumnsEditor(cols: List<IndexColumn>, columnNames: List<String>, extras: Boolean, onChange: (List<IndexColumn>) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         cols.forEachIndexed { i, ic ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 FText(ic.name, { v -> onChange(cols.replaced(i, ic.copy(name = v, expression = v.trim() !in columnNames))) }, "modify-ix-col:$i", "columna o expresión", modifier = Modifier.weight(1f))
                 ChoiceField(ic.order.ifEmpty { "—" }, listOf("—", "ASC", "DESC"), { v -> onChange(cols.replaced(i, ic.copy(order = if (v == "—") "" else v))) }, "modify-ix-order:$i", Modifier.width(84.dp))
-                FText(ic.collation.orEmpty(), { v -> onChange(cols.replaced(i, ic.copy(collation = v.orNull()))) }, "modify-ix-coll:$i", "colación", modifier = Modifier.width(90.dp))
-                FText(ic.opClass.orEmpty(), { v -> onChange(cols.replaced(i, ic.copy(opClass = v.orNull()))) }, "modify-ix-opc:$i", "clase op.", modifier = Modifier.width(90.dp))
+                if (extras) {
+                    FText(ic.collation.orEmpty(), { v -> onChange(cols.replaced(i, ic.copy(collation = v.orNull()))) }, "modify-ix-coll:$i", "colación", modifier = Modifier.width(90.dp))
+                    FText(ic.opClass.orEmpty(), { v -> onChange(cols.replaced(i, ic.copy(opClass = v.orNull()))) }, "modify-ix-opc:$i", "clase op.", modifier = Modifier.width(90.dp))
+                }
                 ToolButton(IconKind.ArrowUp, "Subir", { onChange(cols.moved(i, i - 1)) }, enabled = i > 0)
                 ToolButton(IconKind.ArrowDown, "Bajar", { onChange(cols.moved(i, i + 1)) }, enabled = i < cols.lastIndex)
                 ToolButton(IconKind.Minus, "Quitar", { onChange(cols.filterIndexed { n, _ -> n != i }) })
@@ -147,6 +149,7 @@ private fun IndexColumnsEditor(cols: List<IndexColumn>, columnNames: List<String
 @Composable
 private fun ModifyForm(draft: ModifyDraft) {
     val m = draft.model
+    val caps = draft.caps
     val sel = draft.selected
     val names = m.columns.map { it.name }
     val i = sel.index
@@ -161,29 +164,34 @@ private fun ModifyForm(draft: ModifyDraft) {
             val k = m.keys[i]
             MField("Nombre:") { FText(k.name, { v -> draft.updateKey(i) { it.copy(name = v) } }, "modify-key-name") }
             MField("") { KCheckbox(k.primary, { v -> draft.updateKey(i) { it.copy(primary = v) } }, label = "Primaria", modifier = Modifier.testTag("modify-key-primary")) }
-            MField("") { KCheckbox(k.deferrable, { v -> draft.updateKey(i) { it.copy(deferrable = v, initiallyDeferred = it.initiallyDeferred && v) } }, label = "Diferible", modifier = Modifier.testTag("modify-key-deferrable")) }
-            MField("") { KCheckbox(k.initiallyDeferred, { v -> draft.updateKey(i) { it.copy(initiallyDeferred = v) } }, label = "Inicialmente diferida", enabled = k.deferrable, modifier = Modifier.testTag("modify-key-initially")) }
+            if (caps.deferrable) {
+                MField("") { KCheckbox(k.deferrable, { v -> draft.updateKey(i) { it.copy(deferrable = v, initiallyDeferred = it.initiallyDeferred && v) } }, label = "Diferible", modifier = Modifier.testTag("modify-key-deferrable")) }
+                MField("") { KCheckbox(k.initiallyDeferred, { v -> draft.updateKey(i) { it.copy(initiallyDeferred = v) } }, label = "Inicialmente diferida", enabled = k.deferrable, modifier = Modifier.testTag("modify-key-initially")) }
+            }
             MField("Columnas:") { StringListEditor(k.columns, { v -> draft.updateKey(i) { it.copy(columns = v) } }, names, "modify-key-col") }
         }
         sel.group == "fks" && i < m.foreignKeys.size -> {
             val f = m.foreignKeys[i]
             MField("Nombre:") { FText(f.name, { v -> draft.updateForeignKey(i) { it.copy(name = v) } }, "modify-fk-name") }
             MField("Columnas:") { StringListEditor(f.columns, { v -> draft.updateForeignKey(i) { it.copy(columns = v) } }, names, "modify-fk-col") }
-            MField("Esquema referido:") { FText(f.refNs.schema.orEmpty(), { v -> draft.updateForeignKey(i) { it.copy(refNs = Namespace(null, v.orNull())) } }, "modify-fk-schema") }
+            if (caps.refInCatalog) MField("Base de datos referida:") { FText(f.refNs.catalog.orEmpty(), { v -> draft.updateForeignKey(i) { it.copy(refNs = Namespace(v.orNull(), null)) } }, "modify-fk-schema") }
+            else MField("Esquema referido:") { FText(f.refNs.schema.orEmpty(), { v -> draft.updateForeignKey(i) { it.copy(refNs = Namespace(null, v.orNull())) } }, "modify-fk-schema") }
             MField("Tabla referida:") { FText(f.refTable, { v -> draft.updateForeignKey(i) { it.copy(refTable = v) } }, "modify-fk-table") }
             MField("Columnas referidas:") { StringListEditor(f.refColumns, { v -> draft.updateForeignKey(i) { it.copy(refColumns = v) } }, null, "modify-fk-refcol") }
             MField("On delete:") { ChoiceField(f.onDelete, ACTIONS, { v -> draft.updateForeignKey(i) { it.copy(onDelete = v) } }, "modify-fk-delete") }
             MField("On update:") { ChoiceField(f.onUpdate, ACTIONS, { v -> draft.updateForeignKey(i) { it.copy(onUpdate = v) } }, "modify-fk-update") }
-            MField("") { KCheckbox(f.deferrable, { v -> draft.updateForeignKey(i) { it.copy(deferrable = v, initiallyDeferred = it.initiallyDeferred && v) } }, label = "Diferible", modifier = Modifier.testTag("modify-fk-deferrable")) }
+            if (caps.deferrable) MField("") { KCheckbox(f.deferrable, { v -> draft.updateForeignKey(i) { it.copy(deferrable = v, initiallyDeferred = it.initiallyDeferred && v) } }, label = "Diferible", modifier = Modifier.testTag("modify-fk-deferrable")) }
         }
         sel.group == "indexes" && i < m.indexes.size -> {
             val x = m.indexes[i]
             MField("Nombre:") { FText(x.name, { v -> draft.updateIndex(i) { it.copy(name = v) } }, "modify-ix-name") }
             MField("") { KCheckbox(x.unique, { v -> draft.updateIndex(i) { it.copy(unique = v) } }, label = "Único", modifier = Modifier.testTag("modify-ix-unique")) }
-            MField("Método de acceso:") { ChoiceField(x.method, METHODS, { v -> draft.updateIndex(i) { it.copy(method = v) } }, "modify-ix-method") }
-            MField("Columnas:") { IndexColumnsEditor(x.columns, names) { v -> draft.updateIndex(i) { it.copy(columns = v) } } }
-            MField("Incluir columnas:") { StringListEditor(x.include, { v -> draft.updateIndex(i) { it.copy(include = v) } }, names, "modify-ix-inc") }
-            MField("Condición:") { FText(x.condition.orEmpty(), { v -> draft.updateIndex(i) { it.copy(condition = v.orNull()) } }, "modify-ix-cond", "p. ej. (activo)") }
+            MField("Método de acceso:") { ChoiceField(x.method, caps.indexMethods, { v -> draft.updateIndex(i) { it.copy(method = v) } }, "modify-ix-method") }
+            MField("Columnas:") { IndexColumnsEditor(x.columns, names, caps.indexExtras) { v -> draft.updateIndex(i) { it.copy(columns = v) } } }
+            if (caps.indexExtras) {
+                MField("Incluir columnas:") { StringListEditor(x.include, { v -> draft.updateIndex(i) { it.copy(include = v) } }, names, "modify-ix-inc") }
+                MField("Condición:") { FText(x.condition.orEmpty(), { v -> draft.updateIndex(i) { it.copy(condition = v.orNull()) } }, "modify-ix-cond", "p. ej. (activo)") }
+            }
         }
         sel.group == "checks" && i < m.checks.size -> {
             val ck = m.checks[i]
@@ -196,6 +204,7 @@ private fun ModifyForm(draft: ModifyDraft) {
 @Composable
 private fun ColumnForm(draft: ModifyDraft, i: Int) {
     val col = draft.model.columns[i]
+    val caps = draft.caps
     val ident = col.identity
     fun edit(f: (ColumnModel) -> ColumnModel) = draft.updateColumn(i, f)
     fun editIdentity(f: (Identity) -> Identity) = edit { it.copy(identity = it.identity?.let(f)) }
@@ -205,10 +214,11 @@ private fun ColumnForm(draft: ModifyDraft, i: Int) {
     MField("") { KCheckbox(col.notNull, { v -> edit { it.copy(notNull = v) } }, label = "Not null", enabled = ident == null, modifier = Modifier.testTag("modify-col-notnull")) }
     MField("Valor por defecto:") { FText(col.default.orEmpty(), { v -> edit { it.copy(default = v.orNull()) } }, "modify-col-default", enabled = ident == null && col.generated == null) }
     MField("Generada como:") { FText(col.generated.orEmpty(), { v -> edit { it.copy(generated = v.orNull()) } }, "modify-col-generated", "solo al crear la columna", enabled = col.origin == null && ident == null) }
+    if (caps.virtualColumns) MField("") { KCheckbox(col.generatedStored, { v -> edit { it.copy(generatedStored = v) } }, label = "Almacenada", enabled = col.origin == null && col.generated != null, modifier = Modifier.testTag("modify-col-stored")) }
     MField("") {
-        KCheckbox(ident != null, { on -> edit { it.copy(identity = if (on) Identity() else null, notNull = it.notNull || on, default = if (on) null else it.default) } }, label = "Identity", modifier = Modifier.testTag("modify-col-identity"))
+        KCheckbox(ident != null, { on -> edit { it.copy(identity = if (on) Identity() else null, notNull = it.notNull || on, default = if (on) null else it.default) } }, label = if (caps.singleIdentity) "auto_increment" else "Identity", modifier = Modifier.testTag("modify-col-identity"))
     }
-    if (ident != null) {
+    if (ident != null && caps.identityOptions) {
         MField("") { KCheckbox(ident.always, { v -> editIdentity { it.copy(always = v) } }, label = "Siempre (always)", modifier = Modifier.testTag("modify-col-always")) }
         MField("Mínimo:") { FText(ident.min.orEmpty(), { v -> editIdentity { it.copy(min = v.orNull()) } }, "modify-col-min") }
         MField("Máximo:") { FText(ident.max.orEmpty(), { v -> editIdentity { it.copy(max = v.orNull()) } }, "modify-col-max") }
