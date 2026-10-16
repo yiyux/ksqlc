@@ -27,9 +27,11 @@ data class ColumnModel(
     val identity: Identity? = null, val generated: String? = null, val generatedStored: Boolean = true,
 )
 
+/** [clustered] is only for engines that choose how a key is stored (SQL Server); null leaves it to the engine. */
 data class KeyModel(
     val origin: String?, val name: String, val primary: Boolean, val columns: List<String>,
     val deferrable: Boolean = false, val initiallyDeferred: Boolean = false,
+    val clustered: Boolean? = null,
 )
 
 /** [onDelete] and [onUpdate] are `NO ACTION`, `RESTRICT`, `CASCADE`, `SET NULL` or `SET DEFAULT`. */

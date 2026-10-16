@@ -52,13 +52,13 @@ object SqlServerDialect : MetaDialect() {
     }
 
     /** A column as the catalog has it; [details] and [ddl] both start from this. */
-    private class Col(
+    internal class Col(
         val name: String, val type: String, val length: Int, val precision: Int, val scale: Int, val nullable: Boolean,
         val identity: Boolean, val seed: String?, val increment: String?, val default: String?, val computed: String?, val persisted: Boolean,
         val collation: String?,
     )
 
-    private fun columns(conn: Connection, o: DbObject): List<Col> =
+    internal fun columns(conn: Connection, o: DbObject): List<Col> =
         conn.query(
             """select c.name, t.name, c.max_length, c.precision, c.scale, c.is_nullable, c.is_identity,
                       cast(ic.seed_value as nvarchar(40)), cast(ic.increment_value as nvarchar(40)),
@@ -78,7 +78,7 @@ object SqlServerDialect : MetaDialect() {
         }
 
     /** `nvarchar(100)`, `decimal(10,2)`, `datetime2(3)`, `varbinary(max)`: the type as it is written in DDL. */
-    private fun typeText(c: Col): String = when (c.type.lowercase()) {
+    internal fun typeText(c: Col): String = when (c.type.lowercase()) {
         "nvarchar", "nchar" -> c.type + "(" + (if (c.length == -1) "max" else (c.length / 2).toString()) + ")"
         "varchar", "char", "varbinary", "binary" -> c.type + "(" + (if (c.length == -1) "max" else c.length.toString()) + ")"
         "decimal", "numeric" -> "${c.type}(${c.precision},${c.scale})"
@@ -115,9 +115,9 @@ object SqlServerDialect : MetaDialect() {
         }.sortedBy { it.name.lowercase() }
     }
 
-    private class Fk(val name: String, val columns: List<String>, val refNs: Namespace, val refTable: String, val refColumns: List<String>, val onDelete: String, val onUpdate: String)
+    internal class Fk(val name: String, val columns: List<String>, val refNs: Namespace, val refTable: String, val refColumns: List<String>, val onDelete: String, val onUpdate: String)
 
-    private fun foreignKeys(conn: Connection, o: DbObject): List<Fk> {
+    internal fun foreignKeys(conn: Connection, o: DbObject): List<Fk> {
         data class Row(val name: String, val col: String, val refSchema: String, val refTable: String, val refCol: String, val seq: Int, val onDelete: String, val onUpdate: String)
         val rows = conn.query(
             """select fk.name, pc.name, rs.name, rt.name, rc.name, fkc.constraint_column_id, fk.delete_referential_action_desc, fk.update_referential_action_desc
@@ -148,6 +148,91 @@ object SqlServerDialect : MetaDialect() {
             ix.filter { !it.primary }.map { IndexInfo(it.name, it.unique, it.keys) },
             foreignKeys(conn, o).map { ForeignKeyInfo(it.name, it.columns, it.refNs, it.refTable, it.refColumns) },
         )
+    }
+
+    override fun tableModel(conn: Connection, o: DbObject): TableModel {
+        val (temporal, inMemory, comment) = conn.query(
+            """select t.temporal_type, t.is_memory_optimized, cast(ep.value as nvarchar(4000))
+               from sys.tables t
+               left join sys.extended_properties ep on ep.class = 1 and ep.major_id = t.object_id and ep.minor_id = 0 and ep.name = 'MS_Description'
+               where t.object_id = object_id(?)""",
+            qualified(o),
+        ) { Triple(it.getInt(1), it.getBoolean(2), it.getString(3)) }.firstOrNull() ?: error("${o.name} no existe")
+        if (temporal != 0) error("${o.name} es una tabla temporal (system-versioned) y todavía no se puede modificar")
+        if (inMemory) error("${o.name} está optimizada para memoria y todavía no se puede modificar")
+
+        val dbCollation = conn.query("select convert(nvarchar(128), databasepropertyex(db_name(), 'Collation'))") { it.getString(1) }.firstOrNull()
+        val comments = conn.query(
+            """select c.name, cast(ep.value as nvarchar(4000)) from sys.columns c
+               join sys.extended_properties ep on ep.class = 1 and ep.major_id = c.object_id and ep.minor_id = c.column_id and ep.name = 'MS_Description'
+               where c.object_id = object_id(?)""",
+            qualified(o),
+        ) { it.getString(1) to it.getString(2) }.toMap()
+        val columnModels = columns(conn, o).map { c ->
+            // alter column without a collation resets it to the database's, so a column's own travels in its type
+            val collate = c.collation?.takeIf { c.computed == null && it != dbCollation && c.type.lowercase() in setOf("varchar", "nvarchar", "char", "nchar") }
+            ColumnModel(
+                c.name, c.name, typeText(c) + (collate?.let { " collate $it" } ?: ""),
+                notNull = c.computed == null && !c.nullable, default = c.default?.let(::unwrap), comment = comments[c.name]?.ifBlank { null },
+                identity = if (c.identity) Identity() else null,
+                generated = c.computed?.let(::unwrap), generatedStored = c.persisted,
+            )
+        }
+
+        // one row per column of every index; the types it can hold are rowstore clustered (1) and nonclustered (2), and the rest are left alone
+        data class Part(val name: String, val primary: Boolean, val uniqueConstraint: Boolean, val unique: Boolean, val type: Int, val filter: String?, val column: String, val ord: Int, val desc: Boolean, val included: Boolean)
+        val parts = conn.query(
+            """select i.name, i.is_primary_key, i.is_unique_constraint, i.is_unique, i.type, i.filter_definition, col.name, ic.key_ordinal, ic.is_descending_key, ic.is_included_column
+               from sys.indexes i
+               join sys.index_columns ic on ic.object_id = i.object_id and ic.index_id = i.index_id
+               join sys.columns col on col.object_id = ic.object_id and col.column_id = ic.column_id
+               where i.object_id = object_id(?) and i.type > 0 and i.name is not null""",
+            qualified(o),
+        ) { Part(it.getString(1), it.getBoolean(2), it.getBoolean(3), it.getBoolean(4), it.getInt(5), it.getString(6), it.getString(7), it.getInt(8), it.getBoolean(9), it.getBoolean(10)) }
+            .groupBy { it.name }
+        val allNames = conn.query("select name from sys.indexes where object_id = object_id(?) and type > 0 and name is not null", qualified(o)) { it.getString(1) }
+        fun Map.Entry<String, List<Part>>.modeled() = value.first().type in 1..2
+        val keys = parts.filter { it.modeled() && (it.value.first().primary || it.value.first().uniqueConstraint) }.filterValues { ps -> ps.none { it.desc } }.map { (name, ps) ->
+            KeyModel(name, name, ps.first().primary, ps.filter { !it.included }.sortedBy { it.ord }.map { it.column }, clustered = ps.first().type == 1)
+        }.sortedWith(compareBy({ !it.primary }, { it.name.lowercase() }))
+        val indexes = parts.filter { it.modeled() && !it.value.first().primary && !it.value.first().uniqueConstraint }.map { (name, ps) ->
+            val first = ps.first()
+            IndexModel(
+                name, name, first.unique, if (first.type == 1) "clustered" else "nonclustered",
+                ps.filter { !it.included }.sortedBy { it.ord }.map { IndexColumn(it.column, order = if (it.desc) "DESC" else "") },
+                ps.filter { it.included }.map { it.column }, first.filter,
+            )
+        }.sortedBy { it.name.lowercase() }
+        // columnstore, xml, spatial and hash indexes, and keys with a descending column, are not modeled: leaving them out means they are never dropped or recreated
+        val skipped = (allNames - keys.map { it.name }.toSet() - indexes.map { it.name }.toSet()).sortedBy { it.lowercase() }
+
+        val foreignKeys = foreignKeys(conn, o).map {
+            ForeignKeyModel(it.name, it.name, it.columns, it.refNs, it.refTable, it.refColumns, it.onDelete.replace('_', ' '), it.onUpdate.replace('_', ' '))
+        }
+        val checks = conn.query("select name, definition from sys.check_constraints where parent_object_id = object_id(?) order by name", qualified(o)) {
+            CheckModel(it.getString(1), it.getString(1), unwrap(it.getString(2)))
+        }
+        return TableModel(o.name, comment?.ifBlank { null }, columnModels, keys, foreignKeys, indexes, checks, skipped)
+    }
+
+    /**
+     * The catalog gives defaults, checks and computed columns wrapped in one pair of parentheses (`((0))`, `([a]>(0))`); the model
+     * holds the text without it and the generator puts it back, so reading and writing back is the identity.
+     */
+    internal fun unwrap(s: String): String {
+        val t = s.trim()
+        if (t.length < 2 || t.first() != '(' || t.last() != ')') return t
+        var depth = 0; var i = 0
+        while (i < t.length) {
+            when (t[i]) {
+                '\'' -> { i++; while (i < t.length && !(t[i] == '\'' && t.getOrNull(i + 1) != '\'')) i += if (t[i] == '\'') 2 else 1 }
+                '[' -> { i++; while (i < t.length && !(t[i] == ']' && t.getOrNull(i + 1) != ']')) i += if (t[i] == ']') 2 else 1 }
+                '(' -> depth++
+                ')' -> { depth--; if (depth == 0 && i != t.lastIndex) return t }
+            }
+            i++
+        }
+        return t.substring(1, t.length - 1).trim()
     }
 
     override fun ddl(conn: Connection, o: DbObject): String = when (o.kind) {

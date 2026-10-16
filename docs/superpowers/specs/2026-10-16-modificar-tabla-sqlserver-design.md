@@ -18,7 +18,7 @@ Incluye:
 - Índices: único, `clustered` o `nonclustered`, columnas con orden, `include` y filtro (`where`).
 - Checks.
 
-No incluye: colación por columna, particiones y filegroups, compresión, opciones de índice (`fillfactor`, `online`…), índices columnstore, xml, spatial y en memoria, cambiar la expresión de una columna calculada existente, cambiar identity en una columna existente, propietario y permisos, reordenar columnas, ni vistas, secuencias o rutinas. Una tabla **temporal** (system-versioned) o **optimizada para memoria** no se puede modificar: `tableModel` devuelve `null` y se avisa. Se anota en el inventario.
+No incluye: colación por columna, particiones y filegroups, compresión, opciones de índice (`fillfactor`, `online`…), índices columnstore, xml, spatial y en memoria, cambiar la expresión de una columna calculada existente, cambiar identity en una columna existente, propietario y permisos, reordenar columnas, ni vistas, secuencias o rutinas. Una tabla **temporal** (system-versioned) o **optimizada para memoria** no se puede modificar: `tableModel` falla con un mensaje que lo dice (la app lo muestra) en vez de devolver `null`, que solo diría «todavía no permite modificar tablas». Se anota en el inventario.
 
 ## Atomicidad
 
@@ -38,7 +38,8 @@ Reglas de lectura:
 - `KeyModel.clustered: Boolean?` (nuevo; `null` = lo que decida el motor, y PostgreSQL y MySQL lo ignoran). Se lee y se conserva al recrear la clave, para que una clave primaria no clustered no pase a clustered. No se muestra en el diálogo.
 - `IndexModel.method` es `clustered` o `nonclustered`.
 - Los índices columnstore, xml, spatial y en memoria van a `TableModel.skipped` y la vista previa los nombra («Fuera de este diálogo y sin tocar: …»).
-- Los defaults y los checks vienen de `sys` entre paréntesis (`((0))`, `([a]>(0))`). Se quita **un** par exterior al leer y el generador lo vuelve a poner, de modo que ida y vuelta es idéntica.
+- Los defaults, los checks y las expresiones de columnas calculadas vienen de `sys` entre paréntesis (`((0))`, `([a]>(0))`). Se quita **un** par exterior al leer (`SqlServerDialect.unwrap`, que no cuenta los paréntesis dentro de textos ni de `[nombres]`) y el generador lo vuelve a poner, de modo que ida y vuelta es idéntica.
+- Si la colación de una columna `char` difiere de la de la base de datos, viaja en su tipo (`nvarchar(50) collate Latin1_General_CS_AS`): `alter column` sin colación la devolvería a la de la base.
 - Una columna calculada lleva `generated` (la expresión) y `generatedStored` (`is_persisted`), y no lleva default.
 - `identity` se lee como `Identity()` sin opciones (semilla e incremento no se editan; se conservan solo al crear).
 
@@ -78,7 +79,7 @@ Reglas:
 ## Pruebas (Testcontainers, `assumeDocker()` como las demás)
 
 - **Generador (sin Docker), `SqlServerAlterTest`:** un caso por tipo de cambio, con listas exactas de sentencias como `MySqlAlterTest`: renombrar, quitar (con su default) y añadir columna, tipo, not null, default, identity al crear, columna calculada, cada clase de restricción (añadir, quitar, recrear, solo renombrar), índices con orden, `include`, filtro y `clustered`, comentarios con comilla simple, renombrar la tabla, columna renombrada que usa un check o un índice, sin cambios.
-- **Servidor, `mssql/server:2022-latest`:** `TableModelSqlServerTest` lee una tabla con todos los elementos y comprueba los campos, y una temporal devuelve `null`; `TableAlterSqlServerTest` aplica un conjunto de cambios con el generador y relee el modelo para comprobar que coincide, que ida y vuelta sin cambios no genera sentencias, y que un fallo a mitad no deja nada aplicado.
+- **Servidor, `mssql/server:2022-latest`:** `TableModelSqlServerTest` lee una tabla con todos los elementos y comprueba los campos, y una temporal falla con su motivo; `TableAlterSqlServerTest` aplica un conjunto de cambios con el generador y relee el modelo para comprobar que coincide, que ida y vuelta sin cambios no genera sentencias, y que un fallo a mitad no deja nada aplicado.
 - **Reglas:** `TableModelRulesTest` cubre las banderas separadas (MySQL y PostgreSQL no cambian).
 - **Interfaz:** abrir «Modificar…» en una conexión SQL Server: sin campos de diferible ni de colación, con `include` y condición en los índices, casilla de identity deshabilitada en una columna existente.
 
