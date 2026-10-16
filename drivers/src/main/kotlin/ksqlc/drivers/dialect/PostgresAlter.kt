@@ -60,6 +60,8 @@ internal fun postgresAlterTable(d: Dialect, o: DbObject, before: TableModel, aft
 
     // 2. columns
     before.columns.filter { b -> after.columns.none { it.origin == b.name } }.forEach { out += alter("drop column ${id(it.name)}") }
+    // renames before the adds, so a new column can take the old name of a renamed one
+    for ((a, b) in kept) if (a.name != b.name) out += alter("rename column ${id(b.name)} to ${id(a.name)}")
     for (c in after.columns.filter { it.origin == null }) {
         val ident = c.identity
         val gen = c.generated
@@ -77,7 +79,6 @@ internal fun postgresAlterTable(d: Dialect, o: DbObject, before: TableModel, aft
     }
     for ((a, b) in kept) {
         val c = id(a.name)
-        if (a.name != b.name) out += alter("rename column ${id(b.name)} to $c")
         // PostgreSQL refuses not null / default changes on a column that is still identity
         if (a.identity == null && b.identity != null) out += alter("alter column $c drop identity")
         val retyped = a.type != b.type

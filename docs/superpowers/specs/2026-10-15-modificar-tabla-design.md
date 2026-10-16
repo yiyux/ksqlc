@@ -48,7 +48,7 @@ CheckModel(origin, name, expression)
 `Dialect.alterTable(o, before, after): List<String>`; por omisión falla con «este motor no puede modificar tablas». En PostgreSQL es una función pura (sin conexión) en `PostgresAlter.kt`. Orden de las sentencias:
 
 1. **Quitar** lo que desaparece o cambia: FK, checks, claves y luego índices (`alter table … drop constraint`, `drop index`).
-2. **Columnas**, en este orden: quitar, añadir, renombrar y cambiar (tipo con `using "c"::tipo`, `set/drop not null`, `set/drop default`, identity, comentario).
+2. **Columnas**, en este orden: quitar, renombrar, añadir y cambiar (tipo con `using "c"::tipo`, `set/drop not null`, `set/drop default`, identity, comentario).
 3. **Crear** lo nuevo o cambiado: claves, checks, índices, FK.
 4. **Comentarios** de tabla y columnas nuevas.
 5. **Renombrar la tabla** al final, de modo que todo lo anterior use el nombre original.

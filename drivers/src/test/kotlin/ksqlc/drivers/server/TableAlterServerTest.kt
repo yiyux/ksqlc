@@ -104,4 +104,25 @@ class TableAlterServerTest {
         assertNull(runAtomically(fx.ds, fx.password, sql), sql.joinToString("\n"))
         assertEquals(listOf("a"), model("w").keys.single().columns)
     }
+
+    @Test fun renamingAColumnAndAddingANewOneWithTheOldNameWorks() {
+        runAtomically(fx.ds, fx.password, listOf("create table at.rn(id int, name text)"))
+        val (_, sql) = statements("rn") { m ->
+            m.copy(columns = listOf(m.columns[0], m.columns[1].copy(name = "name_old"), ColumnModel(null, "name", "int")))
+        }
+        assertNull(runAtomically(fx.ds, fx.password, sql), sql.joinToString("\n"))
+        assertEquals(listOf("id", "name_old", "name"), model("rn").columns.map { it.name })
+    }
+
+    @Test fun aLockTimeoutEndsAnApplyBlockedByAnotherTransaction() {
+        java.sql.DriverManager.getConnection(fx.ds.url, fx.ds.user, fx.password).use { other ->
+            other.autoCommit = false
+            other.createStatement().use { it.executeQuery("select * from at.u").close() }   // holds an AccessShareLock
+            val start = System.currentTimeMillis()
+            val error = runAtomically(fx.ds, fx.password, listOf("set local lock_timeout = '1s'", "alter table at.u add column x int"))
+            assertNotNull(error); assertTrue(error.contains("lock timeout"), error)
+            assertTrue(System.currentTimeMillis() - start < 15_000)
+            other.rollback()
+        }
+    }
 }

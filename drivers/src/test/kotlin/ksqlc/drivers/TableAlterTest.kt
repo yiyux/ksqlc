@@ -29,6 +29,17 @@ class TableAlterTest {
         assertEquals(listOf("alter table $q rename column \"name\" to \"title\""), diff(after))
     }
 
+    @Test fun renameThenAddANewColumnWithTheOldName() {
+        val after = base.copy(
+            columns = listOf(base.columns[0], base.columns[1].copy(name = "name_old"), ColumnModel(null, "name", "text")),
+            indexes = listOf(base.indexes[0].copy(columns = listOf(IndexColumn("name_old")))),
+        )
+        assertEquals(listOf(
+            "alter table $q rename column \"name\" to \"name_old\"",
+            "alter table $q add column \"name\" text",
+        ), diff(after))
+    }
+
     @Test fun dropAndAddColumns() {
         val after = base.copy(
             columns = listOf(base.columns[0], ColumnModel(null, "age", "integer", notNull = true, default = "0", comment = "edad")),

@@ -805,7 +805,8 @@ class AppState(
         if (modifyBusy) return
         modifyBusy = true; modifyError = null
         scope.launch {
-            val error = withContext(Dispatchers.IO) { runCatching { runAtomically(target, pw, statements) }.getOrElse { it.message ?: it.toString() } }
+            val error = withContext(Dispatchers.IO) { runCatching { runAtomically(target, pw, if (target.kind == DbKind.POSTGRES) listOf("set local lock_timeout = '5s'") + statements else statements) }.getOrElse { it.message ?: it.toString() } }
+                .let { if (it != null && it.contains("lock timeout")) "$it\nOtra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla." else it }
             val now = System.currentTimeMillis()
             record(target.id, statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) })
             modifyBusy = false

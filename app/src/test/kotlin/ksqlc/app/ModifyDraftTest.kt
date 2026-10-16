@@ -76,6 +76,15 @@ class ModifyDraftTest {
         assertEquals(listOf("idx"), d.model.indexes[0].columns.map { it.name })
     }
 
+    @Test fun anAliasReturnsToTheRealNameWhenTheOtherColumnIsRenamedAway() {
+        val d = draft()
+        d.updateColumn(1) { it.copy(name = "id") }
+        d.updateColumn(0) { it.copy(name = "pk") }
+        assertEquals(listOf("pk"), d.model.keys[0].columns)
+        assertEquals(listOf("id"), d.model.indexes[0].columns.map { it.name })
+        assertNull(d.problem)
+    }
+
     @Test fun typingANameThatPassesThroughAnotherColumnsNameKeepsEveryReference() {
         val d = draft()
         for (n in 1.."identifier".length) d.updateColumn(1) { it.copy(name = "identifier".take(n)) }

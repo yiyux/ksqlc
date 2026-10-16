@@ -50,6 +50,21 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
             )
         }
         refNames = refNames.replaced(i, newRef)
+        // an alias whose collision is over goes back to the real name
+        for (j in refNames.indices) {
+            val alias = refNames[j]
+            val name = m.columns[j].name
+            if (!alias.startsWith("\u0000") || m.columns.count { it.name.equals(name, ignoreCase = true) } != 1) continue
+            fun r(l: List<String>) = l.map { if (it == alias) name else it }
+            m = m.copy(
+                keys = m.keys.map { it.copy(columns = r(it.columns)) },
+                foreignKeys = m.foreignKeys.map { it.copy(columns = r(it.columns)) },
+                indexes = m.indexes.map { ix ->
+                    ix.copy(columns = ix.columns.map { c -> if (c.expression || c.name != alias) c else c.copy(name = name) }, include = r(ix.include))
+                },
+            )
+            refNames = refNames.replaced(j, name)
+        }
         model = m
     }
 
