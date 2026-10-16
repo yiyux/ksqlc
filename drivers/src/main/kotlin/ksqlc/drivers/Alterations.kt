@@ -60,4 +60,4 @@ fun dropForeignKeySql(kind: DbKind, table: DbObject, fk: String): String? {
 fun supportsRoutineCall(kind: DbKind) = kind in setOf(DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.MSSQL, DbKind.ORACLE)
 
 /** Engines whose tables the Modify dialog can change. */
-fun supportsModifyTable(kind: DbKind) = kind in setOf(DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB)
+fun supportsModifyTable(kind: DbKind) = kind in setOf(DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.MSSQL)
