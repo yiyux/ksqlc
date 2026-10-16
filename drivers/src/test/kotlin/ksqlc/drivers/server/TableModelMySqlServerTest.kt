@@ -31,6 +31,7 @@ private val SETUP = listOf(
          constraint t_parent_fk foreign key (parent_id) references mt.parent(id) on delete cascade on update set null,
          constraint t_price_ck check (price >= 0)
        ) comment = 'hola'""",
+    "create table mt.zf(z int(5) unsigned zerofill, w int(7))",
     "create table mt.skipped(a int, b varchar(50), c text, primary key (a), index pre_idx (b(10)), fulltext index ft_idx (c))",
 )
 
@@ -75,6 +76,12 @@ abstract class TableModelMySqlBase {
         assertEquals("CASCADE", fk.onDelete); assertEquals("SET NULL", fk.onUpdate)
         val ck = m.checks.single()
         assertEquals("t_price_ck", ck.name); assertTrue(ck.expression.contains("price"), ck.expression)
+    }
+
+    @Test fun zerofillKeepsItsWidthButPlainIntegersLoseTheirs() = model("zf").let { m ->
+        val z = m.columns[0].type
+        assertTrue(z.contains("(5)") && z.contains("zerofill"), z)   // the width is the padding
+        assertEquals("int", m.columns[1].type)
     }
 
     @Test fun prefixAndFulltextIndexesAreLeftOut() = model("skipped").let { m ->

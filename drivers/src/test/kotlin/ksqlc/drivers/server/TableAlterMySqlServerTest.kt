@@ -87,6 +87,7 @@ abstract class TableAlterMySqlBase(private val kind: DbKind) {
         assertEquals(1, sqlList.size, sqlList.joinToString("\n"))
         assertNull(runStepwise(fx.ds, fx.password, sqlList).error)
         assertEquals(listOf("id", "g"), model("pk").keys.single().columns)
+        runStepwise(fx.ds, fx.password, listOf("drop table at.pk"))
     }
 
     @Test fun addingAutoIncrementAfterTheKey() {
@@ -109,9 +110,16 @@ abstract class TableAlterMySqlBase(private val kind: DbKind) {
 
     @Test fun renamingTheTable() {
         val sqlList = statements("t2") { it.copy(name = "t3") }
-        assertNull(runStepwise(fx.ds, fx.password, sqlList).error)
-        assertEquals(listOf("a", "b"), model("t3").columns.map { it.name })
-        runStepwise(fx.ds, fx.password, listOf("drop table at.t3"))
+        try {
+            assertNull(runStepwise(fx.ds, fx.password, sqlList).error)
+            assertEquals(listOf("a", "b"), model("t3").columns.map { it.name })
+        } finally { runStepwise(fx.ds, fx.password, listOf("drop table if exists at.t3")) }
+    }
+
+    @Test fun aFailingPreludeStopsBeforeTheStatements() {
+        val r = runStepwise(fx.ds, fx.password, listOf("alter table at.t2 add column c9 int"), prelude = listOf("alter table at.nope add column x int"))
+        assertEquals(0, r.applied); assertNotNull(r.error)
+        assertEquals(listOf("a", "b"), model("t2").columns.map { it.name })
     }
 }
 

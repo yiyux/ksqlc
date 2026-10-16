@@ -133,9 +133,9 @@ object MySqlDialect : MetaDialect() {
     }
 
     // MariaDB gives literals and expressions both as written, MySQL gives plain text plus a DEFAULT_GENERATED flag; either way the result must paste after `default `.
-    // MariaDB reports a display width (bigint(20)) that MySQL 8 no longer does; tinyint(1) stays as the boolean idiom
+    // MariaDB reports a display width (bigint(20)) that MySQL 8 no longer does; tinyint(1) stays as the boolean idiom and zerofill keeps its width (it is the padding)
     private fun columnType(t: String, mariaDb: Boolean) =
-        if (mariaDb) t.replace(Regex("^(smallint|mediumint|int|bigint|tinyint)\\((\\d+)\\)")) { if (it.value == "tinyint(1)") it.value else it.groupValues[1] } else t
+        if (mariaDb && !t.contains("zerofill", ignoreCase = true)) t.replace(Regex("^(smallint|mediumint|int|bigint|tinyint)\\((\\d+)\\)")) { if (it.value == "tinyint(1)") it.value else it.groupValues[1] } else t
 
     private fun defaultText(raw: String?, extra: String, dataType: String, mariaDb: Boolean, nullable: Boolean): String? {
         if (raw == null) return null
