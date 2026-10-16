@@ -18,11 +18,11 @@ data class Identity(
     val cycle: Boolean = false,
 )
 
-/** [type] and [default] are the text PostgreSQL gives (`format_type`, `pg_get_expr`); [generated] is the expression of a stored generated column. */
+/** [type] and [default] are the text the server gives; [generated] is the expression of a generated column, [generatedStored] whether it is stored (else virtual). */
 data class ColumnModel(
     val origin: String?, val name: String, val type: String,
     val notNull: Boolean = false, val default: String? = null, val comment: String? = null,
-    val identity: Identity? = null, val generated: String? = null,
+    val identity: Identity? = null, val generated: String? = null, val generatedStored: Boolean = true,
 )
 
 data class KeyModel(

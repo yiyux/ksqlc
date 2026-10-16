@@ -33,6 +33,9 @@ interface Dialect {
     /** The statements that turn [before] into [after] on table [o]; empty when nothing changed. */
     fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = error("Este motor no puede modificar tablas")
 
+    /** What the Modify dialog offers for this engine. */
+    val modifyCaps: ModifyCaps get() = ModifyCaps()
+
     companion object {
         fun of(kind: DbKind): Dialect = when (kind) {
             DbKind.POSTGRES -> PostgresDialect

@@ -2,19 +2,6 @@ package ksqlc.drivers.dialect
 
 import ksqlc.core.*
 
-private class Changes<T>(val dropped: List<T>, val created: List<T>, val renamed: List<Pair<T, T>>)
-
-/** Pairs each [after] element with its [before] one by origin: a changed definition is dropped and created again, a new name alone is a rename. */
-private fun <T> changes(before: List<T>, after: List<T>, origin: (T) -> String?, name: (T) -> String, same: (T, T) -> Boolean): Changes<T> {
-    val pairs = after.mapNotNull { x -> before.find { name(it) == origin(x) }?.let { it to x } }
-    val changed = pairs.filter { (y, x) -> !same(y, x) }
-    return Changes(
-        dropped = before.filter { y -> after.none { origin(it) == name(y) } } + changed.map { it.first },
-        created = after.filter { origin(it) == null } + changed.map { it.second },
-        renamed = pairs.filter { (y, x) -> same(y, x) && name(y) != name(x) },
-    )
-}
-
 private fun identityOptions(i: Identity): String = listOfNotNull(
     i.step?.let { "increment by $it" }, i.min?.let { "minvalue $it" }, i.max?.let { "maxvalue $it" }, i.cache?.let { "cache $it" },
     if (i.cycle) "cycle" else null,
@@ -32,12 +19,10 @@ internal fun postgresAlterTable(d: Dialect, o: DbObject, before: TableModel, aft
     fun alter(clause: String) = "alter table $q $clause"
     val out = ArrayList<String>()
 
-    val kept = after.columns.mapNotNull { a -> before.columns.find { it.name == a.origin }?.let { a to it } }
-    val renamed = kept.filter { (a, b) -> a.name != b.name }.associate { (a, b) -> b.name to a.name }
-    val gone = before.columns.map { it.name }.filter { n -> after.columns.none { it.origin == n } }
-    // a dropped column takes its constraints with it, so anything using it must be dropped and created again even if a new column reuses the name
-    fun mapped(l: List<String>) = l.map { if (it in gone) "\u0000$it" else renamed[it] ?: it }
-    fun mentionsGone(text: String?) = text != null && gone.any { Regex("""\b${Regex.escape(it)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(text) }
+    val moves = ColumnMoves(before, after)
+    val kept = moves.kept
+    fun mapped(l: List<String>) = moves.mapped(l)
+    fun mentionsGone(text: String?) = moves.mentionsGone(text)
 
     val keys = changes(before.keys, after.keys, { it.origin }, { it.name }) { y, x ->
         y.copy(origin = null, name = "", columns = mapped(y.columns)) == x.copy(origin = null, name = "")
