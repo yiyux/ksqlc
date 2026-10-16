@@ -1,6 +1,6 @@
 # Modificar una tabla en SQL Server
 
-Fecha: 2026-10-16 · Estado: pendiente de revisión
+Fecha: 2026-10-16 · Estado: implementado
 
 ## Objetivo
 
