@@ -59,3 +59,20 @@ fun destructiveChanges(before: TableModel, after: TableModel): List<String> = bu
         if (b.type != a.type) add("Se cambia el tipo de la columna ${a.name} de ${b.type} a ${a.type}; los valores que no quepan darán error o se perderán.")
     }
 }
+
+/**
+ * Engines that do not make an index for a foreign key that already exists (MySQL, MariaDB) refuse to drop the one it rests on (1553):
+ * why a foreign key left as it was has no key or index starting with its columns in [after], or null.
+ */
+fun fkIndexProblem(before: TableModel, after: TableModel): String? {
+    val renamed = after.columns.filter { it.origin != null }.associate { it.origin!! to it.name }
+    val covers = after.keys.map { it.columns } + after.indexes.map { ix -> ix.columns.map { it.name } }
+    for (f in after.foreignKeys) {
+        val old = before.foreignKeys.find { it.name == f.origin } ?: continue
+        // a foreign key that was changed is dropped and added again, and the server makes its index then
+        val unchanged = old.columns.map { renamed[it] } == f.columns && old.refNs == f.refNs && old.refTable == f.refTable &&
+            old.refColumns == f.refColumns && old.onDelete == f.onDelete && old.onUpdate == f.onUpdate
+        if (unchanged && covers.none { it.take(f.columns.size) == f.columns }) return "La clave foránea ${f.name} necesita una clave o un índice que empiece por sus columnas"
+    }
+    return null
+}

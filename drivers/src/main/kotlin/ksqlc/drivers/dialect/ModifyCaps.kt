@@ -16,5 +16,7 @@ data class ModifyCaps(
     val virtualColumns: Boolean = false,
     /** A foreign key's target is a database (catalog), not a schema. */
     val refInCatalog: Boolean = false,
+    /** A foreign key that stays needs a key or index starting with its columns: the engine refuses to drop the one it rests on. */
+    val fkNeedsIndex: Boolean = false,
     val indexMethods: List<String> = listOf("btree", "hash", "gist", "spgist", "gin", "brin"),
 )

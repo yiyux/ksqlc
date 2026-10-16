@@ -35,6 +35,19 @@ class ModifyDraftTest {
         assertEquals(listOf("pk"), d.model.keys[0].columns)
     }
 
+    @Test fun removingTheIndexAForeignKeyRestsOnIsAProblemOnMySqlOnly() {
+        val fk = ForeignKeyModel("fk", "fk", listOf("name"), Namespace("app", null), "parent", listOf("id"))
+        val withFk = before.copy(foreignKeys = listOf(fk))
+        val mysql = ModifyDraft(DbObject(Namespace("app", null), "t", DbObjectKind.TABLE), withFk, Dialect.of(DbKind.MYSQL))
+        assertNull(mysql.problem)
+        mysql.remove(Sel("indexes", 0))
+        assertTrue(mysql.problem!!.contains("fk"), mysql.problem)
+        assertEquals(emptyList(), mysql.statements)
+        val pg = ModifyDraft(tbl, withFk, Dialect.of(DbKind.POSTGRES))
+        pg.remove(Sel("indexes", 0))
+        assertNull(pg.problem)
+    }
+
     @Test fun addingColumnsGivesThemUniqueNamesAndSelectsTheNewOne() {
         val d = draft()
         d.add("columns"); d.add("columns")

@@ -163,6 +163,38 @@ abstract class TableAlterMySqlBase(private val kind: DbKind) {
         exec("drop table at.keep")
     }
 
+    @Test fun droppingTheAutoIncrementColumnAndReplacingItsPrimaryKeyWorks() {
+        exec("drop table if exists at.pk2", "create table at.pk2(id int not null auto_increment primary key, n int)")
+        val sqlList = statements("pk2") { m -> m.copy(columns = listOf(ColumnModel(null, "uid", "int", true), m.columns[1]), keys = listOf(KeyModel(null, "PRIMARY", true, listOf("uid")))) }
+        assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
+        val m = model("pk2")
+        assertEquals(setOf("uid", "n"), m.columns.map { it.name }.toSet())
+        assertEquals(listOf("uid"), m.keys.single().columns)
+        assertTrue(m.columns.none { it.identity != null })
+        exec("drop table at.pk2")
+    }
+
+    @Test fun changingTheOnlyKeyAnAutoIncrementColumnRestsOnWorks() {
+        exec("drop table if exists at.ak", "create table at.ak(id int not null auto_increment, k int, unique key uk_id (id))")
+        val sqlList = statements("ak") { m -> m.copy(keys = listOf(m.keys.single().copy(columns = listOf("id", "k")))) }
+        assertEquals(1, sqlList.size, sqlList.joinToString("\n"))
+        assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
+        val m = model("ak")
+        assertEquals(listOf("id", "k"), m.keys.single().columns)
+        assertNotNull(m.columns.single { it.name == "id" }.identity)
+        exec("drop table at.ak")
+    }
+
+    @Test fun changingAnIndexAForeignKeyRestsOnWorks() {
+        exec("drop table if exists at.fkx", "create table at.fkx(id int primary key, pid int, index fkx_idx (pid), constraint fkx_fk foreign key (pid) references at.parent(id))")
+        val sqlList = statements("fkx") { m -> m.copy(indexes = m.indexes.map { if (it.name == "fkx_idx") it.copy(columns = it.columns + IndexColumn("id")) else it }) }
+        assertEquals(1, sqlList.size, sqlList.joinToString("\n"))
+        assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
+        assertEquals(listOf("pid", "id"), model("fkx").indexes.single { it.name == "fkx_idx" }.columns.map { it.name })
+        assertEquals(1, model("fkx").foreignKeys.size)
+        exec("drop table at.fkx")
+    }
+
     @Test fun anExpressionIndexOnARenamedColumnIsRecreatedWithTheNewName() {
         assumeTrue("MariaDB has no functional indexes", kind == DbKind.MYSQL)
         exec("drop table if exists at.fi", "create table at.fi(id int primary key, name varchar(20), index fi_lower ((lower(name))))")

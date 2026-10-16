@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ksqlc.core.*
 import ksqlc.drivers.dialect.Dialect
+import ksqlc.drivers.fkIndexProblem
 import ksqlc.drivers.tableProblem
 
 /** The selected node of the Modify tree: [group] is "table", "columns", "keys", "fks", "indexes" or "checks"; [index] is -1 on the table and group rows. */
@@ -21,7 +22,7 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
     var selected by mutableStateOf(Sel("table"))
 
     val caps get() = dialect.modifyCaps
-    val problem: String? get() = tableProblem(model, caps)
+    val problem: String? get() = tableProblem(model, caps) ?: if (caps.fkNeedsIndex) fkIndexProblem(before, model) else null
 
     /** What the preview says before the SQL when applying is not all or nothing. */
     val notice: String? get() = if (caps.atomic) null else "MySQL y MariaDB confirman cada sentencia: si una falla, las anteriores quedan aplicadas."

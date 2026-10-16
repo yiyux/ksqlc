@@ -62,6 +62,16 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
 
     // changing the primary key's columns is one statement: the table may have an auto_increment column that needs it at every moment
     val pkChange = keys.dropped.any { it.primary } && keys.created.any { it.primary }
+    // unless dropping its columns already took it away: then there is nothing left to drop (1091)
+    val pkLeft = keys.dropped.filter { it.primary }.any { k -> k.columns.any { it !in moves.gone } }
+
+    // a key or index that an auto_increment column or a foreign key left as it was rests on cannot go alone (1075, 1553): it is swapped in one statement
+    val autoOld = kept.filter { (a, b) -> a.identity != null && b.identity != null }.map { it.second.name }.toSet()
+    val stayingFks = before.foreignKeys.filter { f -> fkDropped.none { it.name == f.name } }
+    fun swaps(cols: List<String>, name: String, hasNew: Boolean) =
+        hasNew && cols.any { it !in moves.gone } && (cols.firstOrNull() in autoOld || stayingFks.any { f -> cols.take(f.columns.size) == f.columns })
+    val swappedKeys = keys.dropped.filter { !it.primary && swaps(it.columns, it.name, keys.created.any { c -> c.origin == it.name }) }.map { it.name }.toSet()
+    val swappedIndexes = indexes.dropped.filter { swaps(it.columns.map { c -> c.name }, it.name, indexesCreated.any { c -> c.origin == it.name }) }.map { it.name }.toSet()
 
     // 1. what goes away
     fkDropped.forEach { out += alter("drop foreign key ${id(it.name)}") }
@@ -71,8 +81,8 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
         val a = kept.find { it.second === b }?.first
         if (b.identity != null && (a == null || a.identity == null)) out += alter("modify column ${definition(b.copy(identity = null), auto = false)}")
     }
-    keys.dropped.filter { !pkChange || !it.primary }.forEach { out += alter(if (it.primary) "drop primary key" else "drop index ${id(it.name)}") }
-    indexes.dropped.forEach { out += alter("drop index ${id(it.name)}") }
+    keys.dropped.filter { (!pkChange || !it.primary) && it.name !in swappedKeys }.forEach { out += alter(if (it.primary) "drop primary key" else "drop index ${id(it.name)}") }
+    indexes.dropped.filter { it.name !in swappedIndexes }.forEach { out += alter("drop index ${id(it.name)}") }
 
     // 2. columns; `auto_increment` waits until its key exists
     before.columns.filter { b -> after.columns.none { it.origin == b.name } }.forEach { out += alter("drop column ${id(it.name)}") }
@@ -88,14 +98,16 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
     indexes.renamed.forEach { (y, x) -> out += alter("rename index ${id(y.name)} to ${id(x.name)}") }
     for (k in keys.created) {
         val add = if (k.primary) "add primary key (${ids(k.columns)})" else "add constraint ${id(k.name)} unique (${ids(k.columns)})"
-        out += alter(*(if (k.primary && pkChange) arrayOf("drop primary key", add) else arrayOf(add)))
+        val drop = if (k.primary && pkChange && pkLeft) "drop primary key" else if (!k.primary && k.origin in swappedKeys) "drop index ${id(k.origin!!)}" else null
+        out += alter(*listOfNotNull(drop, add).toTypedArray())
     }
     checksCreated.forEach { out += alter("add constraint ${id(it.name)} check (${it.expression})") }
     for (i in indexesCreated) {
         val columns = i.columns.joinToString(", ") { c ->
             (if (c.expression) "(${c.name})" else id(c.name)) + when (c.order) { "DESC" -> " desc"; "ASC" -> " asc"; else -> "" }
         }
-        out += "create ${if (i.unique) "unique " else ""}index ${id(i.name)} using ${i.method} on $q ($columns)"
+        if (i.origin in swappedIndexes) out += alter("drop index ${id(i.origin!!)}", "add ${if (i.unique) "unique " else ""}index ${id(i.name)} using ${i.method} ($columns)")
+        else out += "create ${if (i.unique) "unique " else ""}index ${id(i.name)} using ${i.method} on $q ($columns)"
     }
     for (f in fkCreated) {
         val ref = d.qualified(DbObject(if (f.refNs.catalog == null) o.ns else f.refNs, f.refTable, DbObjectKind.TABLE))

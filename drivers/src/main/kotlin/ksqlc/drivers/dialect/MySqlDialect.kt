@@ -60,7 +60,7 @@ object MySqlDialect : MetaDialect() {
 
     override val modifyCaps = ModifyCaps(
         atomic = false, deferrable = false, indexExtras = false, identityOptions = false, singleIdentity = true,
-        virtualColumns = true, refInCatalog = true, indexMethods = listOf("btree", "hash"),
+        virtualColumns = true, refInCatalog = true, fkNeedsIndex = true, indexMethods = listOf("btree", "hash"),
     )
 
     override fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = mysqlAlterTable(this, o, before, after)

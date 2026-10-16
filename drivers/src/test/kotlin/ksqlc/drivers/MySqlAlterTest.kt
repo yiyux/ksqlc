@@ -37,6 +37,36 @@ class MySqlAlterTest {
         assertEquals(listOf("alter table $q add column `note` varchar(20) not null default 'x' comment 'it''s'"), diff(after))
     }
 
+    @Test fun replacingThePrimaryKeyOfADroppedAutoIncrementColumnDoesNotDropItTwice() {
+        val before = TableModel("t", null, columns = listOf(base.columns[0], base.columns[1]), keys = listOf(base.keys[0]))
+        val after = TableModel("t", null, columns = listOf(ColumnModel(null, "uid", "int", true), base.columns[1]), keys = listOf(KeyModel(null, "PRIMARY", true, listOf("uid"))))
+        // dropping `id` already takes the key with it, so there is no `drop primary key` left to run
+        assertEquals(listOf(
+            "alter table $q modify column `id` bigint not null",
+            "alter table $q drop column `id`",
+            "alter table $q add column `uid` int not null",
+            "alter table $q add primary key (`uid`)",
+        ), diff(after, before))
+    }
+
+    @Test fun aKeyThatAnAutoIncrementColumnRestsOnIsSwappedInOneStatement() {
+        val before = TableModel("t", null, columns = listOf(base.columns[0], col("k")), keys = listOf(KeyModel("uk_id", "uk_id", false, listOf("id"))))
+        val after = before.copy(keys = listOf(before.keys[0].copy(columns = listOf("id", "k"))))
+        assertEquals(listOf("alter table $q drop index `uk_id`, add constraint `uk_id` unique (`id`, `k`)"), diff(after, before))
+    }
+
+    @Test fun anIndexThatAForeignKeyRestsOnIsSwappedInOneStatement() {
+        val fk = ForeignKeyModel("t_fk", "t_fk", listOf("price"), Namespace("app", null), "parent", listOf("id"))
+        val before = base.copy(foreignKeys = listOf(fk))
+        val after = before.copy(indexes = listOf(before.indexes[0].copy(method = "hash", columns = listOf(IndexColumn("price"), IndexColumn("name")))))
+        assertEquals(listOf("alter table $q drop index `t_price_idx`, add index `t_price_idx` using hash (`price`, `name`)"), diff(after, before))
+    }
+
+    @Test fun anIndexNothingRestsOnIsStillDroppedFirstAndCreatedAfter() {
+        val after = base.copy(indexes = listOf(base.indexes[0].copy(method = "hash")))
+        assertEquals(listOf("alter table $q drop index `t_price_idx`", "create index `t_price_idx` using hash on $q (`price`)"), diff(after))
+    }
+
     @Test fun onUpdateWithoutADefaultIsWrittenWithoutTheDefaultKeyword() {
         val after = base.copy(columns = base.columns + ColumnModel(null, "d", "datetime", true, "on update CURRENT_TIMESTAMP"))
         assertEquals(listOf("alter table $q add column `d` datetime not null on update CURRENT_TIMESTAMP"), diff(after))
