@@ -60,7 +60,8 @@ object MySqlDialect : MetaDialect() {
 
     override val modifyCaps = ModifyCaps(
         atomic = false, deferrable = false, indexExtras = false, identityOptions = false, singleIdentity = true,
-        virtualColumns = true, refInCatalog = true, fkNeedsIndex = true, indexMethods = listOf("btree", "hash"),
+        virtualColumns = true, refInCatalog = true, // InnoDB builds a btree whatever is asked and refuses SET DEFAULT
+        fkNeedsIndex = true, indexMethods = listOf("btree"), fkActions = listOf("NO ACTION", "RESTRICT", "CASCADE", "SET NULL"),
     )
 
     override fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = mysqlAlterTable(this, o, before, after)
@@ -134,7 +135,8 @@ object MySqlDialect : MetaDialect() {
             db, o.name,
         ) { CheckModel(it.getString(1), it.getString(1), it.getString(2)) }
 
-        return TableModel(o.name, comment.ifEmpty { null }, columns, keys, foreignKeys, indexes, checks)
+        val skipped = (parts.map { it.index }.distinct() - keys.map { it.name }.toSet() - indexes.map { it.name }.toSet()).sorted()
+        return TableModel(o.name, comment.ifEmpty { null }, columns, keys, foreignKeys, indexes, checks, skipped)
     }
 
     // MariaDB gives literals and expressions both as written, MySQL gives plain text plus a DEFAULT_GENERATED flag; either way the result must paste after `default `.
@@ -144,7 +146,7 @@ object MySqlDialect : MetaDialect() {
 
     private fun defaultText(raw: String?, extra: String, dataType: String, mariaDb: Boolean, nullable: Boolean): String? {
         if (raw == null) return null
-        val ready = Regex("""'.*'|-?\d+(\.\d+)?([eE][-+]?\d+)?|[bBxX]'[01a-fA-F]*'|0[xX][0-9a-fA-F]+|current_timestamp(\(\d*\))?""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        val ready = Regex("""'(?:[^'\\]|\\.|'')*'|-?\d+(\.\d+)?([eE][-+]?\d+)?|[bBxX]'[01a-fA-F]*'|0[xX][0-9a-fA-F]+|current_timestamp(\(\d*\))?""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         if (mariaDb) return when {
             raw.equals("NULL", ignoreCase = true) && nullable -> null
             raw.matches(ready) -> raw

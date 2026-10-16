@@ -20,7 +20,6 @@ import ksqlc.core.*
 
 // Not trimmed: the field is controlled, so trimming would eat the space as it is typed.
 private fun String.orNull() = ifBlank { null }
-private val ACTIONS = listOf("NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT")
 
 /** "Modify" for a table: the tree of its parts on the left, the form of the selected one on the right, the SQL it amounts to below. */
 @Composable
@@ -178,8 +177,8 @@ private fun ModifyForm(draft: ModifyDraft) {
             else MField("Esquema referido:") { FText(f.refNs.schema.orEmpty(), { v -> draft.updateForeignKey(i) { it.copy(refNs = Namespace(null, v.orNull())) } }, "modify-fk-schema") }
             MField("Tabla referida:") { FText(f.refTable, { v -> draft.updateForeignKey(i) { it.copy(refTable = v) } }, "modify-fk-table") }
             MField("Columnas referidas:") { StringListEditor(f.refColumns, { v -> draft.updateForeignKey(i) { it.copy(refColumns = v) } }, null, "modify-fk-refcol") }
-            MField("On delete:") { ChoiceField(f.onDelete, ACTIONS, { v -> draft.updateForeignKey(i) { it.copy(onDelete = v) } }, "modify-fk-delete") }
-            MField("On update:") { ChoiceField(f.onUpdate, ACTIONS, { v -> draft.updateForeignKey(i) { it.copy(onUpdate = v) } }, "modify-fk-update") }
+            MField("On delete:") { ChoiceField(f.onDelete, caps.fkActions, { v -> draft.updateForeignKey(i) { it.copy(onDelete = v) } }, "modify-fk-delete") }
+            MField("On update:") { ChoiceField(f.onUpdate, caps.fkActions, { v -> draft.updateForeignKey(i) { it.copy(onUpdate = v) } }, "modify-fk-update") }
             if (caps.deferrable) MField("") { KCheckbox(f.deferrable, { v -> draft.updateForeignKey(i) { it.copy(deferrable = v, initiallyDeferred = it.initiallyDeferred && v) } }, label = "Diferible", modifier = Modifier.testTag("modify-fk-deferrable")) }
         }
         sel.group == "indexes" && i < m.indexes.size -> {

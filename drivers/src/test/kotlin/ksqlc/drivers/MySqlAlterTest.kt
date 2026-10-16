@@ -37,6 +37,20 @@ class MySqlAlterTest {
         assertEquals(listOf("alter table $q add column `note` varchar(20) not null default 'x' comment 'it''s'"), diff(after))
     }
 
+    @Test fun renamingAColumnLeavesBackticksInsideTheStringLiteralsOfACheckAlone() {
+        val renamed = listOf(base.columns[0], base.columns[1], base.columns[2].copy(name = "cost"))
+        val before = base.copy(checks = listOf(CheckModel("t_s_ck", "t_s_ck", "(`price` <> '`price`')")))
+        val after = before.copy(columns = renamed, indexes = listOf(base.indexes[0].copy(columns = listOf(IndexColumn("cost")))))
+        assertEquals(listOf(
+            "alter table $q drop constraint `t_s_ck`",
+            "alter table $q rename column `price` to `cost`",
+            "alter table $q add constraint `t_s_ck` check ((`cost` <> '`price`'))",
+        ), diff(after, before))
+        // a name only inside a literal is no use of the column: that check is not touched
+        val onlyLiteral = base.copy(indexes = emptyList(), checks = listOf(CheckModel("t_l_ck", "t_l_ck", "(`name` <> '`price`')")))
+        assertEquals(listOf("alter table $q rename column `price` to `cost`"), diff(onlyLiteral.copy(columns = renamed), onlyLiteral))
+    }
+
     @Test fun replacingThePrimaryKeyOfADroppedAutoIncrementColumnDoesNotDropItTwice() {
         val before = TableModel("t", null, columns = listOf(base.columns[0], base.columns[1]), keys = listOf(base.keys[0]))
         val after = TableModel("t", null, columns = listOf(ColumnModel(null, "uid", "int", true), base.columns[1]), keys = listOf(KeyModel(null, "PRIMARY", true, listOf("uid"))))

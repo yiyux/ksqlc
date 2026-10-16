@@ -35,6 +35,21 @@ class ModifyDraftTest {
         assertEquals(listOf("pk"), d.model.keys[0].columns)
     }
 
+    @Test fun mySqlOffersNeitherHashNorSetDefaultAndPostgresKeepsBoth() {
+        val my = ModifyDraft(tbl, before, Dialect.of(DbKind.MYSQL)).caps
+        assertEquals(listOf("btree"), my.indexMethods)
+        assertFalse("SET DEFAULT" in my.fkActions)
+        assertTrue("NO ACTION" in my.fkActions && "CASCADE" in my.fkActions)
+        val pg = ModifyDraft(tbl, before, Dialect.of(DbKind.POSTGRES)).caps
+        assertTrue("SET DEFAULT" in pg.fkActions && "hash" in pg.indexMethods)
+    }
+
+    @Test fun theNoticeListsWhatTheDialogCannotShow() {
+        val d = ModifyDraft(tbl, before.copy(skipped = listOf("ft_idx", "PRIMARY")), Dialect.of(DbKind.MYSQL))
+        assertTrue(d.notice!!.contains("ft_idx") && d.notice!!.contains("PRIMARY") && d.notice!!.contains("cada sentencia"), d.notice)
+        assertNull(ModifyDraft(tbl, before, Dialect.of(DbKind.POSTGRES)).notice)
+    }
+
     @Test fun removingTheIndexAForeignKeyRestsOnIsAProblemOnMySqlOnly() {
         val fk = ForeignKeyModel("fk", "fk", listOf("name"), Namespace("app", null), "parent", listOf("id"))
         val withFk = before.copy(foreignKeys = listOf(fk))

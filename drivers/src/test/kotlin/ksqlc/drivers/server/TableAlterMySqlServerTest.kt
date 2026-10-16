@@ -213,6 +213,29 @@ abstract class TableAlterMySqlBase(private val kind: DbKind) {
         exec("drop table at.bs")
     }
 
+    @Test fun theStepwisePreludeSurvivesNoBackslashEscapesInTheMiddleOfTheMode() {
+        exec("drop table if exists at.bs2", "create table at.bs2(a int)")
+        val sqlList = statements("bs2") { it.copy(comment = "a\\b") }
+        val r = runStepwise(fx.ds, fx.password, sqlList, listOf("set session sql_mode = 'STRICT_TRANS_TABLES,NO_BACKSLASH_ESCAPES,NO_ENGINE_SUBSTITUTION'") + mySqlPrelude)
+        assertNull(r.error, sqlList.joinToString("\n"))
+        assertEquals("a\\b", model("bs2").comment)          // a comma left behind would make the prelude itself fail
+        exec("drop table at.bs2")
+    }
+
+    @Test fun namesWithBackticksAndQuotedDefaultsSurviveAnEdit() {
+        exec("drop table if exists at.bt", "create table at.bt(id int primary key, `we``ird` varchar(20) default 'it''s a \\\\ x', unique key `u``k` (`we``ird`))")
+        assertEquals(emptyList(), statements("bt") { it })
+        val sqlList = statements("bt") { m -> m.copy(columns = m.columns.map { if (it.name == "we`ird") it.copy(comment = "c") else it }) }
+        assertTrue(sqlList.isNotEmpty())
+        assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
+        val m = model("bt")
+        assertEquals("c", m.columns.single { it.name == "we`ird" }.comment)
+        assertEquals("'it''s a \\\\ x'", m.columns.single { it.name == "we`ird" }.default)      // the same text goes back in
+        assertEquals(listOf("we`ird"), m.keys.single { it.name == "u`k" }.columns)
+        assertEquals(emptyList(), statements("bt") { it })
+        exec("drop table at.bt")
+    }
+
     @Test fun aFailingPreludeStopsBeforeTheStatements() {
         val r = runStepwise(fx.ds, fx.password, listOf("alter table at.t2 add column c9 int"), prelude = listOf("alter table at.nope add column x int"))
         assertEquals(0, r.applied); assertNotNull(r.error)

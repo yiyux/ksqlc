@@ -30,8 +30,10 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
     fun mapped(l: List<String>) = moves.mapped(l)
     // the server updates keys, indexes and foreign keys on a rename but a check keeps its text, so a check that uses a renamed column is written again
     // one pass over the old names, so a swap (a to b, b to c) does not chain
-    val renameRegex = moves.renamed.keys.takeIf { it.isNotEmpty() }?.joinToString("|") { Regex.escape("`$it`") }?.let { Regex(it) }
-    fun renamedIn(e: String) = renameRegex?.replace(e) { "`${moves.renamed.getValue(it.value.trim('`'))}`" } ?: e
+    // a quoted string is matched first and put back as it was, so a name inside a literal is not a use of the column
+    val literal = "'(?:[^'\\\\]|\\\\.|'')*'|\"(?:[^\"\\\\]|\\\\.|\"\")*\""
+    val renameRegex = moves.renamed.keys.takeIf { it.isNotEmpty() }?.joinToString("|") { Regex.escape("`$it`") }?.let { Regex("$literal|$it", RegexOption.DOT_MATCHES_ALL) }
+    fun renamedIn(e: String) = renameRegex?.replace(e) { if (it.value.startsWith("`")) "`${moves.renamed.getValue(it.value.trim('`'))}`" else it.value } ?: e
     fun touched(e: String) = renamedIn(e) != e || moves.mentionsGone(e)
 
     val keys = changes(before.keys, after.keys, { it.origin }, { it.name }) { y, x ->

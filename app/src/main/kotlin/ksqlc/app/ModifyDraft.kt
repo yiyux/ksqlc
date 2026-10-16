@@ -24,8 +24,11 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
     val caps get() = dialect.modifyCaps
     val problem: String? get() = tableProblem(model, caps) ?: if (caps.fkNeedsIndex) fkIndexProblem(before, model) else null
 
-    /** What the preview says before the SQL when applying is not all or nothing. */
-    val notice: String? get() = if (caps.atomic) null else "MySQL y MariaDB confirman cada sentencia: si una falla, las anteriores quedan aplicadas."
+    /** What the preview says before the SQL: that applying is not all or nothing, and what the dialog cannot hold and so leaves alone. */
+    val notice: String? get() = listOfNotNull(
+        if (caps.atomic) null else "MySQL y MariaDB confirman cada sentencia: si una falla, las anteriores quedan aplicadas.",
+        before.skipped.takeIf { it.isNotEmpty() }?.let { "Fuera de este diálogo y sin tocar: ${it.joinToString(", ")}." },
+    ).takeIf { it.isNotEmpty() }?.joinToString("\n-- ")
 
     /** The SQL OK would run; empty while there is a [problem] or nothing changed. */
     val statements: List<String> get() = if (problem != null) emptyList() else dialect.alterTable(obj, before, model)

@@ -3,6 +3,7 @@ package ksqlc.app
 import androidx.compose.runtime.*
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -810,21 +811,19 @@ class AppState(
         val atomic = d.caps.atomic
         scope.launch {
             val mysql = target.kind == DbKind.MYSQL || target.kind == DbKind.MARIADB
+            // one by one, an exception is the session itself failing: nothing ran, so nothing is recorded
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     if (atomic) ApplyResult(0, runAtomically(target, pw, if (target.kind == DbKind.POSTGRES) listOf("set local lock_timeout = '5s'") + statements else statements))
                     else runStepwise(target, pw, statements, if (mysql) mySqlPrelude else emptyList())
-                }.getOrElse { ApplyResult(0, it.message ?: it.toString()) }
+                }.getOrElse { ApplyResult(0, it.message ?: it.toString(), preludeFailed = !atomic) }
             }
             val error = result.error?.let {
                 if (it.contains("lock timeout", true) || it.contains("Lock wait timeout", true)) "$it\nOtra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla." else it
             }
             val ran = if (atomic) 0 else result.applied
             val now = System.currentTimeMillis()
-            // all or nothing: every statement shares the outcome; one by one: the ones that ran are ok and the one that failed is not
-            // a failed prelude ran none of the statements, so none is recorded as failed
-            if (!result.preludeFailed) record(target.id, if (atomic) statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) }
-                else statements.take(ran).map { HistoryEntry(now, "$it;", 0, ok = true) } + listOfNotNull(error?.let { statements.getOrNull(ran)?.let { s -> HistoryEntry(now, "$s;", 0, ok = false) } }))
+            modifyHistory(statements, atomic, ran, error, result.preludeFailed, now).takeIf { it.isNotEmpty() }?.let { record(target.id, it) }
             val open = modifyDraft === d
             if (error != null) {
                 val partial = if (!atomic && ran > 0) "Se aplicaron $ran de ${statements.size} sentencias; el resto no se ejecutó.\n" else ""
@@ -849,13 +848,18 @@ class AppState(
         val m = explorer ?: run { modifyBusy = false; return }
         modifyBusy = true
         scope.launch {
-            runCatching { withContext(Dispatchers.IO) { m.source.tableModel(d.obj) } }
-                .onSuccess { fresh ->
-                    if (fresh != null && modifyDraft === d) { modifyDraft = ModifyDraft(d.obj, fresh, m.source.dialect); modifyError = error }
-                    else if (modifyDraft === d) { modifyDraft = null; modifyError = null; status = "No se pudo releer ${d.obj.name}" }
-                }
-                .onFailure { if (modifyDraft === d) { modifyDraft = null; modifyError = null }; status = "No se pudo releer ${d.obj.name}: ${it.message}" }
-            modifyBusy = false
+            try {
+                val fresh = withContext(Dispatchers.IO) { m.source.tableModel(d.obj) }
+                if (fresh != null && modifyDraft === d) { modifyDraft = ModifyDraft(d.obj, fresh, m.source.dialect); modifyError = error }
+                else if (modifyDraft === d) { modifyDraft = null; modifyError = null; status = "No se pudo releer ${d.obj.name}" }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (modifyDraft === d) { modifyDraft = null; modifyError = null }
+                status = "No se pudo releer ${d.obj.name}: ${e.message}"
+            } finally {
+                modifyBusy = false      // whatever happened, the dialog must never stay locked
+            }
         }
     }
 
@@ -1079,4 +1083,11 @@ class AppState(
     init { Tunnels.hostKeyDecider = HostKeyDecider(::askHostKey) }
 
     fun dispose() { housekeeping.cancel(); Tunnels.closeAll(); diffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
+}
+
+/** What the history gets for one Modify apply: every statement shares the outcome when all or nothing, else what ran and the one that failed; nothing if the session failed first. */
+internal fun modifyHistory(statements: List<String>, atomic: Boolean, ran: Int, error: String?, preludeFailed: Boolean, now: Long): List<HistoryEntry> = when {
+    preludeFailed -> emptyList()
+    atomic -> statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) }
+    else -> statements.take(ran).map { HistoryEntry(now, "$it;", 0, ok = true) } + listOfNotNull(error?.let { statements.getOrNull(ran)?.let { s -> HistoryEntry(now, "$s;", 0, ok = false) } })
 }

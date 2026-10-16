@@ -19,4 +19,6 @@ data class ModifyCaps(
     /** A foreign key that stays needs a key or index starting with its columns: the engine refuses to drop the one it rests on. */
     val fkNeedsIndex: Boolean = false,
     val indexMethods: List<String> = listOf("btree", "hash", "gist", "spgist", "gin", "brin"),
+    /** What a foreign key can do on delete and on update. */
+    val fkActions: List<String> = listOf("NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT"),
 )

@@ -32,4 +32,4 @@ fun runStepwise(ds: DataSource, password: String?, statements: List<String>, pre
     }
 
 /** Session settings for a MySQL/MariaDB stepwise apply; the generated text doubles backslashes, which NO_BACKSLASH_ESCAPES would take literally. */
-val mySqlPrelude = listOf("set session lock_wait_timeout = 5", "set session sql_mode = replace(@@sql_mode, 'NO_BACKSLASH_ESCAPES', '')")
+val mySqlPrelude = listOf("set session lock_wait_timeout = 5", "set session sql_mode = trim(both ',' from replace(concat(',', @@sql_mode, ','), ',NO_BACKSLASH_ESCAPES,', ','))")

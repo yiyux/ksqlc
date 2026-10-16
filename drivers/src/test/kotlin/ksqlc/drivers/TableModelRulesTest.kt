@@ -61,6 +61,14 @@ class TableModelRulesTest {
         assertNull(fkIndexProblem(before, renamed))                                                                                // the rename carried the index with it
     }
 
+    @Test fun theAutoIncrementLeadRuleIgnoresCaseAndNeedsARealColumnNotAnExpression() {
+        val caps = ModifyCaps(singleIdentity = true)
+        val id = ColumnModel("a", "a", "int", true, identity = Identity())
+        assertNull(tableProblem(TableModel("t", null, columns = listOf(id), keys = listOf(KeyModel("PRIMARY", "PRIMARY", true, listOf("A")))), caps))
+        val viaExpression = TableModel("t", null, columns = listOf(id), indexes = listOf(IndexModel(null, "i", false, "btree", listOf(IndexColumn("a", expression = true)))))
+        assertTrue(tableProblem(viaExpression, caps)!!.contains("auto_increment"))
+    }
+
     @Test fun withASingleIdentityThereCanBeOnlyOneAndItMustLeadAKey() {
         val caps = ModifyCaps(singleIdentity = true)
         val id = ColumnModel("a", "a", "int", true, identity = Identity())

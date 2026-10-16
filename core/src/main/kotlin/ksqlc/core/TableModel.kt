@@ -9,6 +9,8 @@ data class TableModel(
     val foreignKeys: List<ForeignKeyModel> = emptyList(),
     val indexes: List<IndexModel> = emptyList(),
     val checks: List<CheckModel> = emptyList(),
+    /** Names of keys and indexes the engine has but this model cannot hold, so the dialog neither shows nor touches them. */
+    val skipped: List<String> = emptyList(),
 )
 
 /** Sequence options of an identity column; a null option is the server's default. */

@@ -39,6 +39,8 @@ private val SETUP = listOf(
          nn datetime not null on update current_timestamp,
          c varchar(10) character set utf8mb4 collate utf8mb4_bin, d varchar(10)) default charset utf8mb4 collate utf8mb4_general_ci""",
     "create table mt.skipped(a int, b varchar(50), c text, primary key (a), index pre_idx (b(10)), fulltext index ft_idx (c))",
+    "create table mt.pkp(b varchar(100) not null, primary key (b(10)))",
+    "create table mt.eqd(eq int default ('a' = 'b'))",
 )
 
 /** Same expectations for MySQL and MariaDB: both go through [ksqlc.drivers.dialect.MySqlDialect]. */
@@ -104,6 +106,18 @@ abstract class TableModelMySqlBase {
     @Test fun prefixAndFulltextIndexesAreLeftOut() = model("skipped").let { m ->
         assertEquals(emptyList(), m.indexes.map { it.name })
         assertEquals(listOf("PRIMARY"), m.keys.map { it.name })
+        assertEquals(listOf("ft_idx", "pre_idx"), m.skipped)       // said, not hidden: the dialog lists them
+    }
+
+    @Test fun aPrimaryKeyWithAPrefixPartIsSaidToBeLeftOutNotLost() = model("pkp").let { m ->
+        assertEquals(emptyList(), m.keys.map { it.name })
+        assertEquals(listOf("PRIMARY"), m.skipped)
+        assertEquals(emptyList(), model("t").skipped)
+    }
+
+    @Test fun anExpressionDefaultThatLooksLikeAQuotedLiteralStillGetsItsParentheses() {
+        val d = model("eqd").columns.single().default!!
+        assertTrue(d.startsWith("(") && d.endsWith(")"), d)        // `'a' = 'b'` starts and ends with a quote but is not one literal
     }
 
     @Test fun aMissingTableIsAnError() {
