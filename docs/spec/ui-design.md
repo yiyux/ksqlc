@@ -134,7 +134,8 @@ Isla del editor: y 43–484. Isla Services: y 490–968 (hueco de 5 dp). Ambas c
 | Consola: pestaña píldora, barra de acciones, gutter 63 dp, línea actual, guía en col. 120, contorno y tiempo de la sentencia | ✅ |
 | Services: cabecera, árbol lateral, pestañas Output/resultados cerrables | ✅ (árbol de 240 dp; la referencia usaba 413 dp) |
 | Grid: cabecera 26, filas 27, columnas 112, líneas `#323438`, selección de celda, ⌘C, píldora de filas | ✅ |
-| Diálogo Data Sources (lista, cabecera, pestaña General, Motor, tipo de conexión segmentado, host/puerto, usuario, contraseña, BD, SSL, URL, enlace «Probar conexión», Cancelar/Aplicar/OK) | ✅ sigue la disposición observada; **sin** pestañas Options/SSH/Schemas/Advanced, Color, Add comment, Save as Template ni «Save: Forever» (funciones que ksqlc no tiene) |
+| Diálogo Data Sources (lista, cabecera, pestaña General, Motor, tipo de conexión segmentado, host/puerto, usuario, contraseña, BD, SSL, URL, enlace «Probar conexión», Cancelar/Aplicar/OK) | ✅ sigue la disposición observada; pestañas **General**, **Opciones**, **SSH/SSL** y **Esquemas** (sin Advanced); en General, «Carpeta» (texto, un nivel) y «Color» (siete círculos de 20 dp y «ninguno») que se guardan con la conexión; **sin** Add comment, Save as Template ni «Save: Forever» (funciones que ksqlc no tiene) |
+| Explorador: conexiones | ✅ las carpetas van primero por nombre (se pliegan con un clic) y después las conexiones sin carpeta; el color tiñe el icono de la conexión en el explorador, en la barra superior y en la lista del diálogo. Menú contextual de una rutina: «Ejecutar…»; de una tabla: «Modificar…», «Vaciar tabla…» y «Eliminar…» (con la sentencia en un diálogo de confirmación). El menú contextual usa los colores del tema de la app, no los del sistema |
 | Tema oscuro | ✅ medido |
 | Tema claro | ✅ medido (cadena, número y comentario siguen sin observar) |
 | Colores de cadena, comentario e identificador | ⚠️ valores habituales de IDE, no observados (aún no hay una consola de muestra con cadenas y comentarios) |
@@ -183,6 +184,7 @@ Todos son diálogos sobre la ventana (`ModalOverlay`, como el de DDL); ninguno a
 | Importar CSV | 780×600 | archivo, separador, «primera fila es cabecera», vista previa de 6 filas y un desplegable por columna del archivo hacia columna de la tabla o «(omitir)» |
 | Dump / Restaurar | 640×440 / 360 | ámbito (tabla, esquema, base), ruta de la herramienta (detectada, editable, recordada), archivo, opciones; la salida va a Output |
 | Comparar esquemas | 1180×760 | origen izquierdo fijo y derecho elegible (cualquier data source guardado), lista de objetos con `−` `+` `≠` `=`, DDL en dos columnas con números de línea y ajuste de línea |
+| Modificar tabla (menú de una tabla de PostgreSQL) | 920×720 | árbol a la izquierda (290 dp: tabla, columnas, claves, claves foráneas, índices, checks, con `+` `−` duplicar), formulario del nodo elegido a la derecha (nombre, comentario, tipo, not null, valor por defecto, identity…; claves, índices y FK con su lista de columnas con subir/bajar) y abajo «Vista previa» (monoespaciada, 150 dp) con el SQL, o el motivo si el modelo no es válido; Cancelar / OK (OK desactivado sin cambios, con un problema o mientras se aplica) |
 
 Colores provisionales de la comparación (no observados en DataGrip):
 
@@ -192,7 +194,7 @@ Colores provisionales de la comparación (no observados en DataGrip):
 | `diffRemoved` | `#4A2327` | `#FBDDE0` | línea solo en el lado izquierdo |
 | `diffChanged` | `#3A3A24` | `#FCF3CC` | línea distinta en los dos lados |
 
-Capturas en `app/build/snapshots/` (`history-*`, `export-*`, `import-*`, `dump-*`, `diff-*`).
+Capturas en `app/build/snapshots/` (`history-*`, `export-*`, `import-*`, `dump-*`, `diff-*`). El diálogo de modificar tabla no tiene captura: solo lo cubren las pruebas de interfaz.
 
 
 ## Tooltips
