@@ -65,6 +65,17 @@ xerj autoindex map                    # ver qué se indexó
 
 Detecta el tipo de cada archivo y crea un índice por conjunto de datos; el código se analiza con tree-sitter, así que se conservan símbolos y números de línea. Es incremental (los archivos idénticos se saltan), por lo que se puede repetir tras cambios grandes. Es necesario para que `xerj def` y `xerj search` devuelvan algo.
 
+**Qué se indexa.** El `.xerjignore` de la raíz (sintaxis de `.gitignore`, solo para XERJ) deja pasar únicamente el código fuente (`<módulo>/src/`), la documentación (`docs/`, `AGENTS.md`) y los scripts de Gradle. Quedan fuera `*/bin/` (copias del IDE que están versionadas en git y que `xerj search` devolvía antes que `src/`), `build/` y `gradle/`. La salida de `autoindex` dice qué descartó y por qué regla.
+
+**Si cambias el `.xerjignore`** hay que reconstruir el índice: con el grafo activado XERJ no quita los archivos que ya indexó y `--fresh` no borra registros viejos. Se reconstruye así, sin tocar las memorias (`.xerj-memory-ksqlc`):
+
+```
+curl -X DELETE localhost:9200/ax-docs
+curl -X DELETE localhost:9200/.xerj-memory-ksqlc-edges
+rm -rf ~/.xerj/autoindex/<hash>        # el directorio que muestra `xerj autoindex status`
+xerj autoindex /ruta/a/ksqlc
+```
+
 ## Uso (reglas de `AGENTS.md`)
 
 - **Buscar código:** antes de tocar código poco conocido, `xerj def "<símbolo>"` (definición con `archivo:línea` y firma) o `xerj search "<palabras>"` (pasajes ordenados con `archivo:línea`). Citar `archivo:línea` de lo que se use. `xerj gain` muestra lo que XERJ ha ahorrado.

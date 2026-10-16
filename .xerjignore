@@ -1,0 +1,10 @@
+# XERJ indexa solo el código fuente y la documentación.
+# Fuera: bin/ del IDE (versionado en git), build/, wrapper de Gradle y scripts.
+/*
+!/*/
+/*/*
+!/*/src/
+!/*/build.gradle.kts
+!/docs/**
+!/AGENTS.md
+!/*.gradle.kts
