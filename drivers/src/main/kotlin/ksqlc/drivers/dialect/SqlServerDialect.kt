@@ -150,6 +150,8 @@ object SqlServerDialect : MetaDialect() {
         )
     }
 
+    override fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = sqlServerAlterTable(this, o, before, after)
+
     override fun tableModel(conn: Connection, o: DbObject): TableModel {
         val (temporal, inMemory, comment) = conn.query(
             """select t.temporal_type, t.is_memory_optimized, cast(ep.value as nvarchar(4000))
