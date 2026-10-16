@@ -1,6 +1,6 @@
 # Modificar una tabla (diálogo «Modify»)
 
-Fecha: 2026-10-15 · Estado: pendiente de revisión
+Fecha: 2026-10-15 · Estado: implementado
 
 ## Objetivo
 
