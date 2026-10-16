@@ -14,6 +14,7 @@ import ksqlc.drivers.DumpScope
 import ksqlc.drivers.destructiveChanges
 import ksqlc.drivers.ApplyResult
 import ksqlc.drivers.runAtomically
+import ksqlc.drivers.mySqlPrelude
 import ksqlc.drivers.runStepwise
 import ksqlc.drivers.Introspector
 import ksqlc.drivers.JdbcUrl
@@ -812,7 +813,7 @@ class AppState(
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     if (atomic) ApplyResult(0, runAtomically(target, pw, if (target.kind == DbKind.POSTGRES) listOf("set local lock_timeout = '5s'") + statements else statements))
-                    else runStepwise(target, pw, statements, if (mysql) listOf("set session lock_wait_timeout = 5") else emptyList())
+                    else runStepwise(target, pw, statements, if (mysql) mySqlPrelude else emptyList())
                 }.getOrElse { ApplyResult(0, it.message ?: it.toString()) }
             }
             val error = result.error?.let {
@@ -821,16 +822,21 @@ class AppState(
             val ran = if (atomic) 0 else result.applied
             val now = System.currentTimeMillis()
             // all or nothing: every statement shares the outcome; one by one: the ones that ran are ok and the one that failed is not
-            record(target.id, if (atomic) statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) }
+            // a failed prelude ran none of the statements, so none is recorded as failed
+            if (!result.preludeFailed) record(target.id, if (atomic) statements.map { HistoryEntry(now, "$it;", 0, ok = error == null) }
                 else statements.take(ran).map { HistoryEntry(now, "$it;", 0, ok = true) } + listOfNotNull(error?.let { statements.getOrNull(ran)?.let { s -> HistoryEntry(now, "$s;", 0, ok = false) } }))
-            modifyBusy = false
             val open = modifyDraft === d
             if (error != null) {
                 val partial = if (!atomic && ran > 0) "Se aplicaron $ran de ${statements.size} sentencias; el resto no se ejecutó.\n" else ""
                 if (open) modifyError = partial + error else status = "No se pudo modificar la tabla: $partial$error"
-                if (!atomic && ran > 0) { refreshExplorer(); if (open) reloadModify(partial + error) }
+                if (!atomic && ran > 0) {
+                    refreshExplorer()
+                    // busy stays on until the draft is fresh, so the stale one cannot be applied again
+                    if (open) reloadModify(partial + error) else modifyBusy = false
+                } else modifyBusy = false
                 return@launch
             }
+            modifyBusy = false
             if (open) closeModify()
             status = "Tabla modificada"
             refreshExplorer()
@@ -839,12 +845,17 @@ class AppState(
 
     /** After a partial apply the dialog starts again from what the server has now, keeping the error on screen. */
     fun reloadModify(error: String? = null) {
-        val d = modifyDraft ?: return
-        val m = explorer ?: return
+        val d = modifyDraft ?: run { modifyBusy = false; return }
+        val m = explorer ?: run { modifyBusy = false; return }
+        modifyBusy = true
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { m.source.tableModel(d.obj) } }
-                .onSuccess { fresh -> if (fresh != null && modifyDraft === d) { modifyDraft = ModifyDraft(d.obj, fresh, m.source.dialect); modifyError = error } }
-                .onFailure { status = "No se pudo releer ${d.obj.name}: ${it.message}" }
+                .onSuccess { fresh ->
+                    if (fresh != null && modifyDraft === d) { modifyDraft = ModifyDraft(d.obj, fresh, m.source.dialect); modifyError = error }
+                    else if (modifyDraft === d) { modifyDraft = null; modifyError = null; status = "No se pudo releer ${d.obj.name}" }
+                }
+                .onFailure { if (modifyDraft === d) { modifyDraft = null; modifyError = null }; status = "No se pudo releer ${d.obj.name}: ${it.message}" }
+            modifyBusy = false
         }
     }
 

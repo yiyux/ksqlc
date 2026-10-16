@@ -68,19 +68,24 @@ object MySqlDialect : MetaDialect() {
     override fun tableModel(conn: Connection, o: DbObject): TableModel {
         val db = o.ns.catalog
         val mariaDb = conn.metaData.databaseProductVersion.contains("MariaDB", ignoreCase = true)
-        val comment = conn.query("select table_comment from information_schema.tables where table_schema = ? and table_name = ?", db, o.name) { it.getString(1) }
+        val (comment, tableCollation) = conn.query("select table_comment, table_collation from information_schema.tables where table_schema = ? and table_name = ?", db, o.name) { it.getString(1) to it.getString(2) }
             .firstOrNull() ?: error("${o.name} no existe")
 
         val columns = conn.query(
-            """select column_name, column_type, is_nullable, column_default, extra, generation_expression, column_comment, data_type
+            """select column_name, column_type, is_nullable, column_default, extra, generation_expression, column_comment, data_type, collation_name
                from information_schema.columns where table_schema = ? and table_name = ? order by ordinal_position""",
             db, o.name,
         ) { rs ->
-            val extra = rs.getString(5).orEmpty().lowercase()
+            val rawExtra = rs.getString(5).orEmpty()
+            val extra = rawExtra.lowercase()
             val generated = "generated" in extra && "default_generated" !in extra
+            // a modify column rewrites the whole definition, so what the server keeps beside the type has to travel in the text
+            val collation = rs.getString(9)?.takeIf { it != tableCollation }
+            val onUpdate = Regex("""on update\s+\S+""", RegexOption.IGNORE_CASE).find(rawExtra)?.value
+            val default = if (generated) null else defaultText(rs.getString(4), extra, rs.getString(8), mariaDb, rs.getString(3) == "YES")
             ColumnModel(
-                rs.getString(1), rs.getString(1), columnType(rs.getString(2), mariaDb), rs.getString(3) == "NO",
-                if (generated) null else defaultText(rs.getString(4), extra, rs.getString(8), mariaDb, rs.getString(3) == "YES"),
+                rs.getString(1), rs.getString(1), columnType(rs.getString(2), mariaDb) + (collation?.let { " collate $it" } ?: ""), rs.getString(3) == "NO",
+                if (onUpdate != null && !generated) "${default ?: "NULL"} $onUpdate" else default,
                 rs.getString(7)?.ifEmpty { null },
                 if ("auto_increment" in extra) Identity() else null,
                 if (generated) rs.getString(6) else null,

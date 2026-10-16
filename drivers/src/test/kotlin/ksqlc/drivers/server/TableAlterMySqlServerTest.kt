@@ -3,7 +3,10 @@ package ksqlc.drivers.server
 import ksqlc.core.*
 import ksqlc.drivers.Introspector
 import ksqlc.drivers.dialect.Dialect
+import ksqlc.drivers.mySqlPrelude
+import ksqlc.drivers.openConnection
 import ksqlc.drivers.runStepwise
+import org.junit.Assume.assumeTrue
 import org.junit.AfterClass
 import org.junit.BeforeClass
 import org.testcontainers.mariadb.MariaDBContainer
@@ -114,6 +117,67 @@ abstract class TableAlterMySqlBase(private val kind: DbKind) {
             assertNull(runStepwise(fx.ds, fx.password, sqlList).error)
             assertEquals(listOf("a", "b"), model("t3").columns.map { it.name })
         } finally { runStepwise(fx.ds, fx.password, listOf("drop table if exists at.t3")) }
+    }
+
+    private fun exec(vararg sql: String) { assertNull(runStepwise(fx.ds, fx.password, sql.toList()).error, sql.joinToString("\n")) }
+    private fun scalar(sql: String): String? = openConnection(fx.ds, fx.password).use { c ->
+        c.createStatement().executeQuery(sql).use { rs -> if (rs.next()) rs.getString(1) else null }
+    }
+
+    @Test fun droppingAutoIncrementTogetherWithThePrimaryKeyWorks() {
+        exec("drop table if exists at.ai", "create table at.ai(id int not null auto_increment, g int, primary key (id))")
+        val sqlList = statements("ai") { m -> m.copy(columns = listOf(m.columns[0].copy(identity = null), m.columns[1]), keys = emptyList()) }
+        assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
+        val m = model("ai")
+        assertNull(m.columns[0].identity); assertEquals(emptyList(), m.keys)
+        exec("drop table at.ai")
+    }
+
+    @Test fun deletingTheAutoIncrementColumnTogetherWithItsPrimaryKeyWorks() {
+        exec("drop table if exists at.ai2", "create table at.ai2(id int not null auto_increment, g int, primary key (id))")
+        val sqlList = statements("ai2") { m -> m.copy(columns = m.columns.drop(1), keys = emptyList()) }
+        assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
+        assertEquals(listOf("g"), model("ai2").columns.map { it.name })
+        exec("drop table at.ai2")
+    }
+
+    @Test fun aCommentOnlyEditKeepsOnUpdateAndTheColumnsOwnCollation() {
+        exec(
+            "drop table if exists at.keep",
+            """create table at.keep(id int primary key,
+                 upd timestamp not null default current_timestamp on update current_timestamp,
+                 upd6 timestamp(6) not null default current_timestamp(6) on update current_timestamp(6),
+                 onlyupd timestamp null on update current_timestamp,
+                 c varchar(10) character set utf8mb4 collate utf8mb4_bin, unique key keep_c (c)) default charset utf8mb4 collate utf8mb4_general_ci""",
+            "insert into at.keep(id, c) values (1, 'a'), (2, 'A')",
+        )
+        assertEquals(emptyList(), statements("keep") { it })
+        val sqlList = statements("keep") { m -> m.copy(columns = m.columns.map { if (it.name == "id") it else it.copy(comment = "c") }) }
+        assertTrue(sqlList.isNotEmpty())
+        assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
+        fun extra(c: String) = scalar("select lower(extra) from information_schema.columns where table_schema = 'at' and table_name = 'keep' and column_name = '$c'")!!
+        for (c in listOf("upd", "upd6", "onlyupd")) assertTrue("on update" in extra(c), "$c: ${extra(c)}")
+        assertEquals("utf8mb4_bin", scalar("select collation_name from information_schema.columns where table_schema = 'at' and table_name = 'keep' and column_name = 'c'"))
+        assertEquals(emptyList(), statements("keep") { it })
+        exec("drop table at.keep")
+    }
+
+    @Test fun anExpressionIndexOnARenamedColumnIsRecreatedWithTheNewName() {
+        assumeTrue("MariaDB has no functional indexes", kind == DbKind.MYSQL)
+        exec("drop table if exists at.fi", "create table at.fi(id int primary key, name varchar(20), index fi_lower ((lower(name))))")
+        val sqlList = statements("fi") { m -> m.copy(columns = m.columns.map { if (it.name == "name") it.copy(name = "title") else it }) }
+        assertNull(runStepwise(fx.ds, fx.password, sqlList).error, sqlList.joinToString("\n"))
+        assertTrue(model("fi").indexes.single().columns.single().name.contains("title"))
+        exec("drop table at.fi")
+    }
+
+    @Test fun theStepwisePreludeSurvivesNoBackslashEscapes() {
+        exec("drop table if exists at.bs", "create table at.bs(a int)")
+        val sqlList = statements("bs") { it.copy(comment = "a\\b") }
+        val r = runStepwise(fx.ds, fx.password, sqlList, listOf("set session sql_mode = concat(@@sql_mode, ',NO_BACKSLASH_ESCAPES')") + mySqlPrelude)
+        assertNull(r.error, sqlList.joinToString("\n"))
+        assertEquals("a\\b", model("bs").comment)
+        exec("drop table at.bs")
     }
 
     @Test fun aFailingPreludeStopsBeforeTheStatements() {

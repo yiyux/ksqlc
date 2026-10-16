@@ -30,19 +30,21 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class ModifyMySqlUiTest {
     companion object {
-        private var pg: MySQLContainer? = null
+        private var mysql: MySQLContainer? = null
 
         @BeforeClass @JvmStatic fun start() {
             assumeTrue("Docker no disponible", runCatching { DockerClientFactory.instance().isDockerAvailable }.getOrDefault(false))
-            pg = MySQLContainer("mysql:8.4").also { it.start() }
-            java.sql.DriverManager.getConnection(pg!!.jdbcUrl, "root", pg!!.password).use { c ->
+            mysql = MySQLContainer("mysql:8.4").also { it.start() }
+            java.sql.DriverManager.getConnection(mysql!!.jdbcUrl, "root", mysql!!.password).use { c ->
                 c.createStatement().execute("create database ui")
-                c.createStatement().execute("create table ui.mt(id int not null auto_increment primary key, name varchar(40))")
-                c.createStatement().execute("insert into ui.mt(name) values ('a')")
+                for (t in listOf("t1", "t2")) {   // one table per test, so they do not depend on each other
+                    c.createStatement().execute("create table ui.$t(id int not null auto_increment primary key, name varchar(40))")
+                    c.createStatement().execute("insert into ui.$t(name) values ('a')")
+                }
             }
         }
 
-        @AfterClass @JvmStatic fun stop() { pg?.stop() }
+        @AfterClass @JvmStatic fun stop() { mysql?.stop() }
     }
 
     @get:Rule val rule = createComposeRule()
@@ -63,23 +65,23 @@ class ModifyMySqlUiTest {
     }
     private fun exists(tag: String) = rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
     private fun frames() = repeat(3) { rule.mainClock.advanceTimeByFrame() }
-    private fun columns() = java.sql.DriverManager.getConnection(pg!!.jdbcUrl, "root", pg!!.password).use { c ->
-        c.createStatement().executeQuery("select column_name from information_schema.columns where table_schema = 'ui' and table_name = 'mt' order by ordinal_position")
+    private fun columns(table: String) = java.sql.DriverManager.getConnection(mysql!!.jdbcUrl, "root", mysql!!.password).use { c ->
+        c.createStatement().executeQuery("select column_name from information_schema.columns where table_schema = 'ui' and table_name = '$table' order by ordinal_position")
             .use { rs -> buildList { while (rs.next()) add(rs.getString(1)) } }
     }
 
-    private fun open() {
+    private fun open(table: String) {
         rule.setContent { App(state) }
         val f = state.form
-        f.kind = DbKind.MYSQL; f.host = pg!!.host; f.portText = pg!!.firstMappedPort.toString(); f.database = "ui"; f.user = "root"; f.password = pg!!.password
+        f.kind = DbKind.MYSQL; f.host = mysql!!.host; f.portText = mysql!!.firstMappedPort.toString(); f.database = "ui"; f.user = "root"; f.password = mysql!!.password
         state.connect()
         until { state.explorer != null }
-        state.openModify(DbObject(Namespace("ui", null), "mt", DbObjectKind.TABLE))
+        state.openModify(DbObject(Namespace("ui", null), table, DbObjectKind.TABLE))
         until { exists("modify-dialog") }
     }
 
     @Test fun theDialogShowsTheNoticeHidesPostgresFieldsAndApplies() {
-        open()
+        open("t1")
         rule.onNodeWithTag("modify:keys:0").performClick(); frames()
         assertFalse(exists("modify-key-deferrable"))               // MySQL has no deferrable keys
         rule.onNodeWithTag("modify:columns:1").performClick(); frames()
@@ -88,11 +90,11 @@ class ModifyMySqlUiTest {
         rule.onNodeWithTag("modify-preview").assertTextContains("rename column `name` to `nombre`", substring = true)
         rule.onNodeWithTag("modify-ok").assertIsEnabled().performClick()
         until { state.modifyDraft == null }
-        assertEquals(listOf("id", "nombre"), columns())
+        assertEquals(listOf("id", "nombre"), columns("t1"))
     }
 
     @Test fun aFailureInTheMiddleReloadsTheDialogWithTheErrorAndWhatWasApplied() {
-        open()
+        open("t2")
         rule.onNodeWithTag("modify:columns:-1").performClick(); frames()
         rule.onNodeWithTag("modify-add").performClick(); frames()           // adds a column: statement 1
         rule.onNodeWithTag("modify:checks:-1").performClick(); frames()

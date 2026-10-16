@@ -32,6 +32,11 @@ private val SETUP = listOf(
          constraint t_price_ck check (price >= 0)
        ) comment = 'hola'""",
     "create table mt.zf(z int(5) unsigned zerofill, w int(7))",
+    """create table mt.keep(id int primary key,
+         upd timestamp not null default current_timestamp on update current_timestamp,
+         upd6 timestamp(6) not null default current_timestamp(6) on update current_timestamp(6),
+         onlyupd timestamp null on update current_timestamp,
+         c varchar(10) character set utf8mb4 collate utf8mb4_bin, d varchar(10)) default charset utf8mb4 collate utf8mb4_general_ci""",
     "create table mt.skipped(a int, b varchar(50), c text, primary key (a), index pre_idx (b(10)), fulltext index ft_idx (c))",
 )
 
@@ -82,6 +87,15 @@ abstract class TableModelMySqlBase {
         val z = m.columns[0].type
         assertTrue(z.contains("(5)") && z.contains("zerofill"), z)   // the width is the padding
         assertEquals("int", m.columns[1].type)
+    }
+
+    @Test fun onUpdateAndACollationDifferentFromTheTablesAreKept() = model("keep").let { m ->
+        fun d(c: String) = m.columns.single { it.name == c }.default!!.lowercase().replace("()", "")   // MariaDB spells current_timestamp()
+        assertEquals("current_timestamp on update current_timestamp", d("upd"))
+        assertEquals("current_timestamp(6) on update current_timestamp(6)", d("upd6"))
+        assertTrue(d("onlyupd").endsWith("on update current_timestamp"), d("onlyupd"))
+        assertTrue(m.columns.single { it.name == "c" }.type.contains("collate utf8mb4_bin"), m.columns.single { it.name == "c" }.type)
+        assertEquals("varchar(10)", m.columns.single { it.name == "d" }.type)
     }
 
     @Test fun prefixAndFulltextIndexesAreLeftOut() = model("skipped").let { m ->

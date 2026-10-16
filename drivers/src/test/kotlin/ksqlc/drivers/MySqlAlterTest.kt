@@ -145,4 +145,44 @@ class MySqlAlterTest {
             "alter table $q add constraint `t_cost_ck` check ((`price` > 0))",
         ), diff(after))
     }
+
+    @Test fun autoIncrementGoesAwayBeforeItsKeyIsDropped() {
+        val unticked = base.copy(columns = listOf(base.columns[0].copy(identity = null)) + base.columns.drop(1), keys = listOf(base.keys[1]))
+        assertEquals(listOf(
+            "alter table $q modify column `id` bigint not null",
+            "alter table $q drop primary key",
+        ), diff(unticked))
+        // the column is deleted together with its key
+        val deleted = base.copy(columns = base.columns.drop(1), keys = listOf(base.keys[1]))
+        assertEquals(listOf(
+            "alter table $q modify column `id` bigint not null",
+            "alter table $q drop primary key",
+            "alter table $q drop column `id`",
+        ), diff(deleted))
+        // unticked and renamed: the old name is the one the table has at that point
+        val renamed = base.copy(columns = listOf(base.columns[0].copy(identity = null, name = "uid")) + base.columns.drop(1), keys = listOf(base.keys[0].copy(columns = listOf("uid")), base.keys[1]))
+        assertEquals(listOf(
+            "alter table $q modify column `id` bigint not null",
+            "alter table $q rename column `id` to `uid`",
+        ), diff(renamed))
+    }
+
+    @Test fun functionalIndexOnARenamedColumnIsRecreatedWithTheNewName() {
+        val ix = IndexModel("t_lower", "t_lower", false, "btree", listOf(IndexColumn("lower(`name`)", expression = true)))
+        val before = base.copy(indexes = listOf(ix))
+        val after = base.copy(columns = listOf(base.columns[0], base.columns[1].copy(name = "title"), base.columns[2]), indexes = listOf(ix.copy(columns = listOf(IndexColumn("lower(`name`)", expression = true)))), keys = listOf(base.keys[0], base.keys[1].copy(columns = listOf("title"))))
+        assertEquals(listOf(
+            "alter table $q drop index `t_lower`",
+            "alter table $q rename column `name` to `title`",
+            "create index `t_lower` using btree on $q ((lower(`title`)))",
+        ), diff(after, before))
+    }
+
+    @Test fun renamesAreAppliedInOnePassSoASwapDoesNotChain() {
+        val ck = CheckModel("t_ck", "t_ck", "(`price` > `id`)")
+        val before = base.copy(checks = listOf(ck))
+        val after = before.copy(columns = listOf(base.columns[0].copy(name = "price"), base.columns[1], base.columns[2].copy(name = "cost")))
+        val create = diff(after, before).single { "add constraint" in it }
+        assertEquals("alter table $q add constraint `t_ck` check ((`cost` > `price`))", create)
+    }
 }

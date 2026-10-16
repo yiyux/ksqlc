@@ -28,7 +28,9 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
     val kept = moves.kept
     fun mapped(l: List<String>) = moves.mapped(l)
     // the server updates keys, indexes and foreign keys on a rename but a check keeps its text, so a check that uses a renamed column is written again
-    fun renamedIn(e: String) = moves.renamed.entries.fold(e) { s, (old, new) -> s.replace("`$old`", "`$new`") }
+    // one pass over the old names, so a swap (a to b, b to c) does not chain
+    val renameRegex = moves.renamed.keys.takeIf { it.isNotEmpty() }?.joinToString("|") { Regex.escape("`$it`") }?.let { Regex(it) }
+    fun renamedIn(e: String) = renameRegex?.replace(e) { "`${moves.renamed.getValue(it.value.trim('`'))}`" } ?: e
     fun touched(e: String) = renamedIn(e) != e || moves.mentionsGone(e)
 
     val keys = changes(before.keys, after.keys, { it.origin }, { it.name }) { y, x ->
@@ -48,8 +50,13 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
     }
     val indexes = changes(before.indexes, after.indexes, { it.origin }, { it.name }) { y, x ->
         val columns = y.columns.map { if (it.expression) it else it.copy(name = mapped(listOf(it.name)).single()) }
-        y.columns.none { it.expression && moves.mentionsGone(it.name) } &&
+        y.columns.none { it.expression && touched(it.name) } &&
             y.copy(origin = null, name = "", columns = columns) == x.copy(origin = null, name = "")
+    }
+
+    val indexesCreated = indexes.created.map { x ->
+        val y = before.indexes.find { it.name == x.origin }
+        if (y != null && y.columns == x.columns) x.copy(columns = x.columns.map { if (it.expression) it.copy(name = renamedIn(it.name)) else it }) else x
     }
 
     // changing the primary key's columns is one statement: the table may have an auto_increment column that needs it at every moment
@@ -58,6 +65,11 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
     // 1. what goes away
     fkDropped.forEach { out += alter("drop foreign key ${id(it.name)}") }
     checksDropped.forEach { out += alter("drop constraint ${id(it.name)}") }
+    // an auto_increment column needs its key, so it stops being one before any key or index goes (its old name: columns are renamed later)
+    for (b in before.columns) {
+        val a = kept.find { it.second === b }?.first
+        if (b.identity != null && (a == null || a.identity == null)) out += alter("modify column ${definition(b.copy(identity = null), auto = false)}")
+    }
     keys.dropped.filter { !pkChange || !it.primary }.forEach { out += alter(if (it.primary) "drop primary key" else "drop index ${id(it.name)}") }
     indexes.dropped.forEach { out += alter("drop index ${id(it.name)}") }
 
@@ -66,8 +78,7 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
     for ((a, b) in kept) if (a.name != b.name) out += alter("rename column ${id(b.name)} to ${id(a.name)}")
     for (c in after.columns.filter { it.origin == null }) out += alter("add column ${definition(c, auto = false)}")
     for ((a, b) in kept) {
-        val lostAuto = a.identity == null && b.identity != null
-        if (a.generated == null && (a.type != b.type || a.notNull != b.notNull || a.default != b.default || a.comment != b.comment || lostAuto))
+        if (a.generated == null && (a.type != b.type || a.notNull != b.notNull || a.default != b.default || a.comment != b.comment))
             out += alter("modify column ${definition(a, auto = a.identity != null && b.identity != null)}")
     }
 
@@ -79,7 +90,7 @@ internal fun mysqlAlterTable(d: Dialect, o: DbObject, before: TableModel, after:
         out += alter(*(if (k.primary && pkChange) arrayOf("drop primary key", add) else arrayOf(add)))
     }
     checksCreated.forEach { out += alter("add constraint ${id(it.name)} check (${it.expression})") }
-    for (i in indexes.created) {
+    for (i in indexesCreated) {
         val columns = i.columns.joinToString(", ") { c ->
             (if (c.expression) "(${c.name})" else id(c.name)) + when (c.order) { "DESC" -> " desc"; "ASC" -> " asc"; else -> "" }
         }
