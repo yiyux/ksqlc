@@ -20,6 +20,11 @@ private val SETUP = listOf(
          qty int not null default 1,
          total decimal(12,2) generated always as (price * 2) stored,
          label varchar(20) generated always as (concat(name, '!')) virtual,
+         flags bit(1) default b'1',
+         uid varchar(36) default (uuid()),
+         ts timestamp null default current_timestamp,
+         n1 varchar(10) default null,
+         n2 varchar(10) default 'NULL',
          primary key (id),
          unique key t_email_key (email),
          index t_name_idx (name desc, email),
@@ -32,12 +37,11 @@ private val SETUP = listOf(
 /** Same expectations for MySQL and MariaDB: both go through [ksqlc.drivers.dialect.MySqlDialect]. */
 abstract class TableModelMySqlBase {
     protected abstract val fx: ServerFixture
-    private val t get() = DbObject(Namespace("mt", null), "t", DbObjectKind.TABLE)
     private fun model(name: String = "t") = Introspector(fx.ds, fx.password).use { it.tableModel(DbObject(Namespace("mt", null), name, DbObjectKind.TABLE))!! }
 
     @Test fun readsTableAndColumns() = model().let { m ->
         assertEquals("t", m.name); assertEquals("hola", m.comment)
-        assertEquals(listOf("id", "name", "email", "parent_id", "price", "qty", "total", "label"), m.columns.map { it.name })
+        assertEquals(listOf("id", "name", "email", "parent_id", "price", "qty", "total", "label", "flags", "uid", "ts", "n1", "n2"), m.columns.map { it.name })
         assertEquals(m.columns.map { it.name }, m.columns.map { it.origin })
         val id = m.columns[0]
         assertTrue(id.type.startsWith("bigint") && id.type.endsWith("unsigned"), id.type); assertTrue(id.notNull)   // MariaDB keeps the display width: bigint(20) unsigned
@@ -49,6 +53,11 @@ abstract class TableModelMySqlBase {
         assertEquals("0", m.columns[4].default); assertEquals("1", m.columns[5].default)
         assertEquals(true, m.columns[6].generatedStored); assertNotNull(m.columns[6].generated); assertNull(m.columns[6].default)
         assertEquals(false, m.columns[7].generatedStored)
+        assertEquals("b'1'", m.columns[8].default)
+        val uid = m.columns[9].default!!                  // an expression default is pasted after `default `, so it needs its parentheses
+        assertTrue(uid.startsWith("(") && uid.endsWith(")") && uid.contains("uuid()", ignoreCase = true), uid)
+        assertTrue(m.columns[10].default!!.startsWith("current_timestamp", ignoreCase = true), m.columns[10].default)
+        assertNull(m.columns[11].default); assertEquals("'NULL'", m.columns[12].default)
     }
 
     @Test fun readsKeysIndexesForeignKeysAndChecks() = model().let { m ->

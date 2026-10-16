@@ -130,16 +130,18 @@ object MySqlDialect : MetaDialect() {
         return TableModel(o.name, comment.ifEmpty { null }, columns, keys, foreignKeys, indexes, checks)
     }
 
-    /**
-     * The default as SQL text that can go back into a statement. MariaDB already gives it so (`'x'`, `current_timestamp()`, and the word `NULL` for none);
-     * MySQL gives a string without quotes, and an expression default flagged `DEFAULT_GENERATED`.
-     */
+    // MariaDB gives literals and expressions both as written, MySQL gives plain text plus a DEFAULT_GENERATED flag; either way the result must paste after `default `.
     private fun defaultText(raw: String?, extra: String, dataType: String, mariaDb: Boolean, nullable: Boolean): String? {
         if (raw == null) return null
-        if (mariaDb) return if (raw.equals("NULL", ignoreCase = true) && nullable) null else raw
+        val ready = Regex("""'.*'|-?\d+(\.\d+)?([eE][-+]?\d+)?|[bBxX]'[01a-fA-F]*'|0[xX][0-9a-fA-F]+|current_timestamp(\(\d*\))?""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        if (mariaDb) return when {
+            raw.equals("NULL", ignoreCase = true) && nullable -> null
+            raw.matches(ready) -> raw
+            else -> "($raw)"
+        }
         if ("default_generated" in extra) return if (raw.startsWith("CURRENT_TIMESTAMP", ignoreCase = true)) raw else "($raw)"
         val numeric = dataType.lowercase() in setOf("tinyint", "smallint", "mediumint", "int", "bigint", "decimal", "numeric", "float", "double")
-        return if (numeric) raw else "'" + raw.replace("\\", "\\\\").replace("'", "''") + "'"
+        return if (numeric || (dataType.equals("bit", ignoreCase = true) && raw.matches(Regex("""[bB]'[01]*'""")))) raw else "'" + raw.replace("\\", "\\\\").replace("'", "''") + "'"
     }
 
     private fun routineType(conn: Connection, o: DbObject): String =
