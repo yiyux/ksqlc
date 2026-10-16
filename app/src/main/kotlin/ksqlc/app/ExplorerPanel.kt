@@ -205,6 +205,7 @@ private fun LazyListScope.nodeItems(
                     if (node.kind == NodeKind.ROUTINE && supportsRoutineCall(state.form.effectiveKind)) add(ContextMenuItem("Ejecutar…") { state.callRoutine(o) })
                     if (node.kind == NodeKind.TABLE && supportsModifyTable(state.form.effectiveKind) && !state.form.options.readOnly) add(ContextMenuItem("Modificar…") { state.openModify(o) })
                     add(ContextMenuItem("Comparar esquema con…") { state.openDiff(o.ns, o.name) })
+                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Comparar contenido con…") { state.openContentDiff(o) })
                     add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
                     add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
                     if (!state.form.options.readOnly) {

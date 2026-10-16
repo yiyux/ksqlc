@@ -39,7 +39,7 @@ private fun numbered(d: ObjectDiff): List<NumberedLine> {
 }
 
 @Composable
-private fun <T> Chooser(text: String, options: List<T>, label: (T) -> String, tag: String, width: androidx.compose.ui.unit.Dp, onPick: (Int) -> Unit) {
+internal fun <T> Chooser(text: String, options: List<T>, label: (T) -> String, tag: String, width: androidx.compose.ui.unit.Dp, onPick: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box(Modifier.width(width)) {
         DropdownField(text, { open = true }, Modifier.fillMaxWidth().testTag(tag))

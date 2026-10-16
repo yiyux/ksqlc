@@ -91,6 +91,7 @@ fun MainWindow(state: AppState) {
         ImportDialog(state)
         NativeDialog(state)
         DiffDialog(state)
+        ContentDiffDialog(state)
         ConfirmDialog(state)
         ParamDialog(state)
         ObjectSearchDialog(state)

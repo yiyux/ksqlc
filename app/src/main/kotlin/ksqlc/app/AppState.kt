@@ -953,6 +953,21 @@ class AppState(
 
     fun closeDiff() { diffJob?.close(); diffJob = null }
 
+    // --- table content diff --------------------------------------------------------------
+    var contentDiffJob by mutableStateOf<ContentDiffJob?>(null)
+        private set
+
+    /** Opens the row comparison of table [o] of the active connection with a table of any saved connection. */
+    fun openContentDiff(o: DbObject) {
+        val src = explorer?.source ?: run { status = "Conéctate primero"; return }
+        val active = form.toDataSource()
+        val sources = listOf(active) + saved.filter { it.id != active.id }
+        contentDiffJob?.close()
+        contentDiffJob = ContentDiffJob(form.name, o, src, active.id, sources, { storedPassword(it.id) ?: if (it.id == active.id) form.passwordOrNull else null }, scope)
+    }
+
+    fun closeContentDiff() { contentDiffJob?.close(); contentDiffJob = null }
+
     // --- native dump / restore ---------------------------------------------------------
     var nativeJob by mutableStateOf<NativeJob?>(null)
         private set
@@ -1082,7 +1097,7 @@ class AppState(
 
     init { Tunnels.hostKeyDecider = HostKeyDecider(::askHostKey) }
 
-    fun dispose() { housekeeping.cancel(); Tunnels.closeAll(); diffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
+    fun dispose() { housekeeping.cancel(); Tunnels.closeAll(); diffJob?.close(); contentDiffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
 }
 
 /** What the history gets for one Modify apply: every statement shares the outcome when all or nothing, else what ran and the one that failed; nothing if the session failed first. */
