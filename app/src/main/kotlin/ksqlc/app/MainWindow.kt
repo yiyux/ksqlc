@@ -84,7 +84,6 @@ fun MainWindow(state: AppState) {
             AppStatusBar(state)
         }
         if (state.dataSourceDialog) DataSourceDialog(state)
-        DdlDialog(state)
         ModifyDialog(state)
         HistoryDialog(state)
         ExportDialog(state)
@@ -92,6 +91,7 @@ fun MainWindow(state: AppState) {
         NativeDialog(state)
         DiffDialog(state)
         ContentDiffDialog(state)
+        DdlDialog(state)   // above the comparison, whose «Ver SQL» opens it
         ConfirmDialog(state)
         ParamDialog(state)
         ObjectSearchDialog(state)

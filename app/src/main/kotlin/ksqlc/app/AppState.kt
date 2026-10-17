@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ksqlc.core.*
 import ksqlc.drivers.DumpScope
+import ksqlc.drivers.RowStatus
 import ksqlc.drivers.destructiveChanges
 import ksqlc.drivers.ApplyResult
 import ksqlc.drivers.runAtomically
@@ -952,6 +953,7 @@ class AppState(
     fun closeDiff() { diffJob?.close(); diffJob = null }
 
     // --- table content diff --------------------------------------------------------------
+    private companion object { const val SYNC_PREVIEW_MAX = 500 }
     var contentDiffJob by mutableStateOf<ContentDiffJob?>(null)
         private set
 
@@ -965,6 +967,29 @@ class AppState(
     }
 
     fun closeContentDiff() { contentDiffJob?.close(); contentDiffJob = null }
+
+    /** Shows the statements the checked kinds of change would run on the right table; a long list is cut, the sync runs all of it. */
+    fun previewContentSync() {
+        val job = contentDiffJob ?: return
+        val statements = job.syncStatements()
+        val shown = statements.take(SYNC_PREVIEW_MAX).joinToString("\n") { it.preview.trimEnd(';') + ";" }
+        val more = statements.size - SYNC_PREVIEW_MAX
+        ddlView = DdlView(job.rightObj?.name.orEmpty(), (shown + if (more > 0) "\n-- … y $more sentencias más" else "").ifBlank { "-- sin cambios que aplicar" }, heading = "SQL de la sincronización")
+    }
+
+    /** Asks before changing the right table, saying how many rows of each kind. */
+    fun confirmContentSync() {
+        val job = contentDiffJob ?: return
+        if (job.syncReason != null || job.syncStatements().isEmpty()) return
+        val i = if (job.syncInsert) job.count(RowStatus.ONLY_LEFT) else 0
+        val u = if (job.syncUpdate) job.count(RowStatus.DIFFERENT) else 0
+        val d = if (job.syncDelete) job.count(RowStatus.ONLY_RIGHT) else 0
+        confirmation = Confirmation(
+            "Sincronizar la tabla de la derecha",
+            "En ${job.rightSource.name}, ${job.rightObj?.name}: se insertarán $i filas, se actualizarán $u y se borrarán $d.\nSe aplica todo o nada.",
+            "Aplicar",
+        ) { confirmation = null; job.applySync(::record) }
+    }
 
     // --- native dump / restore ---------------------------------------------------------
     var nativeJob by mutableStateOf<NativeJob?>(null)

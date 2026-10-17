@@ -82,8 +82,21 @@ fun ContentDiffDialog(state: AppState) {
                 }
             }
             if (r == null) Spacer(Modifier.weight(1f))
+            val canSync = r != null && r.rows.isNotEmpty()
+            val reason = job.syncReason
+            (if (canSync) reason else null)?.let { Text(it, Modifier.padding(horizontal = 12.dp, vertical = 2.dp).testTag("content-diff-sync-reason"), fontSize = 12.sp, color = c.warning) }
+            job.syncMessage?.let { Text(it, Modifier.padding(horizontal = 12.dp, vertical = 2.dp).testTag("content-diff-sync-done"), fontSize = 12.sp, color = c.success) }
             Separator()
-            Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (canSync) {
+                    val ok = reason == null && !job.syncing
+                    KCheckbox(job.syncInsert, { job.syncInsert = it }, label = "Insertar (${job.count(RowStatus.ONLY_LEFT)})", enabled = ok, modifier = Modifier.testTag("content-diff-sync-insert"))
+                    KCheckbox(job.syncUpdate, { job.syncUpdate = it }, label = "Actualizar (${job.count(RowStatus.DIFFERENT)})", enabled = ok, modifier = Modifier.testTag("content-diff-sync-update"))
+                    KCheckbox(job.syncDelete, { job.syncDelete = it }, label = "Eliminar (${job.count(RowStatus.ONLY_RIGHT)})", enabled = ok, modifier = Modifier.testTag("content-diff-sync-delete"))
+                    val any = job.syncInsert || job.syncUpdate || job.syncDelete
+                    TextAction("Ver SQL", state::previewContentSync, Modifier.testTag("content-diff-sync-sql"), enabled = ok && any)
+                    TextAction(if (job.syncing) "Sincronizando…" else "Sincronizar derecha", state::confirmContentSync, Modifier.testTag("content-diff-sync-apply"), enabled = ok && any)
+                }
                 Spacer(Modifier.weight(1f))
                 TextAction("Cerrar", state::closeContentDiff, primary = true)
             }
