@@ -96,10 +96,11 @@ class ContentSyncTest {
         assertEquals(listOf(1, UntypedParam("00000000-0000-0000-0000-000000000001"), UntypedParam("x")), s.params)
     }
 
-    @Test fun sqlServerWrapsInsertsIntoAnIdentityTableInIdentityInsert() {
+    @Test fun sqlServerGivesEachInsertIntoAnIdentityTableItsOwnIdentityInsert() {
         val t = DbObject(Namespace(null, "app"), "t", DbObjectKind.TABLE)
         fun ms(identity: Set<String>, d: ContentDiff = diff) = syncStatements(Dialect.of(DbKind.MSSQL), DbKind.MSSQL, t, d, true, false, false, identity = identity).map { it.sql }
-        assertEquals(listOf("set identity_insert [app].[t] on", "insert into [app].[t] ([id], [v]) values (?, ?)", "set identity_insert [app].[t] off"), ms(setOf("id")))
+        // each insert carries its own set: a prepared statement has a scope of its own, where an earlier `set` is lost
+        assertEquals(listOf("set identity_insert [app].[t] on; insert into [app].[t] ([id], [v]) values (?, ?); set identity_insert [app].[t] off"), ms(setOf("id")))
         assertEquals(listOf("insert into [app].[t] ([id], [v]) values (?, ?)"), ms(emptySet()))
         assertEquals(emptyList(), ms(setOf("id"), diffRows(cols, listOf("id"), listOf(listOf(1, "a")), listOf(listOf(1, "a")))))   // no inserts, no set
     }

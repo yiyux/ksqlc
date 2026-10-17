@@ -47,8 +47,8 @@ private fun bindable(v: Any?, kind: DbKind): Any? = when {
 /**
  * The statements that make the right table (as [target]) equal to the left one: delete the rows only on the right, change the cells that
  * differ, insert the rows only on the left, in that order. Rows are found by the key values they have on the right.
- * [skip] columns (generated) are left out of inserts and updates; on SQL Server, inserts into a table with an [identity] column among
- * the compared ones are wrapped in `set identity_insert`.
+ * [skip] columns (generated) are left out of inserts and updates; on SQL Server, each insert into a table with an [identity] column among
+ * the compared ones carries its own `set identity_insert on` and `off`.
  */
 fun syncStatements(
     dialect: Dialect, kind: DbKind, target: DbObject, diff: ContentDiff,
@@ -76,12 +76,10 @@ fun syncStatements(
     if (insert && inserts.isNotEmpty()) {
         val use = diff.columns.indices.filter { usable(it) }
         if (use.isNotEmpty()) {
-            val sql = "insert into $table (${use.joinToString(", ") { cols[it] }}) values (${use.joinToString(", ") { "?" }})"
-            fun plain(s: String) = DmlStatement(s, emptyList(), s)
-            val identityInsert = kind == DbKind.MSSQL && use.any { diff.columns[it].lowercase() in identity }
-            if (identityInsert) out += plain("set identity_insert $table on")
+            val insertSql = "insert into $table (${use.joinToString(", ") { cols[it] }}) values (${use.joinToString(", ") { "?" }})"
+            // a prepared statement runs in a scope of its own on SQL Server, where a `set` of an earlier statement is gone: it goes in the same batch
+            val sql = if (kind == DbKind.MSSQL && use.any { diff.columns[it].lowercase() in identity }) "set identity_insert $table on; $insertSql; set identity_insert $table off" else insertSql
             inserts.forEach { d -> out += stmt(sql, use.map { bindable(d.left!![it], kind) }) }
-            if (identityInsert) out += plain("set identity_insert $table off")
         }
     }
     return out

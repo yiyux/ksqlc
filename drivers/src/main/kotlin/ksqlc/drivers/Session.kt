@@ -98,8 +98,9 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
             var sent = 0L
             c.prepareStatement(sql).use { ps ->
                 var inBatch = 0
+                val meta = lazy { runCatching { ps.parameterMetaData }.getOrNull() }
                 for (row in rows) {
-                    bindParams(ps, row); ps.addBatch(); sent++
+                    bindParams(ps, row, meta); ps.addBatch(); sent++
                     if (++inBatch == batchSize) { ps.executeBatch(); inBatch = 0; onProgress(sent) }
                 }
                 if (inBatch > 0) ps.executeBatch()
@@ -108,10 +109,16 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
             sent
         }
 
-    private fun bindParams(ps: java.sql.PreparedStatement, params: List<Any?>) {
+    /**
+     * SQL Server sends a bare null as nvarchar and then refuses to convert it for a binary column, so a null there is set with the type the
+     * statement says that parameter has. [meta] is asked at most once per statement; if the driver cannot say, the null goes as before.
+     */
+    private fun bindParams(ps: java.sql.PreparedStatement, params: List<Any?>, meta: Lazy<java.sql.ParameterMetaData?> = lazy { runCatching { ps.parameterMetaData }.getOrNull() }) {
         params.forEachIndexed { i, v ->
-            when (v) {
-                is UntypedParam -> ps.setObject(i + 1, v.text, java.sql.Types.OTHER)
+            when {
+                v is UntypedParam -> ps.setObject(i + 1, v.text, java.sql.Types.OTHER)
+                v == null && ds.kind == DbKind.MSSQL ->
+                    meta.value?.let { m -> runCatching { m.getParameterType(i + 1) }.getOrNull() }?.let { ps.setNull(i + 1, it) } ?: ps.setObject(i + 1, null)
                 else -> ps.setObject(i + 1, v)
             }
         }
