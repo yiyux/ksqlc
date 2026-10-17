@@ -17,6 +17,8 @@ data class RowDiff(val key: List<Any?>, val status: RowStatus, val left: List<An
 data class ContentDiff(
     val columns: List<String>, val key: List<String>, val rows: List<RowDiff>, val same: Int, val truncated: Boolean,
     val onlyLeftColumns: List<String>, val onlyRightColumns: List<String>,
+    /** [columns] as the right table spells them, and the right table's own primary key: what a script that changes the right table needs. */
+    val rightColumns: List<String> = columns, val rightKey: List<String> = key,
 )
 
 /** A value in a form that is equal across drivers: blobs by content, numbers by value (`1` = `1.0`), anything else by its text. */
@@ -100,5 +102,5 @@ fun diffTableContent(
         ld.columns.map { it.name }.filter { it !in common },
         rightNames.filter { n -> common.none { it.equals(n, ignoreCase = true) } },
         cancelled,
-    )
+    ).copy(rightColumns = rightCols, rightKey = rd.primaryKey)
 }

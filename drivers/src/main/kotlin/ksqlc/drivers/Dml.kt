@@ -107,7 +107,7 @@ private fun render(sql: String, params: List<Any?>): String {
     return sql.map { if (it == '?') literal(params[i++]) else it.toString() }.joinToString("")
 }
 
-private fun stmt(sql: String, params: List<Any?>) = DmlStatement(sql, params, render(sql, params))
+internal fun stmt(sql: String, params: List<Any?>) = DmlStatement(sql, params, render(sql, params))
 
 /**
  * The statements that apply the pending changes to [obj]: deletes first (so a row can be replaced by one with the same key),
