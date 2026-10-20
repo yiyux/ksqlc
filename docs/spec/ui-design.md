@@ -15,6 +15,7 @@ Pantalla 1x: 1 px de la captura = 1 dp. Ventana capturada: 1722×1000.
 - Barra superior de **43 dp** (ventana, widget de proyecto, acciones a derecha e izquierda; el tinte morado de la captura es el color de proyecto, no forma parte del tema).
 - Barra de estado inferior de ≈ **31 dp** sobre el fondo de ventana, texto secundario con migas de pan «Database › conexión › esquema › tables › tabla».
 - Las islas terminan a y = 968 de 1000; el resto es barra de estado.
+- Disposición: arriba, Database Explorer y editor lado a lado; abajo, Services ocupa **todo el ancho** de la ventana (por debajo del Explorer también). El separador horizontal entre ambas filas se arrastra y su proporción se guarda (`resultsRatio`).
 
 ## Database Explorer (isla izquierda, x 7–398 → 392 dp de ancho)
 | Elemento | Medida |
@@ -42,7 +43,7 @@ Pantalla 1x: 1 px de la captura = 1 dp. Ventana capturada: 1722×1000.
 | Scrollbars | pulgar `#3C3D3E`, ≈ 8 dp, redondeado, superpuesto |
 | Píldora flotante «230 rows ⌄ ⋮» | abajo a la derecha del grid: 36 dp de alto, fondo `#26282C`, borde 1 dp `#404040`, radio ≈ 8, texto `#D1D3D9` |
 
-## Consola SQL (isla central) y panel Services (isla inferior)
+## Consola SQL (isla central) y panel Services (isla inferior, a todo el ancho)
 Isla del editor: y 43–484. Isla Services: y 490–968 (hueco de 5 dp). Ambas con las mismas franjas: pestañas 40 dp → separador → barra de acciones 34 dp → separador → contenido.
 | Elemento | Medida |
 |---|---|

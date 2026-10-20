@@ -46,7 +46,7 @@ import ksqlc.storage.ThemeMode
 @Composable
 fun App(state: AppState) = KsqlcTheme(state.settings.themeMode) { MainWindow(state) }
 
-/** Islands on the window background: toolbar on top, Database Explorer left, editor over Services, status bar below. */
+/** Islands on the window background: toolbar on top, Database Explorer left of the editor, Services across the full width below, status bar at the bottom. */
 @Composable
 fun MainWindow(state: AppState) {
     val c = Ksqlc.colors
@@ -65,19 +65,19 @@ fun MainWindow(state: AppState) {
     }) {
         Column(Modifier.fillMaxSize()) {
             TopBar(state)
-            Row(Modifier.weight(1f).fillMaxWidth().padding(start = 7.dp, end = 7.dp)) {
-                if (s.explorerVisible) {
-                    Island(Modifier.width(explorerWidth).fillMaxHeight().testTag("island:explorer")) { ExplorerPanel(state, Modifier.fillMaxSize()) }
-                    Splitter(true, { d -> explorerWidth = (explorerWidth + d).coerceIn(200.dp, 700.dp) }, onDragEnd = { state.updateSettings { it.copy(explorerWidthDp = explorerWidth.value.toInt()) } })
-                }
-                BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
-                    val total = maxHeight
-                    Column(Modifier.fillMaxSize()) {
-                        Island(Modifier.fillMaxWidth().weight(if (state.servicesVisible) 1f - resultsRatio else 1f).testTag("island:editor")) { EditorIsland(state) }
-                        if (state.servicesVisible) {
-                            Splitter(false, { d -> resultsRatio = (resultsRatio - d / total).coerceIn(0.15f, 0.8f) }, onDragEnd = { state.updateSettings { it.copy(resultsRatio = resultsRatio) } })
-                            Island(Modifier.fillMaxWidth().weight(resultsRatio).testTag("island:services")) { ServicesPanel(state, Modifier.fillMaxSize()) }
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(start = 7.dp, end = 7.dp)) {
+                val total = maxHeight
+                Column(Modifier.fillMaxSize()) {
+                    Row(Modifier.fillMaxWidth().weight(if (state.servicesVisible) 1f - resultsRatio else 1f)) {
+                        if (s.explorerVisible) {
+                            Island(Modifier.width(explorerWidth).fillMaxHeight().testTag("island:explorer")) { ExplorerPanel(state, Modifier.fillMaxSize()) }
+                            Splitter(true, { d -> explorerWidth = (explorerWidth + d).coerceIn(200.dp, 700.dp) }, onDragEnd = { state.updateSettings { it.copy(explorerWidthDp = explorerWidth.value.toInt()) } })
                         }
+                        Island(Modifier.weight(1f).fillMaxHeight().testTag("island:editor")) { EditorIsland(state) }
+                    }
+                    if (state.servicesVisible) {
+                        Splitter(false, { d -> resultsRatio = (resultsRatio - d / total).coerceIn(0.15f, 0.8f) }, onDragEnd = { state.updateSettings { it.copy(resultsRatio = resultsRatio) } })
+                        Island(Modifier.fillMaxWidth().weight(resultsRatio).testTag("island:services")) { ServicesPanel(state, Modifier.fillMaxSize()) }
                     }
                 }
             }
