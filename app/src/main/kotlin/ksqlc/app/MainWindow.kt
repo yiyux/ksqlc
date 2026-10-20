@@ -44,11 +44,11 @@ import ksqlc.app.ui.*
 import ksqlc.storage.ThemeMode
 
 @Composable
-fun App(state: AppState) = KsqlcTheme(state.settings.themeMode) { MainWindow(state) }
+fun App(state: AppState, ws: Workspace? = null) = KsqlcTheme(state.settings.themeMode) { key(state) { MainWindow(state, ws) } }
 
 /** Islands on the window background: toolbar on top, Database Explorer left of the editor, Services across the full width below, status bar at the bottom. */
 @Composable
-fun MainWindow(state: AppState) {
+fun MainWindow(state: AppState, ws: Workspace? = null) {
     val c = Ksqlc.colors
     val s = state.settings
     var explorerWidth by remember { mutableStateOf(s.explorerWidthDp.dp) }
@@ -64,20 +64,20 @@ fun MainWindow(state: AppState) {
         else false
     }) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(state)
+            TopBar(state, ws)
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(start = 7.dp, end = 7.dp)) {
                 val total = maxHeight
                 Column(Modifier.fillMaxSize()) {
                     Row(Modifier.fillMaxWidth().weight(if (state.servicesVisible) 1f - resultsRatio else 1f)) {
                         if (s.explorerVisible) {
-                            Island(Modifier.width(explorerWidth).fillMaxHeight().testTag("island:explorer")) { ExplorerPanel(state, Modifier.fillMaxSize()) }
+                            Island(Modifier.width(explorerWidth).fillMaxHeight().testTag("island:explorer")) { ExplorerPanel(state, Modifier.fillMaxSize(), ws) }
                             Splitter(true, { d -> explorerWidth = (explorerWidth + d).coerceIn(200.dp, 700.dp) }, onDragEnd = { state.updateSettings { it.copy(explorerWidthDp = explorerWidth.value.toInt()) } })
                         }
-                        Island(Modifier.weight(1f).fillMaxHeight().testTag("island:editor")) { EditorIsland(state) }
+                        Island(Modifier.weight(1f).fillMaxHeight().testTag("island:editor")) { EditorIsland(state, ws) }
                     }
                     if (state.servicesVisible) {
                         Splitter(false, { d -> resultsRatio = (resultsRatio - d / total).coerceIn(0.15f, 0.8f) }, onDragEnd = { state.updateSettings { it.copy(resultsRatio = resultsRatio) } })
-                        Island(Modifier.fillMaxWidth().weight(resultsRatio).testTag("island:services")) { ServicesPanel(state, Modifier.fillMaxSize()) }
+                        Island(Modifier.fillMaxWidth().weight(resultsRatio).testTag("island:services")) { ServicesPanel(state, Modifier.fillMaxSize(), ws) }
                     }
                 }
             }
@@ -100,7 +100,7 @@ fun MainWindow(state: AppState) {
 }
 
 @Composable
-private fun TopBar(state: AppState) {
+private fun TopBar(state: AppState, ws: Workspace?) {
     val c = Ksqlc.colors
     var menu by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth().height(43.dp).padding(horizontal = 12.dp)) {
@@ -116,7 +116,7 @@ private fun TopBar(state: AppState) {
                     KIcon(IconKind.ChevronDown, tint = c.textSecondary, size = 12.dp)
                 }
                 DropdownMenu(menu, { menu = false }) {
-                    state.saved.forEach { ds -> DropdownMenuItem(text = { Text("${ds.name}  (${ds.kind.label()})", fontSize = 13.sp) }, onClick = { menu = false; state.selectAndConnect(ds) }) }
+                    state.saved.forEach { ds -> DropdownMenuItem(text = { Text("${ds.name}  (${ds.kind.label()})", fontSize = 13.sp) }, onClick = { menu = false; ws?.open(ds) ?: state.selectAndConnect(ds) }) }
                     DropdownMenuItem(text = { Text("Nuevo data source…", fontSize = 13.sp) }, onClick = { menu = false; state.dataSourceDialog = true })
                 }
             }
@@ -135,15 +135,29 @@ private fun TopBar(state: AppState) {
 private fun themeLabel(m: ThemeMode) = when (m) { ThemeMode.SYSTEM -> "sistema"; ThemeMode.LIGHT -> "claro"; ThemeMode.DARK -> "oscuro" }
 
 @Composable
-private fun EditorIsland(state: AppState) {
+private fun EditorIsland(state: AppState, ws: Workspace?) {
     val c = Ksqlc.colors
     Column(Modifier.fillMaxSize()) {
         OverflowTabs(
             buildList {
-                add(TabSpec("console [${state.form.name}]", state.activeEditor == CONSOLE_TAB, "etab:console", IconKind.Database, { state.activeEditor = CONSOLE_TAB }))
-                state.dataTabs.forEachIndexed { i, t -> add(TabSpec(t.obj.name, state.activeEditor == i, "etab:$i", IconKind.Table, { state.activeEditor = i }, { state.closeDataTab(i) })) }
+                if (ws == null) add(TabSpec("console [${state.form.name}]", state.activeEditor == CONSOLE_TAB, "etab:console", IconKind.Database, { state.activeEditor = CONSOLE_TAB }))
+                else ws.consoles.forEachIndexed { i, k ->
+                    val mine = i == ws.activeIndex
+                    add(TabSpec(ws.title(i), mine && state.activeEditor == CONSOLE_TAB, if (mine) "etab:console" else "etab:console:$i", IconKind.Database,
+                        { if (mine) state.activeEditor = CONSOLE_TAB else { k.activeEditor = CONSOLE_TAB; ws.activate(i) } },
+                        if (ws.consoles.size > 1) ({ ws.closeConsole(i) }) else null))
+                }
+                if (ws == null) state.dataTabs.forEachIndexed { i, t -> add(TabSpec(t.obj.name, state.activeEditor == i, "etab:$i", IconKind.Table, { state.activeEditor = i }, { state.closeDataTab(i) })) }
+                else ws.consoles.forEachIndexed { n, k ->
+                    val mine = n == ws.activeIndex
+                    k.dataTabs.forEachIndexed { i, t ->
+                        add(TabSpec("${t.obj.name} [${k.form.name}]", mine && state.activeEditor == i, if (mine) "etab:$i" else "etab:$n:$i", IconKind.Table,
+                            { k.activeEditor = i; ws.activate(n) }, { ws.activate(n); k.closeDataTab(i) }))
+                    }
+                }
             },
             Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 6.dp),
+            trailing = { if (ws != null) ToolButton(IconKind.Plus, "Nueva consola SQL sobre ${state.form.name}", { ws.newConsole(state.form.toDataSource()) }, Modifier.testTag("console-new")) },
         )
         Separator()
         val data = state.dataTabs.getOrNull(state.activeEditor)

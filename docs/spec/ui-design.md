@@ -48,6 +48,7 @@ Isla del editor: y 43–484. Isla Services: y 490–968 (hueco de 5 dp). Ambas c
 | Elemento | Medida |
 |---|---|
 | Pestaña de consola | misma píldora de 28 dp; la activa con borde `#40434A` y fondo `#26282C`; icono del motor + `nombre [conexión]` + `×` |
+| Varias consolas y tablas | la fila de pestañas junta las consolas de todos los data sources abiertos y sus tablas; cada una lleva `[data source]` en el título (`console 2 [nombre]` desde la segunda consola del mismo). Al final de la fila, botón `+` «Nueva consola SQL». El explorador despliega a la vez el árbol de cada data source conectado |
 | Barra de acciones de consola | ▶ ejecutar (verde), ejecutar con plan, historial, ajustes, «Tx: Auto ⌄», stop, selector «Playground ⌄»; a la derecha «esquema actual ⌄» |
 | **Gutter** | **63 dp** de ancho (x 404–466), borde derecho 1 dp `#323438`; número de línea alineado a la derecha ≈ 11 dp antes de una columna de iconos (check verde de ejecución OK) |
 | Texto del editor | empieza 3 dp tras el gutter; JetBrains Mono 13 px; **altura de línea 22 dp** |

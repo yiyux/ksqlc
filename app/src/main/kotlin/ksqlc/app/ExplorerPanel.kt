@@ -81,7 +81,7 @@ internal fun TreeLine(
 }
 
 @Composable
-fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
+fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier, ws: Workspace? = null) {
     val c = Ksqlc.colors
     val model = state.explorer
     val scope = rememberCoroutineScope()
@@ -123,14 +123,14 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
         val rows = if (model != null) visibleRows(model.roots, filter) else emptyList()
         val list = rememberLazyListState()
         val activeId = state.form.currentId
-        var collapsed by remember(activeId) { mutableStateOf(false) }
+        var collapsedIds by remember { mutableStateOf(emptySet<String>()) }
         val activeSaved = state.saved.any { it.id == activeId }
         var closedFolders by remember { mutableStateOf(emptySet<String>()) }
         val connRows = connectionRows(state.saved, closedFolders)
         // "go to declaration" from the editor: show everything again and bring the selected row into view
         LaunchedEffect(state.revealTick) {
             if (state.revealTick == 0 || model == null) return@LaunchedEffect
-            filter = ""; collapsed = false
+            filter = ""; collapsedIds = emptySet()
             val all = visibleRows(model.roots, "")
             val at = all.indexOfFirst { it.node.id == state.explorerSelectedId }
             if (at >= 0) {
@@ -151,19 +151,25 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
                         val ds = r.ds
                         val active = ds.id == activeId
                         val depth = if (r.inFolder) 1 else 0
+                        // every console with a loaded schema shows its own tree; the active one wins when several share a data source
+                        val k = (if (active && model != null) state else null) ?: ws?.consoles?.firstOrNull { it.form.currentId == ds.id && it.explorer != null } ?: if (active) state else null
+                        val m = k?.explorer
+                        val open = m != null && ds.id !in collapsedIds
                         item(key = "ds:${ds.id}") {
+                            ContextMenuArea(items = { if (ws == null) emptyList() else listOf(ContextMenuItem("Nueva consola SQL") { ws.newConsole(ds) }) }) {
                             Column(Modifier.testTag("ds-node:${ds.name}").clickable {
                                 when {
-                                    !active -> { collapsed = false; state.selectAndConnect(ds) }
-                                    model != null -> collapsed = !collapsed
-                                    else -> state.connect()
+                                    m == null && !active -> { collapsedIds -= ds.id; ws?.open(ds) ?: state.selectAndConnect(ds) }
+                                    m == null -> state.connect()
+                                    else -> { collapsedIds = if (ds.id in collapsedIds) collapsedIds - ds.id else collapsedIds + ds.id; ws?.activate(ws.consoles.indexOf(k)) }
                                 }
                             }) {
-                                TreeLine(depth, expandable = true, expanded = active && model != null && !collapsed, icon = IconKind.Database,
-                                    label = ds.name, detail = ds.kind.label(), selected = false, loading = active && state.connecting, iconTint = connectionTint(ds.color, active))
+                                TreeLine(depth, expandable = true, expanded = open, icon = IconKind.Database,
+                                    label = ds.name, detail = ds.kind.label(), selected = false, loading = k?.connecting == true, iconTint = connectionTint(ds.color, active || m != null))
+                            }
                             }
                         }
-                        if (active && model != null && !collapsed) nodeItems(state, model, rows, filter, depth + 1, scope, clipboard)
+                        if (open && m != null) nodeItems(k, m, visibleRows(m.roots, filter), filter, depth + 1, scope, clipboard) { ws?.activate(ws.consoles.indexOf(k)) }
                     }
                 }
                 if (!activeSaved && model != null) {
@@ -183,15 +189,18 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier) {
 private fun LazyListScope.nodeItems(
     state: AppState, model: TreeModel, rows: List<TreeRow>, filter: String, base: Int,
     scope: kotlinx.coroutines.CoroutineScope, clipboard: androidx.compose.ui.platform.ClipboardManager,
+    activate: () -> Unit = {},
 ) {
-    if (rows.isEmpty()) item(key = "empty") {
+    val owner = state.form.currentId
+    if (rows.isEmpty()) item(key = "empty:$owner") {
         val c = Ksqlc.colors
         Text(
             if (filter.isBlank()) "Sin esquemas" else "Nada coincide con «$filter» (solo se filtra lo ya cargado)",
             Modifier.padding(start = 30.dp, top = 6.dp), fontSize = 12.sp, color = c.textMuted,
         )
     }
-    items(rows, key = { it.node.id }) { (node, depth) ->
+    items(rows, key = { "$owner:${it.node.id}" }) { (node, depth) ->
+        fun ContextMenuItem(label: String, action: () -> Unit) = androidx.compose.foundation.ContextMenuItem(label) { activate(); action() }
         val c = Ksqlc.colors
         val o = node.obj
         val selectedId = state.explorerSelectedId
@@ -234,10 +243,11 @@ private fun LazyListScope.nodeItems(
             Column(
                 Modifier.testTag("tree:${node.id}").combinedClickable(
                     onClick = {
+                        activate()
                         state.explorerSelectedId = node.id
                         if (node.expandable) scope.launch { if (node.expanded) node.expanded = false else model.expand(node) }
                     },
-                    onDoubleClick = { if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) state.openData(o) },
+                    onDoubleClick = { activate(); if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) state.openData(o) },
                 ),
             ) {
                 TreeLine(depth + base, node.expandable, node.expanded, iconOf(node.kind), node.label, node.detail, selectedId == node.id, node.loading)

@@ -29,14 +29,14 @@ import ksqlc.app.ui.*
 
 /** Bottom island: a small tree of what ran on the left, and on the right the Output log and one tab per result grid. */
 @Composable
-fun ServicesPanel(state: AppState, modifier: Modifier = Modifier) {
+fun ServicesPanel(state: AppState, modifier: Modifier = Modifier, ws: Workspace? = null) {
     val c = Ksqlc.colors
     val scope = rememberCoroutineScope()
     Column(modifier) {
         PanelHeader("Services") { ToolButton(IconKind.Close, "Ocultar Services", { state.servicesVisible = false }) }
         Separator()
         Row(Modifier.fillMaxSize()) {
-            ServicesTree(state, Modifier.width(240.dp).fillMaxHeight())
+            ServicesTree(state, ws, Modifier.width(240.dp).fillMaxHeight())
             Separator(vertical = true)
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 OverflowTabs(
@@ -69,7 +69,7 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ServicesTree(state: AppState, modifier: Modifier) {
+private fun ServicesTree(state: AppState, ws: Workspace?, modifier: Modifier) {
     val c = Ksqlc.colors
     @Composable
     fun line(depth: Int, icon: IconKind, text: String, hint: String?, selected: Boolean, tag: String, onClick: (() -> Unit)?) {
@@ -89,10 +89,21 @@ private fun ServicesTree(state: AppState, modifier: Modifier) {
     }
     Column(modifier.padding(top = 6.dp)) {
         line(0, IconKind.Folder, "Database", null, false, "svc:root", null)
-        line(1, IconKind.Database, state.form.name, null, false, "svc:connection", null)
-        line(2, IconKind.Play, "console", state.lastMillis?.let { "$it ms" }, state.selectedTab == OUTPUT_TAB, "svc:console") { state.selectedTab = OUTPUT_TAB }
-        state.tabs.forEachIndexed { i, t ->
-            line(2, IconKind.Table, t.title, "${t.rows.size} filas", state.selectedTab == i, "svc:result:$i") { state.selectedTab = i }
+        if (ws == null) {
+            line(1, IconKind.Database, state.form.name, null, false, "svc:connection", null)
+            line(2, IconKind.Play, "console", state.lastMillis?.let { "$it ms" }, state.selectedTab == OUTPUT_TAB, "svc:console") { state.selectedTab = OUTPUT_TAB }
+            state.tabs.forEachIndexed { i, t ->
+                line(2, IconKind.Table, t.title, "${t.rows.size} filas", state.selectedTab == i, "svc:result:$i") { state.selectedTab = i }
+            }
+        } else ws.consoles.forEachIndexed { n, k ->
+            if (n != ws.activeIndex) line(1, IconKind.Database, ws.title(n), null, false, "svc:console:$n") { ws.activate(n) }
+            else {
+                line(1, IconKind.Database, ws.title(n), null, false, "svc:connection", null)
+                line(2, IconKind.Play, "console", state.lastMillis?.let { "$it ms" }, state.selectedTab == OUTPUT_TAB, "svc:console") { state.selectedTab = OUTPUT_TAB }
+                state.tabs.forEachIndexed { i, t ->
+                    line(2, IconKind.Table, t.title, "${t.rows.size} filas", state.selectedTab == i, "svc:result:$i") { state.selectedTab = i }
+                }
+            }
         }
     }
 }

@@ -14,14 +14,14 @@ import ksqlc.storage.SettingsStore
 
 fun main() = application {
     val scope = rememberCoroutineScope()
-    val state = remember { AppState(scope, ConnectionStore.default(), SettingsStore.default(), HistoryStore.default()) }
-    DisposableEffect(Unit) { onDispose { state.dispose() } }
+    val ws = remember { Workspace(scope, ConnectionStore.default(), SettingsStore.default(), HistoryStore.default()) }
+    DisposableEffect(Unit) { onDispose { ws.dispose() } }
     Window(
         // closing with unsent edits or an open transaction asks first
-        onCloseRequest = { state.requestExit(::exitApplication) },
+        onCloseRequest = { ws.requestExit(::exitApplication) },
         title = "ksqlc",
         state = rememberWindowState(size = DpSize(1250.dp, 800.dp)),
     ) {
-        App(state)
+        App(ws.active, ws)
     }
 }

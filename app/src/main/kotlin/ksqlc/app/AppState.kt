@@ -78,19 +78,29 @@ const val OUTPUT_TAB = -1
 /** [AppState.activeEditor] value for the console; 0.. selects a data tab. */
 const val CONSOLE_TAB = -1
 
+/** State every console shares: the saved data sources and the settings. */
+class Shared(store: ConnectionStore, settingsStore: SettingsStore) {
+    var saved by mutableStateOf(runCatching { store.list() }.getOrDefault(emptyList()))
+    var settings by mutableStateOf(settingsStore.load())
+}
+
 class AppState(
     private val scope: CoroutineScope,
     private val store: ConnectionStore,
     private val settingsStore: SettingsStore = SettingsStore.default(),
     private val history: HistoryStore? = null,
+    /** Saved data sources and settings, one instance for every console of a [Workspace]. */
+    private val shared: Shared = Shared(store, settingsStore),
+    preload: Boolean = true,
 ) {
     val form = ConnectionForm()
-    var saved by mutableStateOf(runCatching { store.list() }.getOrDefault(emptyList()))
-        private set
+    var saved: List<DataSource>
+        get() = shared.saved
+        private set(v) { shared.saved = v }
 
     init {
         // first start with configured data sources: make the first one the active connection (not connected yet)
-        saved.firstOrNull()?.let { c ->
+        saved.firstOrNull()?.takeIf { preload }?.let { c ->
             form.load(c)
             scope.launch {
                 form.password = withContext(Dispatchers.IO) { runCatching { store.password(c.id) }.getOrNull() }.orEmpty()
@@ -100,8 +110,9 @@ class AppState(
     }
 
     // --- window state, persisted -----------------------------------------------------------
-    var settings by mutableStateOf(settingsStore.load())
-        private set
+    var settings: Settings
+        get() = shared.settings
+        private set(v) { shared.settings = v }
 
     fun updateSettings(change: (Settings) -> Settings) {
         settings = change(settings)
@@ -1148,7 +1159,7 @@ class AppState(
     }
 
     /** The SSH host key waiting for the user's answer, if any; asked from the thread that is opening the tunnel. */
-    private fun askHostKey(message: String): Boolean {
+    internal fun askHostKey(message: String): Boolean {
         val answer = java.util.concurrent.CompletableFuture<Boolean>()
         confirmation = Confirmation(
             "Servidor SSH desconocido", "$message\n\nSi continúas, su clave se recuerda y se avisará si cambia.", "Confiar y continuar",
@@ -1159,7 +1170,10 @@ class AppState(
 
     init { Tunnels.hostKeyDecider = HostKeyDecider(::askHostKey) }
 
-    fun dispose() { housekeeping.cancel(); Tunnels.closeAll(); diffJob?.close(); contentDiffJob?.close(); copyTableJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
+    fun dispose() { close(); Tunnels.closeAll() }
+
+    /** Releases this console's own resources; SSH tunnels are shared, so they stay open. */
+    fun close() { housekeeping.cancel(); diffJob?.close(); contentDiffJob?.close(); copyTableJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
 }
 
 /** What the history gets for one Modify apply: every statement shares the outcome when all or nothing, else what ran and the one that failed; nothing if the session failed first. */
