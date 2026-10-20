@@ -23,5 +23,19 @@ dependencies {
 }
 compose.desktop { application {
     mainClass = "ksqlc.app.MainKt"
-    nativeDistributions { targetFormats(TargetFormat.Dmg); packageName = "ksqlc" }
+    nativeDistributions {
+        targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+        packageName = "ksqlc"
+        packageVersion = "1.0.0"
+        // los drivers JDBC (java.sql, java.naming, ...) necesitan módulos que jlink omitiría
+        // shortcut: engorda el runtime ~40 MB, cambiar a modules(...) con :app:suggestRuntimeModules si importa
+        includeAllModules = true
+        macOS { iconFile.set(project.file("icons/ksqlc.icns")) }
+        windows {
+            iconFile.set(project.file("icons/ksqlc.ico"))
+            menuGroup = "ksqlc"
+            upgradeUuid = "6f1c2a52-8d3e-4b7a-9c41-3e5d0b7a1f26"
+        }
+        linux { iconFile.set(project.file("icons/ksqlc.png")) }
+    }
 } }

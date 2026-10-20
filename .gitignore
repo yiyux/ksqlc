@@ -8,3 +8,4 @@ local.properties
 .claude/
 .mcp.json
 /*/bin/
+dist/

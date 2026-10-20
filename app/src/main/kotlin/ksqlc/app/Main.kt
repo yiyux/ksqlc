@@ -3,6 +3,7 @@ package ksqlc.app
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -20,6 +21,7 @@ fun main() = application {
         // closing with unsent edits or an open transaction asks first
         onCloseRequest = { ws.requestExit(::exitApplication) },
         title = "ksqlc",
+        icon = painterResource("icon.png"),
         state = rememberWindowState(size = DpSize(1250.dp, 800.dp)),
     ) {
         App(ws.active, ws)
