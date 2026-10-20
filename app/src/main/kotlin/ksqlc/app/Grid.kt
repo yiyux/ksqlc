@@ -15,6 +15,9 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import ksqlc.drivers.CellValue
@@ -55,6 +58,11 @@ internal fun columnWidth(typeName: String, engine: ksqlc.core.DbKind?) = when (t
     TemporalKind.DATETIME_TZ -> 216.dp
     else -> ColumnWidth
 }
+private val HeaderChrome = 70.dp      // header padding + column icon + funnel + sort arrow + gaps
+private val MaxHeaderWidth = 400.dp
+private val MaxFitWidth = 600.dp
+private val CellPadding = 13.dp        // 6dp each side + the grid line
+private val MinColumnWidth = 40.dp
 private val HeaderHeight = 26.dp
 private val RowHeight = 27.dp
 
@@ -128,7 +136,22 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         val path = chooseFile(true, "Guardar «${cols[j].name}» en un archivo", cols[j].name + ".bin") ?: return
         runCatching { java.io.File(path).writeBytes(data) }.onSuccess { onNotice("${data.size} bytes guardados en $path") }.onFailure { onNotice("No se pudo guardar: ${it.message}") }
     }
-    val widths = cols.map { columnWidth(it.typeName, editing?.engine) }
+    // starts wide enough for the type and for the whole header name (icons, funnel and arrow included); dragging a header edge changes it
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val widths = remember(tab, cols) {
+        cols.map { col ->
+            val name = with(density) { measurer.measure(col.name, TextStyle(fontSize = 13.sp), maxLines = 1).size.width.toDp() }
+            maxOf(columnWidth(col.typeName, editing?.engine), (name + HeaderChrome).coerceAtMost(MaxHeaderWidth))
+        }.toMutableStateList()
+    }
+    /** Double click on a header edge: wide enough for the header and the longest loaded value (monospace, so the longest text), up to MaxFitWidth. */
+    fun fitColumn(j: Int) {
+        val head = with(density) { measurer.measure(cols[j].name, TextStyle(fontSize = 13.sp), maxLines = 1).size.width.toDp() } + HeaderChrome
+        val longest = tab.rows.take(2000).maxOfOrNull { (it.getOrNull(j)?.let { v -> cellText(if (v is ByteArray) "<${v.size} bytes>" else v) } ?: "<null>").length } ?: 0
+        val body = if (longest == 0) 0.dp else with(density) { measurer.measure("0".repeat(longest), MonoStyle, maxLines = 1).size.width.toDp() } + CellPadding
+        widths[j] = maxOf(head, body).coerceIn(MinColumnWidth, MaxFitWidth)
+    }
     fun isDefault(i: Int, j: Int) = editing?.valueAt(i, j, tab) is CellValue.Default
     fun raw(i: Int, j: Int): String = when (val v = editing?.valueAt(i, j, tab)) {
         is CellValue.Text -> v.text
@@ -182,7 +205,8 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
             Row(Modifier.height(HeaderHeight).background(c.headerBg)) {
                 Box(Modifier.width(RowNumberWidth).fillMaxHeight().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) })
                 cols.forEachIndexed { j, col ->
-                    Tip(col.name, col.typeName.lowercase(), Modifier.width(widths[j]).fillMaxHeight()) {
+                    Box(Modifier.width(widths[j]).fillMaxHeight()) {
+                    Tip(col.name, col.typeName.lowercase(), Modifier.fillMaxSize()) {
                     Row(
                         Modifier.fillMaxSize().drawBehind { drawLine(c.windowBg, Offset(size.width - 0.5f, 0f), Offset(size.width - 0.5f, size.height), 1f) }.padding(horizontal = 6.dp),
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -207,6 +231,8 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                             contentAlignment = Alignment.Center,
                         ) { KIcon(when (dir) { null -> IconKind.Updown; true -> IconKind.ArrowUp; false -> IconKind.ArrowDown }, tint = if (dir == null) c.textMuted else c.accent, size = 12.dp) }
                     }
+                    }
+                    Splitter(true, { widths[j] = (widths[j] + it).coerceAtLeast(MinColumnWidth) }, Modifier.align(Alignment.CenterEnd).testTag("col-resize:$j").pointerInput(j) { detectTapGestures(onDoubleTap = { fitColumn(j) }) })
                     }
                 }
             }

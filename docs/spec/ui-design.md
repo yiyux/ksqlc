@@ -35,7 +35,7 @@ Pantalla 1x: 1 px de la captura = 1 dp. Ventana capturada: 1722×1000.
 | Fila de filtro | **29 dp**: «WHERE» y «ORDER BY» en `#868A93` con icono de filtro / orden |
 | Cabecera del grid | **26 dp**, fondo `#292A2C`; icono de tipo de columna (azul si es texto, llave si es PK) + nombre `#BCBEC4` + filtro + orden |
 | Columna de números de fila | **39 dp**, texto `#4C5058` alineado a la derecha |
-| Columnas | ancho por defecto **112 dp** (incluida la línea de 1 dp) |
+| Columnas | ancho por defecto **112 dp** (incluida la línea de 1 dp), más ancho si lo piden el tipo (fechas 168/216 dp) o el nombre de la columna (nombre + iconos, hasta 400 dp). Se redimensionan arrastrando el borde derecho de la cabecera (mínimo 40 dp); doble clic en el borde las ajusta al nombre y al valor más largo cargado (hasta 600 dp). Los anchos viven mientras dure la pestaña |
 | Filas | **27 dp** de pitch; líneas de 1 dp `#323438` entre filas y entre columnas; separadores de cabecera `#26282C` |
 | Texto del grid | JetBrains Mono ≈ 13 px, `#BCBEC4`; `<null>` en `#7B7E85`; números alineados a la derecha; texto a la izquierda |
 | Celda seleccionada | fondo `#284180`; la fila de la selección tiene el número de fila resaltado (`#A1A3AA` sobre `#1F2024`) |
@@ -133,7 +133,7 @@ Isla del editor: y 43–484. Isla Services: y 490–968 (hueco de 5 dp). Ambas c
 | Database Explorer (cabecera 40, barra 34, filas 24, selección redondeada) | ✅ |
 | Consola: pestaña píldora, barra de acciones, gutter 63 dp, línea actual, guía en col. 120, contorno y tiempo de la sentencia | ✅ |
 | Services: cabecera, árbol lateral, pestañas Output/resultados cerrables | ✅ (árbol de 240 dp; la referencia usaba 413 dp) |
-| Grid: cabecera 26, filas 27, columnas 112, líneas `#323438`, selección de celda, ⌘C, píldora de filas | ✅ |
+| Grid: cabecera 26, filas 27, columnas 112 (ancho inicial según tipo y nombre; redimensionables con el mouse y ajuste automático con doble clic en el borde), líneas `#323438`, selección de celda, ⌘C, píldora de filas | ✅ |
 | Diálogo Data Sources (lista, cabecera, pestaña General, Motor, tipo de conexión segmentado, host/puerto, usuario, contraseña, BD, SSL, URL, enlace «Probar conexión», Cancelar/Aplicar/OK) | ✅ sigue la disposición observada; pestañas **General**, **Opciones**, **SSH/SSL** y **Esquemas** (sin Advanced); en General, «Carpeta» (texto, un nivel) y «Color» (siete círculos de 20 dp y «ninguno») que se guardan con la conexión; **sin** Add comment, Save as Template ni «Save: Forever» (funciones que ksqlc no tiene) |
 | Explorador: conexiones | ✅ las carpetas van primero por nombre (se pliegan con un clic) y después las conexiones sin carpeta; el color tiñe el icono de la conexión en el explorador, en la barra superior y en la lista del diálogo. Menú contextual de una rutina: «Ejecutar…»; de una tabla: «Modificar…», «Vaciar tabla…» y «Eliminar…» (con la sentencia en un diálogo de confirmación). El menú contextual usa los colores del tema de la app, no los del sistema |
 | Tema oscuro | ✅ medido |
