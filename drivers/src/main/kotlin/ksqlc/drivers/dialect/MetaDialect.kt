@@ -135,6 +135,10 @@ abstract class MetaDialect : Dialect {
         return sb.toString()
     }
 
+    // defaults may point at sequences the copy does not have, and constraint and index names would clash in the same schema
+    override fun createTable(o: DbObject, d: TableDetails): String =
+        generateDdl(o, d.copy(columns = d.columns.map { it.copy(default = null) }, primaryKeyName = null, indexes = emptyList(), foreignKeys = emptyList()))
+
     private fun typeText(c: ColumnInfo): String {
         val sized = c.typeName.lowercase() in SIZED_TYPES
         val size = c.size?.takeIf { sized && it in 1..100_000 }

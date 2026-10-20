@@ -36,7 +36,7 @@ fun syncTarget(src: SchemaSource, o: DbObject): SyncTarget = SyncTarget(
  * The value as the target can take it. PostgreSQL gets text and anything it has no plain type for (uuid, json, enums…) untyped, so the
  * column decides what it is. shortcut: across different engines some types may not fit; the server refuses and nothing is applied.
  */
-private fun bindable(v: Any?, kind: DbKind): Any? = when {
+internal fun bindable(v: Any?, kind: DbKind): Any? = when {
     v == null -> null
     kind == DbKind.POSTGRES && v is String -> UntypedParam(v)
     v is Number || v is String || v is Boolean || v is ByteArray || v is java.sql.Date || v is java.sql.Time || v is java.sql.Timestamp || v is Temporal -> v

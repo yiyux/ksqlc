@@ -21,6 +21,9 @@ interface Dialect {
     fun details(conn: Connection, o: DbObject): TableDetails
     fun ddl(conn: Connection, o: DbObject): String
 
+    /** `create table` for [o] with the columns, types, not-null flags and primary key of [d]; no defaults, foreign keys or indexes. */
+    fun createTable(o: DbObject, d: TableDetails): String = error("Este motor no puede crear tablas")
+
     /**
      * The statements that call routine [o]. Each input parameter is a `:name` placeholder, so the console asks for the values
      * before running; the parameters it cannot take (OUT ones, where the engine needs a variable to hold them) make this fail.

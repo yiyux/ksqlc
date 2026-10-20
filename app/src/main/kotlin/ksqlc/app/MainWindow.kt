@@ -91,7 +91,8 @@ fun MainWindow(state: AppState) {
         NativeDialog(state)
         DiffDialog(state)
         ContentDiffDialog(state)
-        DdlDialog(state)   // above the comparison, whose «Ver SQL» opens it
+        CopyTableDialog(state)
+        DdlDialog(state)   // above the comparison and the copy, whose «Ver SQL» opens it
         ConfirmDialog(state)
         ParamDialog(state)
         ObjectSearchDialog(state)

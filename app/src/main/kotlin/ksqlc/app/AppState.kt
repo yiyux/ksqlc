@@ -991,6 +991,45 @@ class AppState(
         ) { confirmation = null; job.applySync(::record) }
     }
 
+    // --- copy table ----------------------------------------------------------------------
+    var copyTableJob by mutableStateOf<CopyTableJob?>(null)
+        private set
+
+    /** Opens the copy of table [o] of the active connection into a table of any saved connection. */
+    fun openCopyTable(o: DbObject) {
+        val src = explorer?.source ?: run { status = "Conéctate primero"; return }
+        val active = form.toDataSource()
+        val sources = listOf(active) + saved.filter { it.id != active.id }
+        copyTableJob?.close()
+        copyTableJob = CopyTableJob(
+            form.name, o, src, active.id, sources, { storedPassword(it.id) ?: if (it.id == active.id) form.passwordOrNull else null }, scope,
+        ) { target -> if (target.id == active.id) refreshExplorer() }
+    }
+
+    fun closeCopyTable() { copyTableJob?.close(); copyTableJob = null }
+
+    /** Shows the statements the copy would run on the target; the rows themselves are read and inserted by the copy. */
+    fun previewCopyTable() {
+        val job = copyTableJob ?: return
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { job.plan().let { it to job.sqlOf(it) } } }
+                .onSuccess { (p, sql) -> ddlView = DdlView(p.target.name, p.problem?.let { "-- $it" } ?: sql, heading = "SQL de la copia") }
+                .onFailure { status = "No se pudo preparar la copia: ${it.message}" }
+        }
+    }
+
+    /** Asks before copying, saying where and whether the table is created. */
+    fun confirmCopyTable() {
+        val job = copyTableJob ?: return
+        if (job.blocked || job.running) return
+        val what = if (job.existing != null) "se añadirán a la tabla ${job.existing!!.name}" else "se creará la tabla ${job.targetName.trim()} y se copiarán a ella"
+        confirmation = Confirmation(
+            "Copiar tabla",
+            "Las filas de ${job.sourceObj.name} $what en ${job.targetSource.name}.\nSe aplica todo o nada.",
+            "Copiar",
+        ) { confirmation = null; job.copy(::record) }
+    }
+
     // --- native dump / restore ---------------------------------------------------------
     var nativeJob by mutableStateOf<NativeJob?>(null)
         private set
@@ -1120,7 +1159,7 @@ class AppState(
 
     init { Tunnels.hostKeyDecider = HostKeyDecider(::askHostKey) }
 
-    fun dispose() { housekeeping.cancel(); Tunnels.closeAll(); diffJob?.close(); contentDiffJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
+    fun dispose() { housekeeping.cancel(); Tunnels.closeAll(); diffJob?.close(); contentDiffJob?.close(); copyTableJob?.close(); dataTabs.forEach { it.close() }; tabs.forEach { it.dispose() }; sessions.close(); introspectors.close() }
 }
 
 /** What the history gets for one Modify apply: every statement shares the outcome when all or nothing, else what ran and the one that failed; nothing if the session failed first. */
