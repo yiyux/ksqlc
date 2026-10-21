@@ -10,6 +10,10 @@ import kotlin.io.path.readText
 @Serializable
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+/** Where connection passwords are kept: the OS keychain, a master-password encrypted file, or memory only. */
+@Serializable
+enum class PasswordStorage { KEYCHAIN, FILE, NONE }
+
 /** Window layout and look, restored on the next start. Values are clamped by the UI that reads them. */
 @Serializable
 data class Settings(
@@ -22,6 +26,9 @@ data class Settings(
     val toolPaths: Map<String, String> = emptyMap(),
     /** List the engine's own schemas (`pg_catalog`, `sys`, `mysql`…) in the explorer. */
     val showSystemSchemas: Boolean = false,
+    val passwordStorage: PasswordStorage = PasswordStorage.KEYCHAIN,
+    /** The encrypted file for [PasswordStorage.FILE]; blank = `secrets.enc` in the data folder. */
+    val passwordFile: String = "",
 )
 
 /** `settings.json` in [dir]. A missing or unreadable file yields the defaults instead of an error. */

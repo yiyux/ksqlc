@@ -12,6 +12,7 @@ PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, Oracle y Apache Cassandra. Los d
 
 - **Varios data sources y varias consolas a la vez**, con carpetas, colores, modo solo lectura y transacciones Auto/Manual por conexión.
 - **Túnel SSH y SSL/TLS**: contraseñas y frases de paso en el llavero del sistema, nunca en `connections.json`.
+- **Contraseñas protegidas**: en **Ajustes** (botón de la barra superior) eliges dónde se guardan: el llavero del sistema (por defecto), un archivo cifrado con AES-256-GCM y una contraseña maestra que se pide al abrir la app, o en memoria solo (se olvidan al reiniciar). Cambiar de opción mueve las contraseñas ya guardadas.
 - **Database Explorer**: árbol de esquemas, tablas, columnas, índices y claves foráneas; filtro, búsqueda y refresco automático.
 - **Consola y editor SQL**: ejecutar sentencia, selección o script; autocompletado, ir a la declaración, parámetros `:nombre`, plan de ejecución, historial por conexión.
 - **Resultados y datos**: pestañas de resultados con paginación, edición de celdas con vista previa del DML, columnas redimensionables.
@@ -41,6 +42,8 @@ Los data sources se guardan en `~/.ksqlc/`.
 | macOS | `./build.sh` | `.dmg` y zip portable |
 | Linux | `./build.sh` | `.deb` y zip portable |
 | Windows | `.\build.ps1` (JDK 21 en `JAVA_HOME`) | `.msi` y zip portable |
+
+El `.msi` necesita [WiX 3](https://github.com/wixtoolset/wix3/releases) (`candle` y `light`) en el `PATH`. WiX valida el paquete con el servicio Windows Installer, que no funciona en una sesión SSH (`light.exe` falla con el código 216): para compilar en una máquina remota usa `.\build-msi.ps1 [-JavaHome ruta] [-WixDir ruta]`, que lanza `build.ps1` en la sesión de escritorio abierta del usuario (RDP o consola) y devuelve el log y el código de salida.
 
 El workflow [`release.yml`](.github/workflows/release.yml) hace los tres a la vez en GitHub Actions: se lanza a mano (los paquetes quedan como artefactos de la ejecución) o al subir un tag `v*`, que además publica una Release con todos los archivos. El tag tiene que coincidir con `packageVersion` de `app/build.gradle.kts` (`v1.2.0` ↔ `"1.2.0"`); si no, el workflow falla. Los instaladores no están firmados, así que macOS (Gatekeeper) y Windows (SmartScreen) mostrarán un aviso al abrirlos.
 

@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 /** ksqlc's own glyphs, drawn on a 16x16 grid. Deliberately simple; they are not copies of any other product's icons. */
 enum class IconKind {
     Database, Schema, Folder, Table, View, MatView, Sequence, Routine, Column, Key, Index, ForeignKey,
-    Play, PlayAll, Stop, Refresh, Plus, Minus, Copy, Filter, Gear, ChevronRight, ChevronDown, Close, Contrast, Format, Sort, Revert, Preview, Submit, Check, Rollback, Calendar, History, Export, Search, Updown, ArrowUp, ArrowDown, Explain, Analyze, Notebook,
+    Play, PlayAll, Stop, Refresh, Plus, Minus, Copy, Filter, Gear, ChevronRight, ChevronDown, Close, Contrast, Format, Sort, Revert, Preview, Submit, Check, Rollback, Calendar, History, Export, Search, Updown, ArrowUp, ArrowDown, Explain, Analyze, Notebook, Settings,
 }
 
 @Composable
@@ -116,6 +116,10 @@ private fun DrawScope.drawGlyph(kind: IconKind, c: Color) {
         IconKind.Format -> { seg(c, 2.5f, 3.5f, 13.5f, 3.5f); seg(c, 5.5f, 6.8f, 13.5f, 6.8f); seg(c, 5.5f, 10.1f, 11f, 10.1f); seg(c, 2.5f, 13.4f, 9f, 13.4f) }
         IconKind.Copy -> { box(c, 5.5f, 5.5f, 8f, 8f); poly(c, 3f, 10f, 3f, 2.5f, 10.5f, 2.5f) }
         IconKind.Filter -> poly(c, 2f, 3f, 14f, 3f, 9.5f, 8.5f, 9.5f, 13f, 6.5f, 11.5f, 6.5f, 8.5f, close = true)
+        IconKind.Settings -> {   // three sliders
+            seg(c, 2f, 4f, 14f, 4f); seg(c, 2f, 8f, 14f, 8f); seg(c, 2f, 12f, 14f, 12f)
+            drawCircle(c, 1.7f, Offset(10f, 4f), style = Fill); drawCircle(c, 1.7f, Offset(5f, 8f), style = Fill); drawCircle(c, 1.7f, Offset(11f, 12f), style = Fill)
+        }
         IconKind.Gear -> {
             drawCircle(c, 2.4f, Offset(8f, 8f), style = line)
             for (i in 0 until 8) {

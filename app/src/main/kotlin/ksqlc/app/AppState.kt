@@ -38,6 +38,8 @@ import ksqlc.sql.statementAt
 import ksqlc.storage.ConnectionStore
 import ksqlc.storage.HistoryEntry
 import ksqlc.storage.HistoryStore
+import ksqlc.storage.PasswordStorage
+import ksqlc.storage.secretStoreFor
 import ksqlc.storage.Settings
 import ksqlc.storage.SettingsStore
 import ksqlc.storage.ThemeMode
@@ -117,6 +119,21 @@ class AppState(
     fun updateSettings(change: (Settings) -> Settings) {
         settings = change(settings)
         runCatching { settingsStore.save(settings) }
+    }
+
+    /** Moves the stored passwords to the store [mode] asks for; [done] gets null on success or the error text. The setting only changes on success. */
+    fun applyPasswordStorage(mode: PasswordStorage, file: String, master: CharArray, done: (String?) -> Unit) {
+        val cur = settings
+        if (mode == cur.passwordStorage && (mode != PasswordStorage.FILE || file == cur.passwordFile)) return done(null)
+        scope.launch {
+            val err = withContext(Dispatchers.IO) {
+                runCatching {
+                    store.switchSecrets(secretStoreFor(cur.copy(passwordStorage = mode, passwordFile = file), store.dir, master))
+                }.exceptionOrNull()?.let { it.message ?: it.toString() }
+            }
+            if (err == null) updateSettings { it.copy(passwordStorage = mode, passwordFile = file) }
+            done(err)
+        }
     }
 
     fun cycleTheme() = updateSettings {
@@ -202,6 +219,8 @@ class AppState(
 
     // --- panels and dialogs ------------------------------------------------------------
     var dataSourceDialog by mutableStateOf(false)
+    var settingsDialog by mutableStateOf(false)
+    val dataDir: java.nio.file.Path get() = store.dir
     var ddlView by mutableStateOf<DdlView?>(null)
     var servicesVisible by mutableStateOf(true)
 

@@ -94,6 +94,7 @@ fun MainWindow(state: AppState, ws: Workspace? = null) {
         CopyTableDialog(state)
         DdlDialog(state)   // above the comparison and the copy, whose «Ver SQL» opens it
         ConfirmDialog(state)
+        if (state.settingsDialog) SettingsDialog(state)
         ParamDialog(state)
         ObjectSearchDialog(state)
     }
@@ -128,6 +129,7 @@ private fun TopBar(state: AppState, ws: Workspace?) {
         Row(Modifier.align(Alignment.CenterEnd), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             ToolButton(IconKind.Contrast, "Tema: ${themeLabel(state.settings.themeMode)}", state::cycleTheme)
             ToolButton(IconKind.Gear, "Data sources", { state.dataSourceDialog = true })
+            ToolButton(IconKind.Settings, "Ajustes", { state.settingsDialog = true }, modifier = Modifier.testTag("settings-button"))
         }
     }
 }

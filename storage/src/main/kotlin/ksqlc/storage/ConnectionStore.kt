@@ -15,7 +15,7 @@ private data class Stored(val version: Int = 1, val connections: List<DataSource
  * Connections as JSON in [dir]/connections.json; passwords only in [secrets].
  * A blank password clears any stored secret.
  */
-class ConnectionStore(private val dir: Path, private val secrets: SecretStore) {
+class ConnectionStore(val dir: Path, @Volatile private var secrets: SecretStore) {
     private val file = dir.resolve("connections.json")
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
@@ -41,6 +41,17 @@ class ConnectionStore(private val dir: Path, private val secrets: SecretStore) {
         write(list().filterNot { it.id == id })
         secrets.delete(id)
         secrets.delete(sshKey(id))
+    }
+
+    /** Moves every stored secret to [to], copying before deleting so a failure leaves the old store whole. */
+    fun switchSecrets(to: SecretStore) {
+        val from = secrets
+        if (from === to) return
+        val keys = list().flatMap { listOf(it.id, sshKey(it.id)) }
+        val moved = keys.mapNotNull { k -> from.get(k)?.let { k to it } }
+        moved.forEach { (k, v) -> to.set(k, v) }
+        secrets = to
+        moved.forEach { (k, _) -> runCatching { from.delete(k) } }
     }
 
     private fun write(all: List<DataSource>) {

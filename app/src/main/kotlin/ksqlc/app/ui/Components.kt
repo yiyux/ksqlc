@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -262,6 +263,19 @@ fun KCheckbox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier 
             }
         }
         if (label != null) Text(label, fontSize = 13.sp, color = if (enabled) c.text else c.textMuted)
+    }
+}
+
+/** 16dp radio button with a [label]; the same dense sizing as [KCheckbox]. */
+@Composable
+fun KRadio(selected: Boolean, onSelect: () -> Unit, label: String, modifier: Modifier = Modifier) {
+    val c = Ksqlc.colors
+    Row(
+        modifier.clickable(remember { MutableInteractionSource() }, null, onClick = onSelect),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.size(16.dp).clip(CircleShape).background(c.editorBg, CircleShape).border(if (selected) 5.dp else 1.dp, if (selected) c.accent else c.border, CircleShape))
+        Text(label, fontSize = 13.sp, color = c.text)
     }
 }
 
