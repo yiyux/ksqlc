@@ -8,6 +8,9 @@ cd "$(dirname "$0")"
 
 bin=app/build/compose/binaries/main
 rm -rf dist && mkdir -p dist
-cp "$bin"/dmg/*.dmg "$bin"/deb/*.deb dist/ 2>/dev/null || true
+shopt -s nullglob  # cada SO genera solo uno de los dos formatos
+pkgs=("$bin"/dmg/*.dmg "$bin"/deb/*.deb)
+[[ ${#pkgs[@]} -gt 0 ]] || { echo "No se generó ningún instalador en $bin" >&2; exit 1; }
+cp "${pkgs[@]}" dist/
 (cd "$bin/app" && zip -qry "$OLDPWD/dist/ksqlc-$(uname -s)-$(uname -m).zip" .)
 ls -l dist

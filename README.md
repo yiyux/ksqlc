@@ -27,7 +27,7 @@ Hace falta un JDK 21. `run.sh` busca uno (variable `KSQLC_JAVA_HOME`, `JAVA_HOME
 
 ```
 ./run.sh          # abre la aplicación
-./run.sh test     # tests (los de integración usan Testcontainers y necesitan Docker)
+./run.sh test     # tests (los de integración usan Testcontainers y se omiten si no hay Docker)
 ```
 
 Los data sources se guardan en `~/.ksqlc/`.
@@ -42,7 +42,7 @@ Los data sources se guardan en `~/.ksqlc/`.
 | Linux | `./build.sh` | `.deb` y zip portable |
 | Windows | `.\build.ps1` (JDK 21 en `JAVA_HOME`) | `.msi` y zip portable |
 
-El workflow [`release.yml`](.github/workflows/release.yml) hace los tres a la vez en GitHub Actions: se lanza a mano o al subir un tag `v*`. Los instaladores no están firmados, así que macOS (Gatekeeper) y Windows (SmartScreen) mostrarán un aviso al abrirlos.
+El workflow [`release.yml`](.github/workflows/release.yml) hace los tres a la vez en GitHub Actions: se lanza a mano (los paquetes quedan como artefactos de la ejecución) o al subir un tag `v*`, que además publica una Release con todos los archivos. El tag tiene que coincidir con `packageVersion` de `app/build.gradle.kts` (`v1.2.0` ↔ `"1.2.0"`); si no, el workflow falla. Los instaladores no están firmados, así que macOS (Gatekeeper) y Windows (SmartScreen) mostrarán un aviso al abrirlos.
 
 ## Estructura
 
