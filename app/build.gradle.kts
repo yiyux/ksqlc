@@ -30,6 +30,9 @@ compose.desktop { application {
         // los drivers JDBC (java.sql, java.naming, ...) necesitan módulos que jlink omitiría
         // shortcut: engorda el runtime ~40 MB, cambiar a modules(...) con :app:suggestRuntimeModules si importa
         includeAllModules = true
+        // avisos de licencia de terceros (packaging/resources/common) dentro de cada paquete.
+        // Los jars de los drivers deben ir sin modificar (lo exige la licencia de Oracle): sin ProGuard ni fat-jar.
+        appResourcesRootDir.set(rootProject.layout.projectDirectory.dir("packaging/resources"))
         macOS { iconFile.set(project.file("icons/ksqlc.icns")) }
         windows {
             iconFile.set(project.file("icons/ksqlc.ico"))

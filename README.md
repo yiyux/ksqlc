@@ -56,4 +56,8 @@ El workflow [`release.yml`](.github/workflows/release.yml) hace los tres a la ve
 
 ## Licencia
 
-GNU GPL v3. Ver [`LICENSE`](LICENSE).
+GNU GPL v3. Ver [`LICENSE`](LICENSE). El código fuente de cada versión es el del tag correspondiente de este repositorio.
+
+### Licencias de terceros
+
+Los instaladores incluyen, sin modificar, los drivers JDBC de SQLite, PostgreSQL, MySQL, MariaDB, SQL Server, Oracle y Cassandra, cada uno con su propia licencia (el de Oracle es propietario, con permiso de redistribución gratuita). La lista completa de componentes y los textos de licencia están en [`packaging/resources/common/`](packaging/resources/common/THIRD-PARTY-NOTICES.md) y también dentro de cada paquete.
