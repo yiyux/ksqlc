@@ -52,7 +52,7 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier, ws: Workspace?
                 val data = tab?.edit
                 if (tab == null) OutputLog(state, Modifier.fillMaxSize())
                 else if (tab.plan) PlanView(tab, Modifier.fillMaxSize())
-                else if (data == null) Grid(tab, onLoadMore = { scope.launch(Dispatchers.IO) { tab.loadMore(PAGE) } }, modifier = Modifier.fillMaxSize())
+                else if (data == null) Grid(tab, onLoadMore = { scope.launch(Dispatchers.IO) { state.loadMore(tab) } }, modifier = Modifier.fillMaxSize())
                 else {
                     val grid = data.grid
                     Row(Modifier.fillMaxWidth().height(34.dp).background(c.toolbarBg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -61,7 +61,7 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier, ws: Workspace?
                         EditStatus(state, data, "result")
                     }
                     Separator()
-                    Grid(grid, onLoadMore = { scope.launch(Dispatchers.IO) { grid.loadMore(PAGE) } }, modifier = Modifier.fillMaxSize().testTag("result-grid"), editing = data.editor, onNotice = { state.status = it })
+                    Grid(grid, onLoadMore = { scope.launch(Dispatchers.IO) { state.loadMore(grid) } }, modifier = Modifier.fillMaxSize().testTag("result-grid"), editing = data.editor, onNotice = { state.status = it })
                 }
             }
         }

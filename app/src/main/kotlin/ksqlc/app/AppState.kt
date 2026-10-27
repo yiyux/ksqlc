@@ -949,24 +949,30 @@ class AppState(
         }
     }
 
-    /** A console result: every row of its query (read again on another connection) or just the rows its grid has loaded. */
+    /**
+     * A console result: every row of its query (read again on another connection) or just the rows its grid has loaded.
+     * A statement that may write (INSERT … RETURNING, CALL…) is never run a second time: only the loaded rows are offered.
+     */
     fun exportResult(tab: ResultTab) {
         val target = form.toDataSource(); val pw = form.passwordOrNull
         val dialect = ksqlc.drivers.dialect.Dialect.of(form.effectiveKind)
         val names = tab.result.columns.map { it.name }
         val loaded = tab.rows.toList()
+        val writeLoaded: WriteFn = { w, stop, progress ->
+            val out = w(names)
+            out.header()
+            for (r in loaded) { if (stop()) break; out.row(r) }
+            out.finish(); progress(out.count); out.count
+        }
+        val rerunnable = ksqlc.drivers.readOnlyViolation(tab.result.sql) == null
         openExport(ExportRequest(
             tab.title, "${form.name} · ${tab.title}", "resultado", dialect::quote,
-            "Todas las filas vuelve a ejecutar la consulta en una conexión aparte (no ve tablas temporales ni ajustes hechos en la consola).",
+            if (rerunnable) "Todas las filas vuelve a ejecutar la consulta en una conexión aparte (no ve tablas temporales ni ajustes hechos en la consola)."
+            else "Esta sentencia puede escribir datos y no se ejecuta de nuevo: solo se exportan las filas cargadas.",
             sample = { ExportSample(names, loaded.take(PREVIEW_ROWS_EXPORT)) },
             loaded = loaded.size,
-            writeLoaded = { w, stop, progress ->
-                val out = w(names)
-                out.header()
-                for (r in loaded) { if (stop()) break; out.row(r) }
-                out.finish(); progress(out.count); out.count
-            },
-            write = rerun(target, pw, tab.result.sql),
+            writeLoaded = writeLoaded.takeIf { rerunnable },
+            write = if (rerunnable) rerun(target, pw, tab.result.sql) else writeLoaded,
         ))
     }
 
@@ -984,6 +990,11 @@ class AppState(
 
     fun exportData(tab: DataTab) = exportQuery(tab.obj, tab.query())
     fun exportObject(o: DbObject) { exportQuery(o, explorer?.source?.dialect?.selectAll(o) ?: return) }
+
+    /** Reads the next page of [tab] (blocking: call it off the UI thread); a failed read ends the grid and says why in the status bar. */
+    fun loadMore(tab: ResultTab) {
+        runCatching { tab.loadMore(PAGE) }.onFailure { status = "Error al leer más filas: ${it.message ?: it}" }
+    }
 
     /** Loads a .sql file into the console (run it with "Ejecutar script"). */
     fun openSqlFile() {

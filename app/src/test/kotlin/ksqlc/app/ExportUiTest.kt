@@ -115,6 +115,30 @@ class ExportUiTest {
         assertEquals(total, Files.readAllLines(csv).size)
     }
 
+    @Test fun aResultFromAStatementThatWritesIsNeverRunAgain() {
+        rule.setContent { App(state) }
+        val db = Files.createTempFile("ksqlc-ui", ".db").also { it.toFile().deleteOnExit() }.toString()
+        state.form.database = db
+        setEditor("create table t(id integer primary key, v text)")
+        rule.onNodeWithContentDescription("Ejecutar script", substring = true).performClick()
+        until { !state.running && state.explorer != null }
+        setEditor("insert into t(v) values ('a') returning id, v")
+        rule.onNodeWithContentDescription("Ejecutar (", substring = true).performClick()
+        until { !state.running && state.tabs.size == 1 }
+        rule.onNodeWithTag("export-result").performClick()
+        untilTag("export-dialog")
+        assertTrue(!exists("export-all"), "no debe ofrecer volver a ejecutar una sentencia que escribe")
+        val csv = Files.createTempFile("ksqlc-export", ".csv")
+        rule.onNodeWithTag("export-path").performTextReplacement(csv.toString())
+        until { state.exportJob!!.path == csv.toString() }
+        rule.onNodeWithTag("export-file").assertIsEnabled().performClick()
+        until { state.exportJob == null || state.exportJob!!.error != null }
+        assertEquals(null, state.exportJob?.error)
+        assertEquals(listOf("1,a"), Files.readAllLines(csv))
+        val rows = java.sql.DriverManager.getConnection("jdbc:sqlite:$db").use { c -> c.createStatement().use { st -> st.executeQuery("select count(*) from t").use { it.next(); it.getInt(1) } } }
+        assertEquals(1, rows)
+    }
+
     @Test fun canExportOnlyTheLoadedRows() {
         rule.setContent { App(state) }
         state.form.database = Files.createTempFile("ksqlc-ui", ".db").also { it.toFile().deleteOnExit() }.toString()

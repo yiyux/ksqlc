@@ -37,8 +37,9 @@ class ResultTab(val title: String, val result: StatementResult.Rows) {
         loading = true
         try {
             rows.addAll(result.cursor.fetch(pageSize))
-            exhausted = result.cursor.exhausted
         } finally {
+            // also after a failed read: the cursor is closed then, and there is nothing more to ask it for
+            exhausted = result.cursor.exhausted
             loading = false
         }
     }

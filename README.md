@@ -15,7 +15,7 @@ PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, Oracle, Apache Cassandra y Trino
 - **Contraseñas protegidas**: en **Ajustes** (botón de la barra superior) eliges dónde se guardan: el llavero del sistema (por defecto), un archivo cifrado con AES-256-GCM y una contraseña maestra que se pide al abrir la app, o en memoria solo (se olvidan al reiniciar). Cambiar de opción mueve las contraseñas ya guardadas.
 - **Database Explorer**: árbol de esquemas, tablas, columnas, índices y claves foráneas; filtro, búsqueda y refresco automático.
 - **Consola y editor SQL**: ejecutar sentencia, selección o script; autocompletado, ir a la declaración, parámetros `:nombre`, plan de ejecución, historial por conexión.
-- **Resultados y datos**: pestañas de resultados con paginación, edición de celdas con vista previa del DML, columnas redimensionables.
+- **Resultados y datos**: pestañas de resultados con paginación (un error al cargar más filas se muestra en la barra de estado), edición de celdas con vista previa del DML, columnas redimensionables.
 - **DDL**: ver, copiar y modificar tablas; eliminar, vaciar y ejecutar rutinas.
 - **Importar y exportar**: CSV, TSV, JSON y SQL `INSERT`, con todas las filas de la consulta (leídas por bloques y en segundo plano, con indicador y cancelación); importar CSV con asignación de columnas; volcado y restauración nativos (`pg_dump`, `mysqldump`, `sqlite3`).
 - **Comparar y copiar**: diff de esquemas, diff de contenido de tablas con «Sincronizar derecha», y copiar una tabla a otro data source.
