@@ -36,8 +36,12 @@ const val PREVIEW_ROWS_EXPORT = 20
 class ExportRequest(
     val name: String, val source: String, val table: String, val quote: (String) -> String, val note: String?,
     val sample: () -> ExportSample,
-    val write: (newWriter: (List<String>) -> RowWriter, cancelled: () -> Boolean, progress: (Long) -> Unit) -> Long,
+    /** [writeLoaded], when set, writes only the [loaded] rows the grid already has; [write] then means every row of the query. */
+    val loaded: Int = 0, val writeLoaded: WriteFn? = null,
+    val write: WriteFn,
 )
+
+typealias WriteFn = (newWriter: (List<String>) -> RowWriter, cancelled: () -> Boolean, progress: (Long) -> Unit) -> Long
 
 /** Rows the clipboard export stops at; a text that big is already more than a paste target copes with. */
 const val CLIPBOARD_ROWS = 10_000
@@ -51,6 +55,8 @@ class ExportJob(val request: ExportRequest, private val scope: CoroutineScope, p
     var header by mutableStateOf(false)
     var transpose by mutableStateOf(false)
     var rowHeader by mutableStateOf(false)
+    /** Every row of the query (true) or only those the grid has loaded; only offered when the request has [ExportRequest.writeLoaded]. */
+    var allRows by mutableStateOf(true)
     var running by mutableStateOf(false)
         private set
     var progress by mutableStateOf(0L)
@@ -103,10 +109,11 @@ class ExportJob(val request: ExportRequest, private val scope: CoroutineScope, p
             }
             val file = if (toClipboard) null else Path.of(path.trim().replaceFirst(Regex("^~"), System.getProperty("user.home")))
             val text = StringBuilder()
+            val write = if (allRows) request.write else request.writeLoaded ?: request.write
             val outcome = withContext(Dispatchers.IO) {
                 runCatching {
-                    if (file == null) request.write(newWriter(text), stop) { progress = it }
-                    else Files.newBufferedWriter(file).use { out -> request.write(newWriter(out), stop) { progress = it } }
+                    if (file == null) write(newWriter(text), stop) { progress = it }
+                    else Files.newBufferedWriter(file).use { out -> write(newWriter(out), stop) { progress = it } }
                 }.onFailure { if (file != null) runCatching { Files.deleteIfExists(file) } }
             }
             running = false

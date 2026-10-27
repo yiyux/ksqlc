@@ -919,20 +919,55 @@ class AppState(
     var exportJob by mutableStateOf<ExportJob?>(null)
         private set
 
-    private fun openExport(r: ExportRequest) { exportJob = ExportJob(r, scope) { status = it; logLine("exportar ${r.name}", it) } }
-    fun closeExport() { exportJob?.let { if (it.running) it.cancel() }; exportJob = null }
+    /** Whether the export dialog is on screen; a running export outlives it and shows in the status bar instead. */
+    var exportDialogOpen by mutableStateOf(false)
+        private set
 
-    /** A console result: the rows already loaded plus whatever is left in its cursor (which then cannot load more). */
+    internal fun openExport(r: ExportRequest) {
+        if (exportJob?.running == true) { exportDialogOpen = true; status = "Ya hay una exportación en curso"; return }
+        exportJob = ExportJob(r, scope) { status = it; logLine("exportar ${r.name}", it); if (!exportDialogOpen) exportJob = null }
+        exportDialogOpen = true
+    }
+
+    /** Closes the dialog; an export that is still running keeps going in the background (see [cancelExport]). */
+    fun closeExport() { exportDialogOpen = false; if (exportJob?.running != true) exportJob = null }
+    fun showExport() { if (exportJob != null) exportDialogOpen = true }
+    fun cancelExport() { exportJob?.cancel() }
+
+    /** Runs [sql] again on a connection of its own, so the console and open tabs are left alone, and writes every row it returns. */
+    private fun rerun(target: DataSource, pw: String?, sql: String): WriteFn = { w, stop, progress ->
+        Session(target, pw, autoCommit = true).use { ksqlc.drivers.exportQuery(it, sql, w, stop, progress) }
+    }
+
+    private fun sampleOf(target: DataSource, pw: String?, sql: String): () -> ExportSample = {
+        Session(target, pw, autoCommit = true).use { s ->
+            when (val r = s.stream(sql, PREVIEW_ROWS_EXPORT)) {
+                is StatementResult.Rows -> try { ExportSample(r.columns.map { it.name }, r.cursor.fetch(PREVIEW_ROWS_EXPORT)) } finally { r.cursor.close() }
+                is StatementResult.Failed -> error(r.message)
+                else -> error("la consulta no devuelve filas")
+            }
+        }
+    }
+
+    /** A console result: every row of its query (read again on another connection) or just the rows its grid has loaded. */
     fun exportResult(tab: ResultTab) {
+        val target = form.toDataSource(); val pw = form.passwordOrNull
         val dialect = ksqlc.drivers.dialect.Dialect.of(form.effectiveKind)
         val names = tab.result.columns.map { it.name }
+        val loaded = tab.rows.toList()
         openExport(ExportRequest(
-            tab.title, "${form.name} · ${tab.title}", "resultado", dialect::quote, "Las filas que faltan por cargar se leen del cursor; después la pestaña no podrá cargar más.",
-            sample = { ExportSample(names, tab.rows.take(PREVIEW_ROWS_EXPORT)) },
-        ) { w, stop, progress ->
-            try { ksqlc.drivers.exportRows(tab.result, tab.rows.toList(), w(names), stop, progress) }
-            finally { tab.exhausted = true }
-        })
+            tab.title, "${form.name} · ${tab.title}", "resultado", dialect::quote,
+            "Todas las filas vuelve a ejecutar la consulta en una conexión aparte (no ve tablas temporales ni ajustes hechos en la consola).",
+            sample = { ExportSample(names, loaded.take(PREVIEW_ROWS_EXPORT)) },
+            loaded = loaded.size,
+            writeLoaded = { w, stop, progress ->
+                val out = w(names)
+                out.header()
+                for (r in loaded) { if (stop()) break; out.row(r) }
+                out.finish(); progress(out.count); out.count
+            },
+            write = rerun(target, pw, tab.result.sql),
+        ))
     }
 
     /** A table or view: runs [sql] again on its own connection, so the console and open tabs are left alone. */
@@ -942,18 +977,9 @@ class AppState(
         val db = form.database.substringAfterLast('/').ifBlank { form.name }
         openExport(ExportRequest(
             o.name, listOfNotNull(db, o.ns.label.ifBlank { null }, o.name).joinToString("."), dialect.qualified(o), dialect::quote, null,
-            sample = {
-                Session(target, pw, autoCommit = true).use { s ->
-                    when (val r = s.runScript(listOf(sql), keepRows = 0).single()) {
-                        is StatementResult.Rows -> try { ExportSample(r.columns.map { it.name }, r.cursor.fetch(PREVIEW_ROWS_EXPORT)) } finally { r.cursor.close() }
-                        is StatementResult.Failed -> error(r.message)
-                        else -> error("la consulta no devuelve filas")
-                    }
-                }
-            },
-        ) { w, stop, progress ->
-            Session(target, pw, autoCommit = true).use { ksqlc.drivers.exportQuery(it, sql, w, stop, progress) }
-        })
+            sample = sampleOf(target, pw, sql),
+            write = rerun(target, pw, sql),
+        ))
     }
 
     fun exportData(tab: DataTab) = exportQuery(tab.obj, tab.query())

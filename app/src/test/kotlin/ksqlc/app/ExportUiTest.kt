@@ -94,6 +94,90 @@ class ExportUiTest {
         assertEquals("[\n  {\"id\": 1, \"name\": \"Ada\"},\n  {\"id\": 2, \"name\": \"Grace, \\\"G\\\"\"}\n]\n", Files.readString(json))
     }
 
+    @Test fun exportsEveryRowOfAResultThatWasCutAtThePageLimit() {
+        rule.setContent { App(state) }
+        state.form.database = Files.createTempFile("ksqlc-ui", ".db").also { it.toFile().deleteOnExit() }.toString()
+        val total = PAGE * 2 + 300
+        // the first result is not the last statement of the script, so the console keeps only its first page
+        setEditor("with recursive n(i) as (select 1 union all select i + 1 from n where i < $total) select i from n; select 1 as z")
+        rule.onNodeWithContentDescription("Ejecutar script", substring = true).performClick()
+        until { !state.running && state.tabs.size == 2 }
+        assertEquals(PAGE, state.tabs[0].rows.size)
+        state.selectedTab = 0
+        rule.onNodeWithTag("export-result").performClick()
+        untilTag("export-dialog")
+        val csv = Files.createTempFile("ksqlc-export", ".csv")
+        rule.onNodeWithTag("export-path").performTextReplacement(csv.toString())
+        until { state.exportJob!!.path == csv.toString() }
+        rule.onNodeWithTag("export-file").assertIsEnabled().performClick()
+        until { state.exportJob == null || state.exportJob!!.error != null }
+        assertEquals(null, state.exportJob?.error)
+        assertEquals(total, Files.readAllLines(csv).size)
+    }
+
+    @Test fun canExportOnlyTheLoadedRows() {
+        rule.setContent { App(state) }
+        state.form.database = Files.createTempFile("ksqlc-ui", ".db").also { it.toFile().deleteOnExit() }.toString()
+        setEditor("with recursive n(i) as (select 1 union all select i + 1 from n where i < ${PAGE * 2}) select i from n; select 1 as z")
+        rule.onNodeWithContentDescription("Ejecutar script", substring = true).performClick()
+        until { !state.running && state.tabs.size == 2 }
+        state.selectedTab = 0
+        rule.onNodeWithTag("export-result").performClick()
+        untilTag("export-dialog")
+        val csv = Files.createTempFile("ksqlc-export", ".csv")
+        rule.onNodeWithTag("export-path").performTextReplacement(csv.toString())
+        rule.onNodeWithTag("export-loaded").performClick()
+        until { state.exportJob!!.path == csv.toString() && !state.exportJob!!.allRows }
+        rule.onNodeWithTag("export-file").assertIsEnabled().performClick()
+        until { state.exportJob == null || state.exportJob!!.error != null }
+        assertEquals(PAGE, Files.readAllLines(csv).size)
+    }
+
+    private fun fakeRequest(write: WriteFn) = ExportRequest("grande", "origen", "grande", { it }, null, sample = { ExportSample(listOf("a"), listOf(listOf(1))) }, write = write)
+
+    private fun startFake(write: WriteFn): java.nio.file.Path {
+        val out = Files.createTempFile("ksqlc-export", ".csv")
+        state.openExport(fakeRequest(write))
+        untilTag("export-dialog")
+        rule.onNodeWithTag("export-path").performTextReplacement(out.toString())
+        until { state.exportJob!!.path == out.toString() }
+        rule.onNodeWithTag("export-file").assertIsEnabled().performClick()
+        untilTag("export-indicator")
+        return out
+    }
+
+    @Test fun aRunningExportKeepsGoingWhenTheDialogIsHiddenAndShowsAnIndicator() {
+        rule.setContent { App(state) }
+        val gate = java.util.concurrent.CountDownLatch(1)
+        startFake { w, _, progress ->
+            val out = w(listOf("a")); out.header(); progress(1)
+            gate.await(20, java.util.concurrent.TimeUnit.SECONDS)
+            out.row(listOf(1)); out.finish(); out.count
+        }
+        rule.onNodeWithTag("export-hide").performClick()
+        until { !exists("export-dialog") }
+        assertTrue(state.exportJob?.running == true)
+        assertTrue(exists("export-indicator"))
+        gate.countDown()
+        until { state.exportJob == null }
+        assertTrue("1 filas exportadas" in state.status, state.status)
+        assertTrue(!exists("export-indicator"))
+    }
+
+    @Test fun theIndicatorCancelsARunningExport() {
+        rule.setContent { App(state) }
+        startFake { w, stop, progress ->
+            val out = w(listOf("a")); out.header(); progress(0)
+            while (!stop()) Thread.sleep(10)
+            out.finish(); out.count
+        }
+        rule.onNodeWithTag("export-hide").performClick()
+        until { !exists("export-dialog") }
+        rule.onNodeWithTag("export-indicator-cancel").performClick()
+        until { state.exportJob == null }
+        assertTrue("(cancelado)" in state.status, state.status)
+    }
+
     @Test fun missingPathShowsAnError() {
         rule.setContent { App(state) }
         state.form.database = Files.createTempFile("ksqlc-ui", ".db").also { it.toFile().deleteOnExit() }.toString()

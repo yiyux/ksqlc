@@ -17,7 +17,7 @@ PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, Oracle, Apache Cassandra y Trino
 - **Consola y editor SQL**: ejecutar sentencia, selección o script; autocompletado, ir a la declaración, parámetros `:nombre`, plan de ejecución, historial por conexión.
 - **Resultados y datos**: pestañas de resultados con paginación, edición de celdas con vista previa del DML, columnas redimensionables.
 - **DDL**: ver, copiar y modificar tablas; eliminar, vaciar y ejecutar rutinas.
-- **Importar y exportar**: CSV, TSV, JSON y SQL `INSERT`; importar CSV con asignación de columnas; volcado y restauración nativos (`pg_dump`, `mysqldump`, `sqlite3`).
+- **Importar y exportar**: CSV, TSV, JSON y SQL `INSERT`, con todas las filas de la consulta (leídas por bloques y en segundo plano, con indicador y cancelación); importar CSV con asignación de columnas; volcado y restauración nativos (`pg_dump`, `mysqldump`, `sqlite3`).
 - **Comparar y copiar**: diff de esquemas, diff de contenido de tablas con «Sincronizar derecha», y copiar una tabla a otro data source.
 
 El detalle y el estado de cada función está en [`docs/spec/feature-inventory.md`](docs/spec/feature-inventory.md).

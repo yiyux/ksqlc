@@ -150,13 +150,13 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
      * Only the last result set stays open; earlier ones are drained to [keepRows] rows so
      * one script can show several grids without holding every cursor.
      */
-    fun runScript(statements: List<String>, keepRows: Int = 500): List<StatementResult> {
+    fun runScript(statements: List<String>, keepRows: Int = 500, fetchSize: Int = 0): List<StatementResult> {
         cancelRequested = false
         touch()
         activeCursor?.close(); activeCursor = null
         val results = mutableListOf<StatementResult>()
         for (sql in statements) {
-            val r = runOne(sql)
+            val r = runOne(sql, fetchSize)
             results += r
             if (r is StatementResult.Failed || cancelRequested) break
         }
@@ -166,13 +166,13 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
         }
     }
 
-    private fun runOne(sql: String): StatementResult {
+    private fun runOne(sql: String, fetchSize: Int = 0): StatementResult {
         val t0 = System.nanoTime()
         fun ms() = (System.nanoTime() - t0) / 1_000_000
         if (options.readOnly) readOnlyViolation(sql)?.let { return StatementResult.Failed(sql, 0, it) }
         var st: Statement? = null
         try {
-            st = connection().createStatement().also { current = it }
+            st = connection().createStatement().also { current = it; if (fetchSize != 0) it.fetchSize = fetchSize }
             // A cancel that arrived while connecting had no statement to hit yet.
             if (cancelRequested) {
                 st.close()
@@ -184,7 +184,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
             val rs = st.resultSet
             val md = rs.metaData
             val cols = (1..md.columnCount).map { Column(md.getColumnLabel(it), md.getColumnTypeName(it)) }
-            val cursor = JdbcCursor(st, rs, (1..md.columnCount).map { md.getColumnType(it) })
+            val cursor = JdbcCursor(st, rs, (1..md.columnCount).map { md.getColumnType(it) }, cancelOnClose = fetchSize == Int.MIN_VALUE)
             activeCursor = cursor
             return StatementResult.Rows(sql, ms(), cols, cursor)
         } catch (e: SQLException) {
@@ -193,6 +193,16 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
         } finally {
             current = null
         }
+    }
+
+    /**
+     * One read whose rows the driver hands over in blocks of [fetchSize] instead of loading the whole result first, so a huge table
+     * can be walked in constant memory. Meant for a session of its own: on PostgreSQL it leaves the connection in a read transaction.
+     */
+    fun stream(sql: String, fetchSize: Int = STREAM_FETCH): StatementResult {
+        // pgjdbc only uses a server-side cursor inside a transaction; Connector/J streams row by row with this magic value
+        if (ds.kind == DbKind.POSTGRES) setAutoCommit(false)
+        return runScript(listOf(sql), keepRows = 0, fetchSize = if (ds.kind == DbKind.MYSQL) Int.MIN_VALUE else fetchSize).single()
     }
 
     override fun close() {
@@ -209,14 +219,19 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
     }
 }
 
-private class JdbcCursor(private val st: Statement, private val rs: ResultSet, private val types: List<Int>) : RowCursor {
+private const val STREAM_FETCH = 1000
+
+private class JdbcCursor(private val st: Statement, private val rs: ResultSet, private val types: List<Int>, private val cancelOnClose: Boolean = false) : RowCursor {
     private val width = types.size
+    /** A read that broke after some rows were already handed out: raised by the next [fetch] instead of ending the result as if it were complete. */
+    private var broken: SQLException? = null
 
     override var exhausted = false
         private set
 
     override fun fetch(n: Int): List<List<Any?>> {
         if (exhausted) return emptyList()
+        broken?.let { exhausted = true; close(); throw it }
         val rows = ArrayList<List<Any?>>(minOf(n, 1024))
         try {
             while (rows.size < n) {
@@ -224,8 +239,9 @@ private class JdbcCursor(private val st: Statement, private val rs: ResultSet, p
                 rows += List(width) { value(it + 1, types[it]) }
             }
         } catch (e: SQLException) {
-            exhausted = true
-            if (rows.isEmpty()) throw e
+            if (rows.isEmpty()) { exhausted = true; close(); throw e }
+            broken = e
+            return rows
         }
         if (exhausted) close()
         return rows
@@ -242,7 +258,8 @@ private class JdbcCursor(private val st: Statement, private val rs: ResultSet, p
     @Volatile var isClosed = false
         private set
 
-    override fun close() { isClosed = true; runCatching { rs.close() }; runCatching { st.close() } }
+    // a streaming MySQL result read to its end before closing: cancelling first makes closing early cheap
+    override fun close() { isClosed = true; if (cancelOnClose && !exhausted) runCatching { st.cancel() }; runCatching { rs.close() }; runCatching { st.close() } }
 }
 
 private const val ORACLE_TIMESTAMPTZ = -101

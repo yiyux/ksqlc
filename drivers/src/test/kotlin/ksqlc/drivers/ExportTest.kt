@@ -68,4 +68,12 @@ class ExportTest {
         assertFailsWith<IllegalStateException> { exportQuery(s, "select * from nope", { RowWriter(ExportFormat.CSV, it, sb) }) }
     }
     }
+
+    @Test fun aReadThatBreaksHalfwayFailsTheExportInsteadOfEndingItEarly() { Session(DataSource("t", "t", DbKind.SQLITE, "jdbc:sqlite::memory:"), null).use { s ->
+        // the second row overflows an integer: SQLite only notices when it steps to it, after the first row was already handed out
+        val sql = "select abs(x) from (select 1 as x union all select -9223372036854775808)"
+        val e = assertFailsWith<java.sql.SQLException> { exportQuery(s, sql, { RowWriter(ExportFormat.CSV, it, StringBuilder()) }) }
+        assertTrue("overflow" in e.message.orEmpty(), e.message)
+    }
+    }
 }

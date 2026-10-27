@@ -240,6 +240,16 @@ private fun AppStatusBar(state: AppState) {
             KIcon(IconKind.Play, tint = c.textSecondary, size = 12.dp)
             Text("Services", fontSize = 12.sp, color = c.textSecondary)
         }
+        state.exportJob?.takeIf { it.running }?.let { job ->
+            Row(
+                Modifier.height(22.dp).clip(RoundedCornerShape(5.dp)).clickable { state.showExport() }.padding(horizontal = 6.dp).testTag("export-indicator"),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon)
+                Text("Exportando ${job.request.name}: ${job.progress} filas…", fontSize = 12.sp, color = c.textSecondary, maxLines = 1)
+            }
+            ToolButton(IconKind.Close, "Cancelar exportación", state::cancelExport, Modifier.testTag("export-indicator-cancel"))
+        }
         val problem = state.diagnosticAtCaret
         if (problem != null) Text(problem.message, fontSize = 12.sp, color = if (problem.severity == Severity.ERROR) c.error else c.warning, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("problem"))
         else Text(state.status, fontSize = 12.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("status"))

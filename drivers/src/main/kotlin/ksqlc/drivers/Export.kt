@@ -137,7 +137,7 @@ fun exportQuery(
     session: Session, sql: String, newWriter: (List<String>) -> RowWriter,
     cancelled: () -> Boolean = { false }, onProgress: (Long) -> Unit = {},
 ): Long {
-    when (val r = session.runScript(listOf(sql), keepRows = 0).single()) {
+    when (val r = session.stream(sql)) {
         is StatementResult.Rows -> try {
             return exportRows(r, emptyList(), newWriter(r.columns.map { it.name }), cancelled, onProgress)
         } finally { r.cursor.close() }

@@ -28,6 +28,7 @@ import ksqlc.drivers.ExportFormat
 @Composable
 fun ExportDialog(state: AppState) {
     val job = state.exportJob ?: return
+    if (!state.exportDialogOpen) return
     val c = Ksqlc.colors
     val clipboard = LocalClipboardManager.current
     var formats by remember { mutableStateOf(false) }
@@ -48,6 +49,11 @@ fun ExportDialog(state: AppState) {
                                 DropdownMenuItem(text = { Text(f.label, fontSize = 13.sp) }, modifier = Modifier.testTag("export-format:${f.ordinal}"), onClick = { formats = false; job.chooseFormat(f) })
                             }
                         }
+                    }
+                    if (job.request.writeLoaded != null) {
+                        FieldLabel("Filas:")
+                        KCheckbox(job.allRows, { job.allRows = true }, label = "Todas las filas de la consulta", enabled = !job.running, modifier = Modifier.testTag("export-all"))
+                        KCheckbox(!job.allRows, { job.allRows = false }, label = "Solo las ${job.request.loaded} cargadas", enabled = !job.running, modifier = Modifier.testTag("export-loaded"))
                     }
                     KCheckbox(job.transpose, { job.transpose = it }, label = "Transponer", enabled = job.delimited, modifier = Modifier.testTag("export-transpose"))
                     KCheckbox(job.header, { job.header = it }, label = "Añadir cabecera de columnas", enabled = job.delimited, modifier = Modifier.testTag("export-header"))
@@ -80,8 +86,10 @@ fun ExportDialog(state: AppState) {
             }
             Separator()
             Row(Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                if (job.running) TextAction("Cancelar exportación", job::cancel, Modifier.testTag("export-cancel"))
-                else TextAction("Cancelar", state::closeExport, Modifier.testTag("export-close"))
+                if (job.running) {
+                    TextAction("Cancelar exportación", job::cancel, Modifier.testTag("export-cancel"))
+                    TextAction("Ocultar", state::closeExport, Modifier.testTag("export-hide"))
+                } else TextAction("Cancelar", state::closeExport, Modifier.testTag("export-close"))
                 TextAction("Copiar al portapapeles", { job.start(true, { clipboard.setText(AnnotatedString(it)) }, state::closeExport) }, Modifier.testTag("export-clipboard"), enabled = !job.running)
                 TextAction("Exportar a archivo", { job.start(false, {}, state::closeExport) }, Modifier.testTag("export-file"), enabled = !job.running, primary = true)
             }
