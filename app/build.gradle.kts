@@ -26,7 +26,7 @@ compose.desktop { application {
     nativeDistributions {
         targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
         packageName = "ksqlc"
-        packageVersion = "1.0.1"
+        packageVersion = "1.0.2"
         // los drivers JDBC (java.sql, java.naming, ...) necesitan módulos que jlink omitiría
         // shortcut: engorda el runtime ~40 MB, cambiar a modules(...) con :app:suggestRuntimeModules si importa
         includeAllModules = true
