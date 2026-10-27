@@ -15,6 +15,8 @@ class ExplainTest {
         val ms = explainScript(DbKind.MSSQL, "select 1", false)!!
         assertEquals(listOf("set showplan_text on", "select 1"), ms.statements); assertEquals(listOf("set showplan_text off"), ms.cleanup)
         assertEquals("explain plan for select 1", explainScript(DbKind.ORACLE, "select 1", false)!!.statements.first())
+        assertEquals(listOf("explain select 1"), explainScript(DbKind.TRINO, "select 1", false)!!.statements)
+        assertEquals(listOf("explain analyze select 1"), explainScript(DbKind.TRINO, "select 1", true)!!.statements)
         for (k in listOf(DbKind.SQLITE, DbKind.MSSQL, DbKind.ORACLE)) assertNull(explainScript(k, "select 1", true), k.name)
     }
 

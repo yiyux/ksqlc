@@ -3,7 +3,7 @@ package ksqlc.core
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class DbKind { POSTGRES, MYSQL, MARIADB, SQLITE, MSSQL, ORACLE, CASSANDRA }
+enum class DbKind { POSTGRES, MYSQL, MARIADB, SQLITE, MSSQL, ORACLE, CASSANDRA, TRINO }
 
 /** The "Options" of a data source. Zero or blank means off; every field keeps its default so older saved connections load unchanged. */
 @Serializable

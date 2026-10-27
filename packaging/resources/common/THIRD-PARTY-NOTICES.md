@@ -17,6 +17,7 @@ cuando este los trae (`META-INF/`). El código fuente de ksqlc es el del tag de 
 | SQL Server (`com.microsoft.sqlserver:mssql-jdbc`) | 13.6.0.jre11 | MIT | `licenses/MIT-mssql-jdbc.txt` |
 | Oracle (`com.oracle.database.jdbc:ojdbc11`) | 23.6.0.24.10 | Oracle Free Use Terms and Conditions 1.0 | `licenses/Oracle-JDBC-Free-Use-Terms-1.0.txt` |
 | Cassandra (`com.ing.data:cassandra-jdbc-wrapper`) y su driver DataStax | 5.0.4 / 4.19.3 | Apache-2.0 | `licenses/Apache-2.0.txt` |
+| Trino (`io.trino:trino-jdbc`, jar autocontenido) | 484 | Apache-2.0 | `licenses/Apache-2.0.txt` |
 
 Notas:
 
@@ -81,6 +82,7 @@ Notas:
 | `io.netty:netty-resolver` | 4.1.130.Final | Apache-2.0 |
 | `io.netty:netty-transport` | 4.1.130.Final | Apache-2.0 |
 | `io.netty:netty-transport-native-unix-common` | 4.1.130.Final | Apache-2.0 |
+| `io.trino:trino-jdbc` | 484 | Apache-2.0 (jar autocontenido: trae sus dependencias reubicadas) |
 | `jakarta.annotation:jakarta.annotation-api` | 3.0.0 | EPL-2.0 o GPL-2.0 con Classpath Exception |
 | `javax.validation:validation-api` | 2.0.0.Final | Apache-2.0 |
 | `net.java.dev.jna:jna` | 5.13.0 | Apache-2.0 (doble licencia LGPL-2.1+ / Apache-2.0; se usa Apache-2.0) |

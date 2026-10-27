@@ -160,7 +160,7 @@ private fun SchemasTab(state: AppState, draft: ConnectionForm, modifier: Modifie
 /** Which of the four SSL modes (off, encrypted, verify CA, verify CA and name) an engine offers. */
 private fun sslModesFor(kind: DbKind): List<String> = when (kind) {
     DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.MSSQL -> listOf("Desactivado", "Cifrado", "Verificar CA", "CA y host")
-    DbKind.CASSANDRA -> listOf("Desactivado", "Cifrado")
+    DbKind.CASSANDRA, DbKind.TRINO -> listOf("Desactivado", "Cifrado")
     else -> emptyList()
 }
 
@@ -225,6 +225,7 @@ private fun SshSslTab(draft: ConnectionForm, modifier: Modifier) {
             }
             Text(
                 when (kind) {
+                    DbKind.TRINO -> "«Cifrado» usa HTTPS con el almacén de confianza de Java; Trino exige HTTPS para enviar una contraseña."
                     DbKind.CASSANDRA -> "Cassandra cifra con el almacén de confianza de Java; no se comprueban archivos propios."
                     DbKind.MSSQL -> "«Cifrado» acepta cualquier certificado del servidor; «Verificar» lo comprueba con la CA indicada, o con el almacén de Java si no hay ninguna."
                     else -> "«Cifrado» no comprueba el certificado del servidor. «Verificar CA» lo comprueba con la CA indicada; «y nombre» exige además que el certificado sea para el host."
@@ -344,7 +345,7 @@ fun DataSourceDialog(state: AppState) {
                         }
                         Field("Usuario:") { CompactTextField(draft.user, { draft.user = it }, Modifier.weight(1f), testTag = "ds-user", height = 28.dp) }
                         Field("Contraseña:") { CompactTextField(draft.password, { draft.password = it }, Modifier.weight(1f), password = true, placeholder = "<oculta>", testTag = "ds-pass", height = 28.dp) }
-                        Field(if (draft.kind == DbKind.CASSANDRA) "Keyspace:" else if (network) "Base de datos:" else "Archivo:") {
+                        Field(if (draft.kind == DbKind.CASSANDRA) "Keyspace:" else if (draft.kind == DbKind.TRINO) "Catálogo/esquema:" else if (network) "Base de datos:" else "Archivo:") {
                             CompactTextField(draft.database, { draft.database = it }, Modifier.weight(1f), enabled = !draft.customUrl, placeholder = if (network) null else "vacío = memoria compartida", testTag = "ds-db", height = 28.dp)
                         }
                         if (draft.kind == DbKind.CASSANDRA) Field("Datacenter local:") {

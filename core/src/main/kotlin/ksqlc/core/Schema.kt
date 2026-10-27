@@ -2,7 +2,8 @@ package ksqlc.core
 
 /** A browsable container: a schema (PostgreSQL, SQLite) or a catalog/database (MySQL, MariaDB). */
 data class Namespace(val catalog: String?, val schema: String?) {
-    val label: String get() = schema ?: catalog ?: ""
+    // Trino has both: catalogs repeat schema names (`default`), so the label carries the catalog
+    val label: String get() = if (catalog != null && schema != null) "$catalog.$schema" else schema ?: catalog ?: ""
 }
 
 enum class DbObjectKind { TABLE, VIEW, MATERIALIZED_VIEW, SEQUENCE, ROUTINE }

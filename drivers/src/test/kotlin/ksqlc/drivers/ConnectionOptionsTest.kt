@@ -24,7 +24,7 @@ class ConnectionOptionsSupportTest {
     @Test fun whichOptionsEachEngineOffers() {
         assertEquals(setOf(DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.ORACLE), DbKind.entries.filter(::supportsTimeZone).toSet())
         assertEquals(setOf(DbKind.MYSQL, DbKind.MARIADB, DbKind.CASSANDRA, DbKind.ORACLE), DbKind.entries.filter(::supportsSingleDatabase).toSet())
-        assertEquals(DbKind.entries.toSet() - DbKind.CASSANDRA, DbKind.entries.filter(::supportsTransactions).toSet())
+        assertEquals(DbKind.entries.toSet() - DbKind.CASSANDRA - DbKind.TRINO, DbKind.entries.filter(::supportsTransactions).toSet())
     }
 
     @Test fun onlyReadsPassTheReadOnlyCheck() {

@@ -10,7 +10,7 @@ fun supportsTimeZone(kind: DbKind) = kind == DbKind.POSTGRES || kind == DbKind.M
 /** Engines where "single database" narrows the tree: MySQL-family and Cassandra list every database or keyspace of the server, Oracle every user. */
 fun supportsSingleDatabase(kind: DbKind) = kind == DbKind.MYSQL || kind == DbKind.MARIADB || kind == DbKind.CASSANDRA || kind == DbKind.ORACLE
 
-fun supportsTransactions(kind: DbKind) = kind != DbKind.CASSANDRA
+fun supportsTransactions(kind: DbKind) = kind != DbKind.CASSANDRA && kind != DbKind.TRINO
 
 private fun String.sqlQuoted() = "'" + replace("'", "''") + "'"
 

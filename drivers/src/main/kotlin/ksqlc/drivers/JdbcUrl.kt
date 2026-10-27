@@ -11,6 +11,7 @@ object JdbcUrl {
         DbKind.MSSQL -> 1433
         DbKind.ORACLE -> 1521
         DbKind.CASSANDRA -> 9042
+        DbKind.TRINO -> 8080
         DbKind.SQLITE -> null
     }
 
@@ -21,6 +22,7 @@ object JdbcUrl {
         url.startsWith("jdbc:sqlserver") -> DbKind.MSSQL
         url.startsWith("jdbc:oracle") -> DbKind.ORACLE
         url.startsWith("jdbc:cassandra") -> DbKind.CASSANDRA
+        url.startsWith("jdbc:trino") -> DbKind.TRINO
         else -> DbKind.SQLITE
     }
 
@@ -29,6 +31,7 @@ object JdbcUrl {
      * connection in this process, so the console and the schema tree see the same tables) and
      * host/port/ssl are ignored.
      * For Oracle [database] is the service name.
+     * For Trino [database] is `catalog` or `catalog/schema` (may be blank).
      * For Cassandra [database] is the keyspace (may be blank) and [datacenter] the local datacenter its driver needs (default `datacenter1`).
      * For SQL Server, [trustCert] (only with [ssl]) accepts the server's certificate without validating it, which a self-signed one needs.
      */
@@ -43,6 +46,7 @@ object JdbcUrl {
             DbKind.MSSQL -> "jdbc:sqlserver://$h:$p" + (if (database.isBlank()) "" else ";databaseName=$database") +
                 ";encrypt=" + ssl + (if (ssl && trustCert) ";trustServerCertificate=true" else "")
             DbKind.ORACLE -> "jdbc:oracle:thin:@//$h:$p/$database"
+            DbKind.TRINO -> "jdbc:trino://$h:$p" + (if (database.isBlank()) "" else "/$database") + if (ssl) "?SSL=true" else ""
             DbKind.CASSANDRA -> "jdbc:cassandra://$h:$p" + (if (database.isBlank()) "" else "/$database") + "?localdatacenter=${datacenter.ifBlank { DEFAULT_DATACENTER }}" + if (ssl) "&enableSsl=true" else ""
         }
     }
@@ -69,6 +73,7 @@ object JdbcUrl {
             DbKind.MARIADB -> Regex("""^jdbc:mariadb://([^:/?]+):(\d+)/([^?]*)(\?sslMode=trust)?$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[4].isNotEmpty()) }
             DbKind.MSSQL -> Regex("""^jdbc:sqlserver://([^:;/]+):(\d+)(?:;databaseName=([^;]*))?;encrypt=(true|false)(;trustServerCertificate=true)?$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[4] == "true", it.groupValues[5].isNotEmpty()) }
             DbKind.ORACLE -> Regex("""^jdbc:oracle:thin:@//([^:/]+):(\d+)/(.*)$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], false) }
+            DbKind.TRINO -> Regex("""^jdbc:trino://([^:/?]+):(\d+)(?:/([^?]+))?(\?SSL=true)?$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[4].isNotEmpty()) }
             DbKind.CASSANDRA -> Regex("""^jdbc:cassandra://([^:/?]+):(\d+)(?:/([^?]+))?\?localdatacenter=([^&]+)(&enableSsl=true)?$""").matchEntire(url)?.let { Parts(kind, it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3], it.groupValues[5].isNotEmpty(), datacenter = it.groupValues[4]) }
         }
         return parts?.takeIf { build(it.kind, it.host, it.port, it.database, it.ssl, it.trustCert, it.datacenter) == url }

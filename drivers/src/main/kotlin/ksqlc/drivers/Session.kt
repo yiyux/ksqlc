@@ -14,8 +14,8 @@ import java.sql.Statement
  */
 class Session(private val ds: DataSource, private val password: String?, autoCommit: Boolean = !ds.manualTx) : AutoCloseable {
     private var conn: Connection? = null
-    // Cassandra only has auto-commit: no transactions, so no manual mode
-    private val noTransactions = ds.kind == DbKind.CASSANDRA
+    // Cassandra and Trino only have auto-commit: no transactions, so no manual mode
+    private val noTransactions = !supportsTransactions(ds.kind)
     @Volatile var autoCommit: Boolean = autoCommit || noTransactions
         private set
     /** In manual mode: something that is not a plain read has run since the last commit or rollback. */

@@ -16,6 +16,8 @@ class JdbcUrlTest {
         assertEquals("jdbc:mysql://h:3306/d", JdbcUrl.build(MYSQL, "h", null, "d", false))
         assertEquals("jdbc:sqlserver://h:1433;databaseName=d;encrypt=true", JdbcUrl.build(MSSQL, "h", null, "d", true))
         assertEquals("jdbc:oracle:thin:@//h:1521/svc", JdbcUrl.build(ORACLE, "h", null, "svc", false))
+        assertEquals("jdbc:trino://h:8080/hive/sales", JdbcUrl.build(TRINO, "h", null, "hive/sales", false))
+        assertEquals("jdbc:trino://h:8443?SSL=true", JdbcUrl.build(TRINO, "h", 8443, "", true))
     }
     @Test fun kindRoundTrip() {
         for (k in entries) assertEquals(k, JdbcUrl.kindOf(JdbcUrl.build(k, "h", null, "d", false)))
@@ -31,6 +33,7 @@ class JdbcUrlParseTest {
             JdbcUrl.Parts(MSSQL, "h", 1433, "d", true, trustCert = true),
             JdbcUrl.Parts(ORACLE, "h", 1521, "svc", false), JdbcUrl.Parts(SQLITE, "", null, "/tmp/x.db", false),
             JdbcUrl.Parts(SQLITE, "", null, "", false),
+            JdbcUrl.Parts(TRINO, "h", 8080, "", false), JdbcUrl.Parts(TRINO, "h", 8443, "hive/sales", true),
         )
         for (p in cases) {
             val url = JdbcUrl.build(p.kind, p.host, p.port, p.database, p.ssl, p.trustCert)

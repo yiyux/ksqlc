@@ -47,6 +47,7 @@ interface Dialect {
             DbKind.MSSQL -> SqlServerDialect
             DbKind.ORACLE -> OracleDialect
             DbKind.CASSANDRA -> CassandraDialect
+            DbKind.TRINO -> TrinoDialect
         }
     }
 }

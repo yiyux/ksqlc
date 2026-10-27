@@ -6,7 +6,7 @@ Cliente SQL de escritorio multiplataforma (macOS, Linux y Windows), escrito en K
 
 ## Motores
 
-PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, Oracle y Apache Cassandra. Los drivers JDBC van dentro de la aplicación; no hay que instalarlos.
+PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, Oracle, Apache Cassandra y Trino. Los drivers JDBC van dentro de la aplicación; no hay que instalarlos.
 
 ## Qué hace
 
@@ -63,4 +63,4 @@ GNU GPL v3. Ver [`LICENSE`](LICENSE). El código fuente de cada versión es el d
 
 ### Licencias de terceros
 
-Los instaladores incluyen, sin modificar, los drivers JDBC de SQLite, PostgreSQL, MySQL, MariaDB, SQL Server, Oracle y Cassandra, cada uno con su propia licencia (el de Oracle es propietario, con permiso de redistribución gratuita). La lista completa de componentes y los textos de licencia están en [`packaging/resources/common/`](packaging/resources/common/THIRD-PARTY-NOTICES.md) y también dentro de cada paquete.
+Los instaladores incluyen, sin modificar, los drivers JDBC de SQLite, PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, Cassandra y Trino, cada uno con su propia licencia (el de Oracle es propietario, con permiso de redistribución gratuita). La lista completa de componentes y los textos de licencia están en [`packaging/resources/common/`](packaging/resources/common/THIRD-PARTY-NOTICES.md) y también dentro de cada paquete.

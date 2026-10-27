@@ -50,7 +50,7 @@ fun dropForeignKeySql(kind: DbKind, table: DbObject, fk: String): String? {
     val d = Dialect.of(kind)
     val t = d.qualified(table)
     return when (kind) {
-        DbKind.SQLITE, DbKind.CASSANDRA -> null
+        DbKind.SQLITE, DbKind.CASSANDRA, DbKind.TRINO -> null
         DbKind.MYSQL, DbKind.MARIADB -> "alter table $t drop foreign key ${d.quote(fk)}"
         else -> "alter table $t drop constraint ${d.quote(fk)}"
     }

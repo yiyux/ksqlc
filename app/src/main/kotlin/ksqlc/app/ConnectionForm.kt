@@ -14,6 +14,7 @@ import ksqlc.core.SshSettings
 import ksqlc.drivers.JdbcUrl
 import ksqlc.drivers.supportsSingleDatabase
 import ksqlc.drivers.supportsTimeZone
+import ksqlc.drivers.supportsTransactions
 
 /** The connection fields on screen. The URL is derived from them unless [customUrl] is on. */
 class ConnectionForm {
@@ -117,7 +118,7 @@ class ConnectionForm {
     val effectiveKind: DbKind get() = if (customUrl) JdbcUrl.kindOf(url) else kind
     val passwordOrNull: String? get() = password.ifBlank { null }
 
-    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && effectiveKind != DbKind.CASSANDRA, options, ssh, sslSettings, schemas, sshSecret.ifBlank { null }, folder.trim(), color)
+    fun toDataSource() = DataSource(currentId ?: "unsaved", name, effectiveKind, url, user.ifBlank { null }, manualTx && supportsTransactions(effectiveKind), options, ssh, sslSettings, schemas, sshSecret.ifBlank { null }, folder.trim(), color)
 
     fun copyFrom(o: ConnectionForm) {
         currentId = o.currentId; name = o.name; folder = o.folder; color = o.color; kind = o.kind; host = o.host; portText = o.portText; database = o.database
@@ -154,4 +155,5 @@ fun DbKind.label(): String = when (this) {
     DbKind.MSSQL -> "SQL Server"
     DbKind.ORACLE -> "Oracle"
     DbKind.CASSANDRA -> "Apache Cassandra"
+    DbKind.TRINO -> "Trino"
 }

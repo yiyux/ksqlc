@@ -14,7 +14,7 @@ class CopyColumns(val from: List<String>, val to: List<String>)
  * otherwise it is created, which only works between tables of the same engine because column types are not translated.
  */
 fun copyProblem(source: DbKind, target: DbKind, targetReadOnly: Boolean, targetExists: Boolean, columns: CopyColumns?): String? = when {
-    DbKind.CASSANDRA in setOf(source, target) -> "Cassandra no tiene transacciones: una copia que falle a medias dejaría filas"
+    setOf(DbKind.CASSANDRA, DbKind.TRINO).any { it in setOf(source, target) } -> "Cassandra y Trino no tienen transacciones: una copia que falle a medias dejaría filas"
     targetReadOnly -> "La conexión de destino es de solo lectura"
     !targetExists && !sameEngine(source, target) -> "La tabla de destino no existe y no se crea entre motores distintos: los tipos no se traducen"
     columns != null && columns.from.isEmpty() -> "Las tablas no tienen ninguna columna con el mismo nombre"

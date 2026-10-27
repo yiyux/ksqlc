@@ -16,6 +16,7 @@ import ksqlc.drivers.RowStatus
 import ksqlc.drivers.destructiveChanges
 import ksqlc.drivers.ApplyResult
 import ksqlc.drivers.runAtomically
+import ksqlc.drivers.supportsTransactions
 import ksqlc.drivers.runStepwise
 import ksqlc.drivers.Introspector
 import ksqlc.drivers.JdbcUrl
@@ -349,8 +350,8 @@ class AppState(
     // --- running SQL -------------------------------------------------------------------
 
     /** Oracle scripts keep PL/SQL blocks whole (they end at a `/` line) instead of cutting them at every `;`. */
-    /** False for engines without transactions (Cassandra): the Tx controls are hidden. */
-    val hasTransactions: Boolean get() = form.effectiveKind != DbKind.CASSANDRA
+    /** False for engines without transactions (Cassandra, Trino): the Tx controls are hidden. */
+    val hasTransactions: Boolean get() = supportsTransactions(form.effectiveKind)
 
     /** The SQL dialect the editor's text follows: null = that of the connection. Decides how a script is split and what counts as a parameter. */
     var editorDialect by mutableStateOf<DbKind?>(null)
