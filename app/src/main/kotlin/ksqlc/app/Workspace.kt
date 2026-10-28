@@ -72,14 +72,14 @@ class Workspace(
         return if (n > 1) "console $n [$name]" else "console [$name]"
     }
 
-    /** Asks about each console with unsent work, one after the other, then exits. */
+    /** Asks to confirm leaving, then about each console with unsent work, one after the other, then exits. */
     fun requestExit(exit: () -> Unit) {
         fun next(i: Int) {
             if (i >= consoles.size) { exit(); return }
             activate(i)
             consoles[i].requestExit { next(i + 1) }
         }
-        next(0)
+        active.confirmation = Confirmation("Salir de ksqlc", "¿Seguro que quieres cerrar la aplicación?", "Salir") { active.confirmation = null; next(0) }
     }
 
     fun dispose() { consoles.forEach { it.close() }; Tunnels.closeAll() }
