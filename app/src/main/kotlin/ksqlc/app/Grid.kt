@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
@@ -126,15 +127,15 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         else -> null
     }
     fun loadBytes(i: Int, j: Int) {
-        val path = chooseFile(false, "Cargar «${cols[j].name}» desde un archivo") ?: return
+        val path = chooseFile(false, tr("Cargar «%s» desde un archivo", cols[j].name)) ?: return
         val f = java.io.File(path)
-        if (f.length() > MAX_LOAD_BYTES) { onNotice("El archivo pesa más de ${MAX_LOAD_BYTES / 1_000_000} MB: no se carga en una celda"); return }
-        runCatching { f.readBytes() }.onSuccess { editing?.setCell(i, j, CellValue.Bytes(f.name, it), tab) }.onFailure { onNotice("No se pudo leer el archivo: ${it.message}") }
+        if (f.length() > MAX_LOAD_BYTES) { onNotice(tr("El archivo pesa más de %d MB: no se carga en una celda", MAX_LOAD_BYTES / 1_000_000)); return }
+        runCatching { f.readBytes() }.onSuccess { editing?.setCell(i, j, CellValue.Bytes(f.name, it), tab) }.onFailure { onNotice(tr("No se pudo leer el archivo: %s", it.message)) }
     }
     fun saveBytes(i: Int, j: Int) {
-        val data = bytesOf(i, j) ?: run { onNotice("La celda no tiene contenido binario"); return }
-        val path = chooseFile(true, "Guardar «${cols[j].name}» en un archivo", cols[j].name + ".bin") ?: return
-        runCatching { java.io.File(path).writeBytes(data) }.onSuccess { onNotice("${data.size} bytes guardados en $path") }.onFailure { onNotice("No se pudo guardar: ${it.message}") }
+        val data = bytesOf(i, j) ?: run { onNotice(tr("La celda no tiene contenido binario")); return }
+        val path = chooseFile(true, tr("Guardar «%s» en un archivo", cols[j].name), cols[j].name + ".bin") ?: return
+        runCatching { java.io.File(path).writeBytes(data) }.onSuccess { onNotice(tr("%d bytes guardados en %s", data.size, path)) }.onFailure { onNotice(tr("No se pudo guardar: %s", it.message)) }
     }
     // starts wide enough for the type and for the whole header name (icons, funnel and arrow included); dragging a header edge changes it
     val measurer = rememberTextMeasurer()
@@ -163,9 +164,9 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
         val ed = editing ?: return
         val insertRow = ed.isInsertRow(i, tab)
         when {
-            !insertRow && !ed.canEditRows -> { onNotice(ed.readOnlyReason() ?: "No se pueden editar las filas de esta tabla"); return }
-            !insertRow && i in ed.deleted -> { onNotice("La fila está marcada para borrar: revierte los cambios para editarla"); return }
-            !ed.isEditable(j, tab) -> { onNotice("«${cols[j].name}» es una columna binaria (${cols[j].typeName}): no se puede editar como texto"); return }
+            !insertRow && !ed.canEditRows -> { onNotice(ed.readOnlyReason() ?: tr("No se pueden editar las filas de esta tabla")); return }
+            !insertRow && i in ed.deleted -> { onNotice(tr("La fila está marcada para borrar: revierte los cambios para editarla")); return }
+            !ed.isEditable(j, tab) -> { onNotice(tr("«%s» es una columna binaria (%s): no se puede editar como texto", cols[j].name, cols[j].typeName)); return }
         }
         selected = i to j; editCell = i to j
         (seed ?: raw(i, j)).let { draft = TextFieldValue(it, TextRange(it.length)) }
@@ -336,18 +337,18 @@ fun Grid(tab: ResultTab, onLoadMore: () -> Unit, modifier: Modifier = Modifier, 
                                 if (editing == null) cell()
                                 else ContextMenuArea(items = {
                                     buildList {
-                                        add(ContextMenuItem("Editar") { startEdit(i, j) })
-                                        if (editing.isEditable(j, tab)) add(ContextMenuItem("Editar en ventana…") { bigCell = i to j })
+                                        add(ContextMenuItem(tr("Editar")) { startEdit(i, j) })
+                                        if (editing.isEditable(j, tab)) add(ContextMenuItem(tr("Editar en ventana…")) { bigCell = i to j })
                                         else {
-                                            add(ContextMenuItem("Cargar desde archivo…") { loadBytes(i, j) })
-                                            add(ContextMenuItem("Guardar en archivo…") { saveBytes(i, j) })
+                                            add(ContextMenuItem(tr("Cargar desde archivo…")) { loadBytes(i, j) })
+                                            add(ContextMenuItem(tr("Guardar en archivo…")) { saveBytes(i, j) })
                                         }
-                                        add(ContextMenuItem("Poner NULL") { editing.setCell(i, j, CellValue.Null, tab) })
-                                        if (isNew) add(ContextMenuItem("Valor por defecto") { editing.setCell(i, j, CellValue.Default, tab) })
+                                        add(ContextMenuItem(tr("Poner NULL")) { editing.setCell(i, j, CellValue.Null, tab) })
+                                        if (isNew) add(ContextMenuItem(tr("Valor por defecto")) { editing.setCell(i, j, CellValue.Default, tab) })
                                         if (editing.isEditable(j, tab)) generators(cols[j].typeName, editing.engine).forEach { (label, make) ->
                                             add(ContextMenuItem(label) { editing.setCell(i, j, CellValue.Text(make()), tab) })
                                         }
-                                        add(ContextMenuItem("Copiar") { clipboard.setText(AnnotatedString(shown.orEmpty())) })
+                                        add(ContextMenuItem(tr("Copiar")) { clipboard.setText(AnnotatedString(shown.orEmpty())) })
                                     }
                                 }) { cell() }
                             }
@@ -393,12 +394,12 @@ private fun RowsPill(tab: ResultTab, filtered: Int?, onLoadMore: () -> Unit, mod
         modifier.height(32.dp).clip(shape).background(c.windowBg, shape).border(1.dp, c.border, shape).padding(horizontal = 10.dp).testTag("rows-pill").semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text((if (filtered != null) "$filtered de " else "") + "${tab.rows.size} filas${if (tab.exhausted) "" else "+"}", fontSize = 12.sp, color = c.text)
+        Text((if (filtered != null) tr("%s de ", filtered) else "") + tr("%d filas%s", tab.rows.size, if (tab.exhausted) "" else "+"), fontSize = 12.sp, color = c.text)
         if (!tab.exhausted && !tab.result.truncated) {
             VSeparator()
-            if (tab.loading) Text("Cargando…", fontSize = 12.sp, color = c.textSecondary)
-            else ToolButton(IconKind.Plus, "Cargar más", onLoadMore)
+            if (tab.loading) Text(tr("Cargando…"), fontSize = 12.sp, color = c.textSecondary)
+            else ToolButton(IconKind.Plus, tr("Cargar más"), onLoadMore)
         }
-        if (tab.result.truncated) { VSeparator(); Text("recortado", fontSize = 12.sp, color = c.textSecondary, fontStyle = FontStyle.Italic) }
+        if (tab.result.truncated) { VSeparator(); Text(tr("recortado"), fontSize = 12.sp, color = c.textSecondary, fontStyle = FontStyle.Italic) }
     }
 }

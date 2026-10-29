@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -27,8 +28,8 @@ import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.util.Locale
 
-private val Spanish = Locale("es")
-private val WEEKDAYS = listOf("L", "M", "X", "J", "V", "S", "D")
+private val Spanish = Locale(if (ksqlc.core.I18n.language == ksqlc.core.Language.EN) "en" else "es")
+private val WEEKDAYS = if (ksqlc.core.I18n.language == ksqlc.core.Language.EN) listOf("M", "T", "W", "T", "F", "S", "S") else listOf("L", "M", "X", "J", "V", "S", "D")
 
 /** Under the cell when it fits, above it otherwise; always inside the window. */
 private object BelowOrAbove : PopupPositionProvider {
@@ -124,11 +125,11 @@ fun DatePickerPopup(kind: TemporalKind, text: String, onText: (String, Boolean) 
             }
             Row(Modifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Tap("date-now", Modifier.height(26.dp), { put(now().let { n -> if (kind == TemporalKind.DATETIME_TZ) n else n }, done = kind == TemporalKind.DATE) }) {
-                    Text(if (kind == TemporalKind.DATE) "Hoy" else "Ahora", fontSize = 12.sp, color = c.link)
+                    Text(if (kind == TemporalKind.DATE) tr("Hoy") else tr("Ahora"), fontSize = 12.sp, color = c.link)
                 }
                 Tap("date-null", Modifier.height(26.dp), onNull) { Text("NULL", fontSize = 12.sp, color = c.link) }
                 Spacer(Modifier.weight(1f))
-                if (kind != TemporalKind.DATE) Tap("date-ok", Modifier.height(24.dp).clip(RoundedCornerShape(5.dp)).background(c.accent).padding(horizontal = 12.dp), onAccept) { Text("Aceptar", fontSize = 12.sp, color = c.onAccent) }
+                if (kind != TemporalKind.DATE) Tap("date-ok", Modifier.height(24.dp).clip(RoundedCornerShape(5.dp)).background(c.accent).padding(horizontal = 12.dp), onAccept) { Text(tr("Aceptar"), fontSize = 12.sp, color = c.onAccent) }
             }
         }
     }

@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -50,12 +51,12 @@ fun BigCellEditor(title: String, initial: String, json: Boolean, onSave: (String
             }
             error?.let { Text(it, fontSize = 12.sp, color = c.error, modifier = Modifier.testTag("big-editor-error")) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (json) TextAction("Formatear JSON", {
-                    prettyJson(value.text)?.let { value = TextFieldValue(it, TextRange(it.length)); error = null } ?: run { error = "No es un JSON válido" }
+                if (json) TextAction(tr("Formatear JSON"), {
+                    prettyJson(value.text)?.let { value = TextFieldValue(it, TextRange(it.length)); error = null } ?: run { error = tr("No es un JSON válido") }
                 }, Modifier.testTag("big-editor-format"))
                 Spacer(Modifier.weight(1f))
-                TextAction("Cancelar", onCancel, Modifier.testTag("big-editor-cancel"))
-                TextAction("Aceptar", { onSave(value.text) }, Modifier.testTag("big-editor-ok"), primary = true)
+                TextAction(tr("Cancelar"), onCancel, Modifier.testTag("big-editor-cancel"))
+                TextAction(tr("Aceptar"), { onSave(value.text) }, Modifier.testTag("big-editor-ok"), primary = true)
             }
         }
     }

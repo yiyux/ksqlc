@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -65,7 +66,7 @@ class TablePicker(
                 if (ns == null) return@onSuccess
                 namespaces = ns
                 chooseNamespace(ns.indexOfFirst { it.label == leftObj.ns.label }.takeIf { it >= 0 } ?: 0)
-            }.onFailure { if (gen == generation) onError("No se pudo abrir ${ds.name}: ${it.message}") }
+            }.onFailure { if (gen == generation) onError(tr("No se pudo abrir %s: %s", ds.name, it.message)) }
         }
     }
 

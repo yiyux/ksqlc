@@ -53,7 +53,7 @@ internal fun sqlServerAlterTable(d: Dialect, o: DbObject, before: TableModel, af
     val moves = ColumnMoves(before, after)
     val kept = moves.kept
     kept.firstOrNull { (a, b) -> (a.identity != null) != (b.identity != null) }
-        ?.let { error("SQL Server no puede añadir ni quitar identity a la columna ${it.first.name}, que ya existe") }
+        ?.let { error(tr("SQL Server no puede añadir ni quitar identity a la columna %s, que ya existe", it.first.name)) }
     // a computed column cannot be altered, so its type and nullability do not count
     val altered = kept.filter { (a, b) -> a.generated == null && (a.type != b.type || a.notNull != b.notNull) }.map { it.second.name }.toSet()
     fun mapped(l: List<String>) = moves.mapped(l)

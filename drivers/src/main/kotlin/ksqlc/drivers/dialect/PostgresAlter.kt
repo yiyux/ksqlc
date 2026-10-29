@@ -10,7 +10,7 @@ private fun identityOptions(i: Identity): String = listOfNotNull(
 private fun deferral(deferrable: Boolean, initially: Boolean) = if (!deferrable) "" else if (initially) " deferrable initially deferred" else " deferrable"
 
 internal fun postgresAlterTable(d: Dialect, o: DbObject, before: TableModel, after: TableModel): List<String> {
-    val schema = o.ns.schema ?: error("La tabla no tiene esquema")
+    val schema = o.ns.schema ?: error(tr("La tabla no tiene esquema"))
     val q = d.qualified(o)
     fun id(n: String) = d.quote(n)
     fun ids(l: List<String>) = l.joinToString(", ") { d.quote(it) }

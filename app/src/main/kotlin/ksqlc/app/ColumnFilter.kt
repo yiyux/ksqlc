@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -76,12 +77,12 @@ fun ColumnFilterPopup(tab: ResultTab, j: Int, onDismiss: () -> Unit) {
             Modifier.testTag("colfilter").width(250.dp).height(340.dp).clip(shape).background(c.popupBg, shape).border(1.dp, c.border, shape).padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Filtro local de '$name'", Modifier.fillMaxWidth(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.text, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(tr("Filtro local de '%s'", name), Modifier.fillMaxWidth(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.text, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
             SearchField(query, { query = it }, Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 KCheckbox(allShownSelected, { if (allShownSelected) set(selected - shown.map { it.first }.toSet()) else set(selected + shown.map { it.first }) }, Modifier.testTag("colfilter-all"), enabled = shown.isNotEmpty())
-                Text("Valor", Modifier.weight(1f), fontSize = 12.sp, color = c.textSecondary)
-                Text("Cantidad", Modifier.width(64.dp), fontSize = 12.sp, color = c.textSecondary)
+                Text(tr("Valor"), Modifier.weight(1f), fontSize = 12.sp, color = c.textSecondary)
+                Text(tr("Cantidad"), Modifier.width(64.dp), fontSize = 12.sp, color = c.textSecondary)
             }
             Separator()
             LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
@@ -98,7 +99,7 @@ fun ColumnFilterPopup(tab: ResultTab, j: Int, onDismiss: () -> Unit) {
                     }
                 }
             }
-            Text("Marca una casilla para filtrar las filas", Modifier.fillMaxWidth(), fontSize = 12.sp, color = c.textMuted, textAlign = TextAlign.Center)
+            Text(tr("Marca una casilla para filtrar las filas"), Modifier.fillMaxWidth(), fontSize = 12.sp, color = c.textMuted, textAlign = TextAlign.Center)
         }
     }
 }

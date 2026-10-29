@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import ksqlc.core.DbObject
 import ksqlc.core.StatementResult
 import java.math.BigDecimal
@@ -42,12 +44,12 @@ fun diffRows(
     truncated: Boolean = false, onlyLeftColumns: List<String> = emptyList(), onlyRightColumns: List<String> = emptyList(),
     cancelled: () -> Boolean = { false },
 ): ContentDiff {
-    val keyIdx = key.map { k -> columns.indexOfFirst { it.equals(k, ignoreCase = true) }.also { require(it >= 0) { "Falta la columna de la clave $k" } } }
+    val keyIdx = key.map { k -> columns.indexOfFirst { it.equals(k, ignoreCase = true) }.also { require(it >= 0) { tr("Falta la columna de la clave %s", k) } } }
     fun keyOf(row: List<Any?>) = keyIdx.map { canonical(row[it]) }
     val byKey = LinkedHashMap<List<Any?>, List<Any?>>()
     for (row in right) {
         if (cancelled()) break
-        check(byKey.put(keyOf(row), row) == null) { "La clave se repite en la tabla de la derecha: ${keyIdx.map { row[it] }}" }
+        check(byKey.put(keyOf(row), row) == null) { tr("La clave se repite en la tabla de la derecha: %s", keyIdx.map { row[it] }) }
     }
     val out = ArrayList<RowDiff>()
     var same = 0
@@ -68,7 +70,7 @@ private fun readRows(session: Session, src: SchemaSource, o: DbObject, cols: Lis
     val sql = "select ${cols.joinToString(", ") { src.dialect.quote(it) }} from ${src.dialect.qualified(o)}"
     when (val r = session.runScript(listOf(sql), keepRows = 0).single()) {
         is StatementResult.Failed -> error("${o.name}: ${r.message}")
-        is StatementResult.Updated -> error("${o.name}: la consulta no devolvió filas")
+        is StatementResult.Updated -> error(tr("%s: la consulta no devolvió filas", o.name))
         is StatementResult.Rows -> r.cursor.use { c ->
             val rows = ArrayList<List<Any?>>()
             // one row past the limit tells "exactly limit rows" from "more"
@@ -88,11 +90,11 @@ fun diffTableContent(
     limit: Int = 200_000, cancelled: () -> Boolean = { false },
 ): ContentDiff {
     val ld = left.details(leftObj); val rd = right.details(rightObj)
-    require(ld.primaryKey.isNotEmpty()) { "La tabla ${leftObj.name} no tiene clave primaria" }
+    require(ld.primaryKey.isNotEmpty()) { tr("La tabla %s no tiene clave primaria", leftObj.name) }
     val rightNames = rd.columns.map { it.name }
     val common = ld.columns.map { it.name }.filter { n -> rightNames.any { it.equals(n, ignoreCase = true) } }
     ld.primaryKey.firstOrNull { k -> common.none { it.equals(k, ignoreCase = true) } }
-        ?.let { throw IllegalArgumentException("La columna de la clave $it no existe en ${rightObj.name}") }
+        ?.let { throw IllegalArgumentException(tr("La columna de la clave %s no existe en %s", it, rightObj.name)) }
     // shortcut: both sides held in memory up to `limit` rows, a merge over sorted reads would need the same collation on both engines
     val (lRows, lMore) = readRows(leftSession, left, leftObj, common, limit, cancelled)
     val rightCols = common.map { c -> rightNames.first { it.equals(c, ignoreCase = true) } }

@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import ksqlc.core.StatementResult
 import java.util.Base64
 
@@ -142,7 +144,7 @@ fun exportQuery(
             return exportRows(r, emptyList(), newWriter(r.columns.map { it.name }), cancelled, onProgress)
         } finally { r.cursor.close() }
         is StatementResult.Failed -> error(r.message)
-        else -> error("la consulta no devuelve filas")
+        else -> error(tr("la consulta no devuelve filas"))
     }
 }
 

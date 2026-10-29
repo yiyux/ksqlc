@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -33,7 +34,7 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier, ws: Workspace?
     val c = Ksqlc.colors
     val scope = rememberCoroutineScope()
     Column(modifier) {
-        PanelHeader("Services") { ToolButton(IconKind.Close, "Ocultar Services", { state.servicesVisible = false }) }
+        PanelHeader("Services") { ToolButton(IconKind.Close, tr("Ocultar Services"), { state.servicesVisible = false }) }
         Separator()
         Row(Modifier.fillMaxSize()) {
             ServicesTree(state, ws, Modifier.width(240.dp).fillMaxHeight())
@@ -45,7 +46,7 @@ fun ServicesPanel(state: AppState, modifier: Modifier = Modifier, ws: Workspace?
                         state.tabs.forEachIndexed { i, t -> add(TabSpec(t.title, state.selectedTab == i, "tab:$i", IconKind.Table, { state.selectedTab = i }, { state.closeTab(i) })) }
                     },
                     Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 8.dp), height = 26.dp, spacing = 4.dp,
-                    trailing = { state.tabs.getOrNull(state.selectedTab)?.let { t -> ToolButton(IconKind.Export, "Exportar resultado…", { state.exportResult(t.shown) }, Modifier.testTag("export-result")) } },
+                    trailing = { state.tabs.getOrNull(state.selectedTab)?.let { t -> ToolButton(IconKind.Export, tr("Exportar resultado…"), { state.exportResult(t.shown) }, Modifier.testTag("export-result")) } },
                 )
                 Separator()
                 val tab = state.tabs.getOrNull(state.selectedTab)
@@ -93,7 +94,7 @@ private fun ServicesTree(state: AppState, ws: Workspace?, modifier: Modifier) {
             line(1, IconKind.Database, state.form.name, null, false, "svc:connection", null)
             line(2, IconKind.Play, "console", state.lastMillis?.let { "$it ms" }, state.selectedTab == OUTPUT_TAB, "svc:console") { state.selectedTab = OUTPUT_TAB }
             state.tabs.forEachIndexed { i, t ->
-                line(2, IconKind.Table, t.title, "${t.rows.size} filas", state.selectedTab == i, "svc:result:$i") { state.selectedTab = i }
+                line(2, IconKind.Table, t.title, tr("%d filas", t.rows.size), state.selectedTab == i, "svc:result:$i") { state.selectedTab = i }
             }
         } else ws.consoles.forEachIndexed { n, k ->
             if (n != ws.activeIndex) line(1, IconKind.Database, ws.title(n), null, false, "svc:console:$n") { ws.activate(n) }
@@ -101,7 +102,7 @@ private fun ServicesTree(state: AppState, ws: Workspace?, modifier: Modifier) {
                 line(1, IconKind.Database, ws.title(n), null, false, "svc:connection", null)
                 line(2, IconKind.Play, "console", state.lastMillis?.let { "$it ms" }, state.selectedTab == OUTPUT_TAB, "svc:console") { state.selectedTab = OUTPUT_TAB }
                 state.tabs.forEachIndexed { i, t ->
-                    line(2, IconKind.Table, t.title, "${t.rows.size} filas", state.selectedTab == i, "svc:result:$i") { state.selectedTab = i }
+                    line(2, IconKind.Table, t.title, tr("%d filas", t.rows.size), state.selectedTab == i, "svc:result:$i") { state.selectedTab = i }
                 }
             }
         }
@@ -114,7 +115,7 @@ private fun OutputLog(state: AppState, modifier: Modifier) {
     val list = rememberLazyListState()
     LaunchedEffect(state.log.size) { if (state.log.isNotEmpty()) list.animateScrollToItem(state.log.lastIndex) }
     Box(modifier.background(c.editorBg).testTag("output")) {
-        if (state.log.isEmpty()) Text("Aquí aparece el registro de las sentencias ejecutadas.", Modifier.padding(12.dp), fontSize = 12.sp, color = c.textMuted)
+        if (state.log.isEmpty()) Text(tr("Aquí aparece el registro de las sentencias ejecutadas."), Modifier.padding(12.dp), fontSize = 12.sp, color = c.textMuted)
         LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp), state = list) {
             items(state.log) { Text(it, style = MonoStyle.copy(fontSize = 12.sp, lineHeight = 18.sp), color = if ("ERROR" in it) c.error else c.text) }
         }

@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -99,7 +100,7 @@ class ExportJob(val request: ExportRequest, private val scope: CoroutineScope, p
     /** Runs the export off the UI thread; [setClipboard] is called on the UI thread with the text, [onDone] after a run that did not fail. */
     fun start(toClipboard: Boolean, setClipboard: (String) -> Unit, onDone: () -> Unit) {
         if (running) return
-        if (!toClipboard && path.isBlank()) { error = "Indica el archivo de destino"; return }
+        if (!toClipboard && path.isBlank()) { error = tr("Indica el archivo de destino"); return }
         running = true; error = null; progress = 0; cancelled = false
         scope.launch {
             var writer: RowWriter? = null
@@ -118,12 +119,12 @@ class ExportJob(val request: ExportRequest, private val scope: CoroutineScope, p
             }
             running = false
             outcome.onSuccess { rows ->
-                val where = if (file == null) "el portapapeles" else file.toString()
+                val where = if (file == null) tr("el portapapeles") else file.toString()
                 if (file == null) setClipboard(text.toString())
                 val limited = file == null && rows >= CLIPBOARD_ROWS
-                report("$rows filas exportadas a $where" + if (cancelled) " (cancelado)" else if (limited) " (límite de $CLIPBOARD_ROWS filas)" else "")
+                report(tr("%s filas exportadas a %s", rows, where) + if (cancelled) tr(" (cancelado)") else if (limited) tr(" (límite de %s filas)", CLIPBOARD_ROWS) else "")
                 onDone()
-            }.onFailure { error = it.message ?: it.toString(); report("Error al exportar: $error") }
+            }.onFailure { error = it.message ?: it.toString(); report(tr("Error al exportar: %s", error)) }
         }
     }
 }

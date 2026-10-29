@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import ksqlc.core.Column
 import ksqlc.core.DbKind
 import ksqlc.core.DbObject
@@ -57,37 +59,37 @@ fun isBinaryType(typeName: String) = baseType(typeName).let { t -> !t.startsWith
 fun parseParam(text: String, typeName: String, kind: DbKind): Any? {
     val t = baseType(typeName)
     val isText = TEXT_WORDS.any { it in t }
-    if (isBinaryType(typeName)) throw IllegalArgumentException("las columnas binarias no se pueden editar")
-    if (kind == DbKind.CASSANDRA && CQL_COLLECTIONS.any { t.startsWith(it) }) throw IllegalArgumentException("las colecciones, tuplas y tipos de usuario no se pueden editar aquí; usa una sentencia CQL")
+    if (isBinaryType(typeName)) throw IllegalArgumentException(tr("las columnas binarias no se pueden editar"))
+    if (kind == DbKind.CASSANDRA && CQL_COLLECTIONS.any { t.startsWith(it) }) throw IllegalArgumentException(tr("las colecciones, tuplas y tipos de usuario no se pueden editar aquí; usa una sentencia CQL"))
     if (isText) return text
     if (text.isBlank()) return null
     val s = text.trim()
-    fun bad(what: String): Nothing = throw IllegalArgumentException("«$s» no es $what")
+    fun bad(what: String): Nothing = throw IllegalArgumentException(tr("«%s» no es %s", s, what))
     return when {
-        kind == DbKind.SQLITE && t in INTEGER_TYPES -> s.toLongOrNull() ?: bad("un entero")
-        t in INTEGER_TYPES -> s.toBigIntegerOrNull()?.let { if (it.bitLength() < 64) it.toLong() else it } ?: bad("un entero")
-        kind == DbKind.SQLITE && (t in DECIMAL_TYPES || t in FLOAT_TYPES || t == "NUMERIC") -> s.toLongOrNull() ?: s.toDoubleOrNull() ?: bad("un número")
-        t in DECIMAL_TYPES -> runCatching { BigDecimal(s) }.getOrNull() ?: bad("un número")
-        t in FLOAT_TYPES -> s.toDoubleOrNull() ?: bad("un número")
+        kind == DbKind.SQLITE && t in INTEGER_TYPES -> s.toLongOrNull() ?: bad(tr("un entero"))
+        t in INTEGER_TYPES -> s.toBigIntegerOrNull()?.let { if (it.bitLength() < 64) it.toLong() else it } ?: bad(tr("un entero"))
+        kind == DbKind.SQLITE && (t in DECIMAL_TYPES || t in FLOAT_TYPES || t == "NUMERIC") -> s.toLongOrNull() ?: s.toDoubleOrNull() ?: bad(tr("un número"))
+        t in DECIMAL_TYPES -> runCatching { BigDecimal(s) }.getOrNull() ?: bad(tr("un número"))
+        t in FLOAT_TYPES -> s.toDoubleOrNull() ?: bad(tr("un número"))
         t in BOOLEAN_TYPES || (t == "BIT" && kind != DbKind.POSTGRES) -> when (s.lowercase()) {
             "true", "t", "1", "yes", "y", "si", "sí" -> true
             "false", "f", "0", "no", "n" -> false
-            else -> bad("un booleano (true/false)")
+            else -> bad(tr("un booleano (true/false)"))
         }
         kind == DbKind.SQLITE && (t == "DATE" || t.startsWith("TIME") || t == "DATETIME") -> s
         kind == DbKind.ORACLE && t == "DATE" -> // an Oracle DATE carries a time of day
             runCatching { Timestamp.valueOf(LocalDateTime.parse(s.replace(' ', 'T'))) }.getOrNull()
-                ?: runCatching { Timestamp.valueOf(LocalDate.parse(s).atStartOfDay()) }.getOrNull() ?: bad("una fecha (aaaa-mm-dd hh:mm:ss)")
-        t == "DATE" -> runCatching { Date.valueOf(LocalDate.parse(s)) }.getOrNull() ?: bad("una fecha (aaaa-mm-dd)")
-        t == "TIME" || t == "TIME WITHOUT TIME ZONE" -> runCatching { Time.valueOf(LocalTime.parse(s).withNano(0)) }.getOrNull() ?: bad("una hora (hh:mm:ss)")
+                ?: runCatching { Timestamp.valueOf(LocalDate.parse(s).atStartOfDay()) }.getOrNull() ?: bad(tr("una fecha (aaaa-mm-dd hh:mm:ss)"))
+        t == "DATE" -> runCatching { Date.valueOf(LocalDate.parse(s)) }.getOrNull() ?: bad(tr("una fecha (aaaa-mm-dd)"))
+        t == "TIME" || t == "TIME WITHOUT TIME ZONE" -> runCatching { Time.valueOf(LocalTime.parse(s).withNano(0)) }.getOrNull() ?: bad(tr("una hora (hh:mm:ss)"))
         t == "TIMESTAMP" || t == "DATETIME" || t == "DATETIME2" || t == "SMALLDATETIME" || t == "TIMESTAMP WITHOUT TIME ZONE" || t == "TIMESTAMPLTZ" || t == "TIMESTAMP WITH LOCAL TIME ZONE" ->
             runCatching { Timestamp.valueOf(LocalDateTime.parse(s.replace(' ', 'T'))) }.getOrNull()
-                ?: runCatching { Timestamp.valueOf(LocalDate.parse(s).atStartOfDay()) }.getOrNull() ?: bad("una fecha y hora (aaaa-mm-dd hh:mm:ss)")
+                ?: runCatching { Timestamp.valueOf(LocalDate.parse(s).atStartOfDay()) }.getOrNull() ?: bad(tr("una fecha y hora (aaaa-mm-dd hh:mm:ss)"))
         t == "TIMESTAMPTZ" || t == "TIMESTAMP WITH TIME ZONE" || t == "DATETIMEOFFSET" ->
-            runCatching { OffsetDateTime.parse(s.replace(' ', 'T')) }.getOrNull() ?: bad("una fecha y hora con zona (2026-01-31 10:00:00+01:00)")
-        kind == DbKind.CASSANDRA && (t == "UUID" || t == "TIMEUUID") -> runCatching { java.util.UUID.fromString(s) }.getOrNull() ?: bad("un UUID")
-        kind == DbKind.CASSANDRA && t == "VARINT" -> s.toBigIntegerOrNull() ?: bad("un entero")
-        kind == DbKind.CASSANDRA && t == "INET" -> runCatching { java.net.InetAddress.getByName(s) }.getOrNull()?.takeIf { s.any { it == '.' || it == ':' } } ?: bad("una dirección IP")
+            runCatching { OffsetDateTime.parse(s.replace(' ', 'T')) }.getOrNull() ?: bad(tr("una fecha y hora con zona (2026-01-31 10:00:00+01:00)"))
+        kind == DbKind.CASSANDRA && (t == "UUID" || t == "TIMEUUID") -> runCatching { java.util.UUID.fromString(s) }.getOrNull() ?: bad(tr("un UUID"))
+        kind == DbKind.CASSANDRA && t == "VARINT" -> s.toBigIntegerOrNull() ?: bad(tr("un entero"))
+        kind == DbKind.CASSANDRA && t == "INET" -> runCatching { java.net.InetAddress.getByName(s) }.getOrNull()?.takeIf { s.any { it == '.' || it == ':' } } ?: bad(tr("una dirección IP"))
         kind == DbKind.POSTGRES -> UntypedParam(text)
         else -> text
     }
@@ -120,15 +122,15 @@ fun buildDml(
 ): List<DmlStatement> {
     val table = dialect.qualified(obj)
     val typeOf = columns.associate { it.name.lowercase() to it.typeName }
-    val keyIndexes = primaryKey.map { k -> columns.indexOfFirst { it.name.equals(k, true) }.also { check(it >= 0) { "la clave primaria $k no está entre las columnas" } } }
-    check(keyIndexes.isNotEmpty() || (updates.isEmpty() && deletes.isEmpty())) { "la tabla no tiene clave primaria" }
+    val keyIndexes = primaryKey.map { k -> columns.indexOfFirst { it.name.equals(k, true) }.also { check(it >= 0) { tr("la clave primaria %s no está entre las columnas", k) } } }
+    check(keyIndexes.isNotEmpty() || (updates.isEmpty() && deletes.isEmpty())) { tr("la tabla no tiene clave primaria") }
 
     fun where(row: List<Any?>) = keyIndexes.joinToString(" and ") { dialect.quote(columns[it].name) + " = ?" } to keyIndexes.map { row[it] }
     fun bind(column: String, v: CellValue): Any? = when (v) {
         is CellValue.Null -> null
         is CellValue.Default -> null
         is CellValue.Bytes -> v.data
-        is CellValue.Text -> try { parseParam(v.text, typeOf[column.lowercase()] ?: "", kind) } catch (e: IllegalArgumentException) { throw DmlException(column, e.message ?: "valor no válido") }
+        is CellValue.Text -> try { parseParam(v.text, typeOf[column.lowercase()] ?: "", kind) } catch (e: IllegalArgumentException) { throw DmlException(column, e.message ?: tr("valor no válido")) }
     }
 
     val out = ArrayList<DmlStatement>()

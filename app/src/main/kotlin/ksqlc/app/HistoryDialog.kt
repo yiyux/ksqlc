@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -47,15 +48,15 @@ fun HistoryDialog(state: AppState) {
 
     ModalOverlay(state::closeHistory, Modifier.testTag("history-dialog"), width = 980.dp, height = 600.dp) {
         Column(Modifier.fillMaxSize()) {
-            PanelHeader("Historial — ${state.form.name}") { ToolButton(IconKind.Close, "Cerrar", state::closeHistory) }
+            PanelHeader(tr("Historial — %s", state.form.name)) { ToolButton(IconKind.Close, tr("Cerrar"), state::closeHistory) }
             Separator()
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 Column(Modifier.width(380.dp).fillMaxHeight()) {
                     Box(Modifier.fillMaxWidth().padding(8.dp)) {
-                        CompactTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = "Buscar…", testTag = "history-search")
+                        CompactTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = tr("Buscar…"), testTag = "history-search")
                     }
                     Separator()
-                    if (shown.isEmpty()) Text(if (all.isEmpty()) "Aún no se ha ejecutado nada." else "Sin coincidencias.", Modifier.padding(12.dp), fontSize = 12.sp, color = c.textMuted)
+                    if (shown.isEmpty()) Text(if (all.isEmpty()) tr("Aún no se ha ejecutado nada.") else tr("Sin coincidencias."), Modifier.padding(12.dp), fontSize = 12.sp, color = c.textMuted)
                     LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                         items(shown.size) { i ->
                             val e = shown[i]
@@ -77,20 +78,20 @@ fun HistoryDialog(state: AppState) {
                         SelectionContainer { Text(current?.sql.orEmpty(), style = MonoStyle.copy(fontSize = 12.sp, lineHeight = 18.sp), color = c.gridText) }
                     }
                     if (current != null) Text(
-                        (if (current.ok) "OK" else "Con error") + " · ${current.millis} ms" + (current.rows?.let { " · $it filas" } ?: ""),
+                        (if (current.ok) "OK" else tr("Con error")) + " · ${current.millis} ms" + (current.rows?.let { tr(" · %s filas", it) } ?: ""),
                         Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontSize = 11.sp, color = c.textMuted,
                     )
                 }
             }
             Separator()
             Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextAction("Insertar en consola", { current?.let(::insert) }, Modifier.testTag("history-insert"), enabled = current != null)
-                TextAction("Copiar", { current?.let { clipboard.setText(AnnotatedString(it.sql)) } }, enabled = current != null)
-                TextAction("Vaciar historial", {
-                    state.confirmation = Confirmation("Vaciar historial", "Se borran las ${all.size} sentencias guardadas de ${state.form.name}.", "Vaciar") { state.confirmation = null; state.clearHistory() }
+                TextAction(tr("Insertar en consola"), { current?.let(::insert) }, Modifier.testTag("history-insert"), enabled = current != null)
+                TextAction(tr("Copiar"), { current?.let { clipboard.setText(AnnotatedString(it.sql)) } }, enabled = current != null)
+                TextAction(tr("Vaciar historial"), {
+                    state.confirmation = Confirmation(tr("Vaciar historial"), tr("Se borran las %d sentencias guardadas de %s.", all.size, state.form.name), tr("Vaciar")) { state.confirmation = null; state.clearHistory() }
                 }, enabled = all.isNotEmpty())
                 Spacer(Modifier.weight(1f))
-                TextAction("Cerrar", state::closeHistory, primary = true)
+                TextAction(tr("Cerrar"), state::closeHistory, primary = true)
             }
         }
     }

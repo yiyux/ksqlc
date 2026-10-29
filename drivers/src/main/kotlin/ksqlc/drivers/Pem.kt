@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -21,7 +23,7 @@ object Pem {
         val certs = try {
             CertificateFactory.getInstance("X.509").generateCertificates(ByteArrayInputStream(bytes)).filterIsInstance<X509Certificate>()
         } catch (e: java.security.cert.CertificateException) { emptyList() }
-        require(certs.isNotEmpty()) { "«$file» no contiene ningún certificado PEM" }
+        require(certs.isNotEmpty()) { tr("«%s» no contiene ningún certificado PEM", file) }
         return certs
     }
 
@@ -29,10 +31,10 @@ object Pem {
     fun privateKey(file: String): PrivateKey {
         val text = Files.readString(Path.of(expand(file)))
         val der = when {
-            "BEGIN ENCRYPTED PRIVATE KEY" in text || "Proc-Type: 4,ENCRYPTED" in text -> throw IllegalArgumentException("la clave de «$file» tiene frase de paso: quítala con `openssl pkcs8 -topk8 -nocrypt`")
+            "BEGIN ENCRYPTED PRIVATE KEY" in text || "Proc-Type: 4,ENCRYPTED" in text -> throw IllegalArgumentException(tr("la clave de «%s» tiene frase de paso: quítala con `openssl pkcs8 -topk8 -nocrypt`", file))
             "BEGIN PRIVATE KEY" in text -> body(text, "PRIVATE KEY")
             "BEGIN RSA PRIVATE KEY" in text -> wrapPkcs1(body(text, "RSA PRIVATE KEY"))
-            else -> throw IllegalArgumentException("«$file» no es una clave PEM admitida (PKCS#8 o RSA); conviértela con `openssl pkcs8 -topk8 -nocrypt`")
+            else -> throw IllegalArgumentException(tr("«%s» no es una clave PEM admitida (PKCS#8 o RSA); conviértela con `openssl pkcs8 -topk8 -nocrypt`", file))
         }
         return pkcs8(der)
     }
@@ -64,7 +66,7 @@ object Pem {
     private fun pkcs8(der: ByteArray): PrivateKey {
         val spec = PKCS8EncodedKeySpec(der)
         for (alg in listOf("RSA", "EC", "Ed25519", "DSA")) runCatching { return KeyFactory.getInstance(alg).generatePrivate(spec) }
-        throw IllegalArgumentException("tipo de clave privada no admitido")
+        throw IllegalArgumentException(tr("tipo de clave privada no admitido"))
     }
 
     /** An RSA PKCS#1 key inside the PKCS#8 envelope: SEQUENCE { INTEGER 0, SEQUENCE { rsaEncryption, NULL }, OCTET STRING key }. */

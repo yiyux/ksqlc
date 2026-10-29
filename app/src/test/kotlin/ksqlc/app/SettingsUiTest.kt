@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import ksqlc.core.DataSource
 import ksqlc.core.DbKind
+import ksqlc.core.I18n
+import ksqlc.core.Language
 import ksqlc.storage.ConnectionStore
 import ksqlc.storage.InMemorySecretStore
 import ksqlc.storage.PasswordStorage
@@ -57,5 +59,17 @@ class SettingsUiTest {
         rule.onNodeWithTag("settings-apply").performClick(); frames()
         assert(exists("settings-error"))
         assertEquals(PasswordStorage.KEYCHAIN, state.settings.passwordStorage)
+    }
+
+    @Test fun languageIsChosenInTheInterfaceSectionAndOnlyStoredUntilRestart() {
+        rule.setContent { App(state) }
+        rule.onNodeWithTag("settings-button").performClick(); frames()
+        rule.onNodeWithTag("settings-section-1").performClick(); frames()
+        rule.onNodeWithTag("lang-en").performClick(); frames()
+        rule.onNodeWithTag("settings-apply").performClick()
+        val end = System.nanoTime() + 20_000_000_000
+        while (exists("settings-dialog")) { check(System.nanoTime() < end) { "timeout" }; Thread.sleep(50); frames(1) }
+        assertEquals(Language.EN, state.settings.language)
+        assertEquals(Language.ES, I18n.language)           // applied on the next start
     }
 }

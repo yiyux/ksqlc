@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -41,7 +42,7 @@ fun NotebookView(state: AppState, modifier: Modifier = Modifier) {
     LazyColumn(modifier.testTag("notebook"), state = list, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         itemsIndexed(cells) { i, r -> NotebookCell(state, i, r.text(text)) }
         item {
-            Box(Modifier.testTag("nb-add")) { TextAction("+ Celda", state::addCell, enabled = !state.running) }
+            Box(Modifier.testTag("nb-add")) { TextAction(tr("+ Celda"), state::addCell, enabled = !state.running) }
         }
     }
 }
@@ -61,18 +62,18 @@ private fun NotebookCell(state: AppState, i: Int, source: String) {
         Modifier.fillMaxWidth().clip(shape).border(1.dp, if (selected) c.accent else c.border, shape).background(c.editorBg).testTag("nb-cell:$i"),
     ) {
         Row(Modifier.fillMaxWidth().height(30.dp).background(c.toolbarBg).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            ToolButton(IconKind.Play, "Ejecutar celda (⇧↵)", { state.notebookCell = i; state.runCell(i) }, Modifier.testTag("nb-run:$i"), enabled = !state.running, tint = c.success)
+            ToolButton(IconKind.Play, tr("Ejecutar celda (⇧↵)"), { state.notebookCell = i; state.runCell(i) }, Modifier.testTag("nb-run:$i"), enabled = !state.running, tint = c.success)
             Text("[${i + 1}]", fontSize = 12.sp, color = c.textMuted, modifier = Modifier.padding(horizontal = 4.dp))
             when {
                 run == null -> {}
                 run.running -> CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp, color = c.accentIcon)
                 else -> Text(
-                    (if (run.ok) "${run.millis} ms" else "error") + if (run.source != source) " · desactualizado" else "",
+                    (if (run.ok) "${run.millis} ms" else tr("error")) + if (run.source != source) tr(" · desactualizado") else "",
                     fontSize = 12.sp, color = if (run.ok) c.textMuted else c.error,
                 )
             }
             Spacer(Modifier.weight(1f))
-            ToolButton(IconKind.Close, "Eliminar celda", { state.deleteCell(i) }, Modifier.testTag("nb-delete:$i"), enabled = !state.running)
+            ToolButton(IconKind.Close, tr("Eliminar celda"), { state.deleteCell(i) }, Modifier.testTag("nb-delete:$i"), enabled = !state.running)
         }
         BasicTextField(
             value, { value = it; if (it.text.trim() != source) state.editCell(i, it.text.trim()) },
@@ -91,7 +92,7 @@ private fun NotebookCell(state: AppState, i: Int, source: String) {
                 val height = (HEADER_DP + ROW_DP * tab.rows.size.coerceIn(1, GRID_ROWS_SHOWN) + 8).dp
                 Grid(tab, onLoadMore = {}, modifier = Modifier.fillMaxWidth().height(height).testTag("nb-result:$i"), showRowsPill = false)
                 Text(
-                    if (tab.exhausted) "${tab.rows.size} filas" else "Primeras ${tab.rows.size} filas",
+                    if (tab.exhausted) tr("%d filas", tab.rows.size) else tr("Primeras %d filas", tab.rows.size),
                     fontSize = 12.sp, color = c.textMuted, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 )
             }

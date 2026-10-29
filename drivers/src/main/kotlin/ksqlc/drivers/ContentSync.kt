@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import ksqlc.core.DbKind
 import ksqlc.core.DbObject
 import ksqlc.drivers.dialect.Dialect
@@ -13,13 +15,13 @@ const val SYNC_LIMIT = 10_000
  * cancelled. A diff that did not read every row would turn rows that were never read into inserts and deletes.
  */
 fun syncProblem(diff: ContentDiff, partial: Boolean, readOnly: Boolean, limit: Int = SYNC_LIMIT): String? = when {
-    diff.rows.isEmpty() -> "No hay diferencias que sincronizar"
-    readOnly -> "La conexión de la derecha es de solo lectura"
-    partial -> "La comparación se canceló: faltan filas por leer y no se puede sincronizar"
-    diff.truncated -> "Alguna tabla tiene más filas de las que se leen: lo que parece faltar a un lado puede ser una fila sin leer"
+    diff.rows.isEmpty() -> tr("No hay diferencias que sincronizar")
+    readOnly -> tr("La conexión de la derecha es de solo lectura")
+    partial -> tr("La comparación se canceló: faltan filas por leer y no se puede sincronizar")
+    diff.truncated -> tr("Alguna tabla tiene más filas de las que se leen: lo que parece faltar a un lado puede ser una fila sin leer")
     diff.rightKey.map { it.lowercase() }.toSet() != diff.key.map { it.lowercase() }.toSet() ->
-        "La clave primaria de la derecha (${diff.rightKey.joinToString().ifEmpty { "ninguna" }}) no es la de la izquierda (${diff.key.joinToString()}): un cambio podría tocar varias filas"
-    diff.rows.size > limit -> "Hay ${diff.rows.size} filas distintas y se sincronizan $limit como mucho de una vez"
+        tr("La clave primaria de la derecha (%s) no es la de la izquierda (%s): un cambio podría tocar varias filas", diff.rightKey.joinToString().ifEmpty { tr("ninguna") }, diff.key.joinToString())
+    diff.rows.size > limit -> tr("Hay %d filas distintas y se sincronizan %d como mucho de una vez", diff.rows.size, limit)
     else -> null
 }
 

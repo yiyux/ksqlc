@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -28,7 +29,7 @@ fun ContentDiffDialog(state: AppState) {
     val c = Ksqlc.colors
     ModalOverlay(state::closeContentDiff, Modifier.testTag("content-diff-dialog"), width = 1180.dp, height = 760.dp) {
         Column(Modifier.fillMaxSize()) {
-            PanelHeader("Comparar contenido") { ToolButton(IconKind.Close, "Cerrar", state::closeContentDiff) }
+            PanelHeader(tr("Comparar contenido")) { ToolButton(IconKind.Close, tr("Cerrar"), state::closeContentDiff) }
             Separator()
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("${job.leftName} · ${job.leftObj.ns.label}.${job.leftObj.name}", fontSize = 13.sp, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 280.dp))
@@ -36,23 +37,23 @@ fun ContentDiffDialog(state: AppState) {
                 Chooser(job.sources.getOrNull(job.rightIndexSource)?.name ?: "—", job.sources, { it.name }, "content-diff-right-source", 170.dp, job::chooseSource)
                 Chooser(job.rightNamespaces.getOrNull(job.rightIndex)?.label ?: "—", job.rightNamespaces, Namespace::label, "content-diff-right-ns", 150.dp, job::chooseNamespace)
                 Chooser(job.rightTables.getOrNull(job.rightTableIndex)?.name ?: "—", job.rightTables, { it.name }, "content-diff-right-table", 170.dp) { job.rightTableIndex = it }
-                if (job.running) TextAction("Cancelar", job::cancel, Modifier.testTag("content-diff-cancel")) else TextAction("Comparar", job::compare, Modifier.testTag("content-diff-run"), primary = true)
+                if (job.running) TextAction(tr("Cancelar"), job::cancel, Modifier.testTag("content-diff-cancel")) else TextAction(tr("Comparar"), job::compare, Modifier.testTag("content-diff-run"), primary = true)
             }
             job.error?.let { Text(it, Modifier.padding(horizontal = 12.dp, vertical = 2.dp).testTag("content-diff-error"), fontSize = 12.sp, color = c.error) }
             Separator()
             val r = job.result
-            if (r == null) Text(if (job.running) "Leyendo las filas…" else "Elige la tabla de la derecha y pulsa Comparar.", Modifier.padding(12.dp), fontSize = 12.sp, color = c.textMuted)
+            if (r == null) Text(if (job.running) tr("Leyendo las filas…") else tr("Elige la tabla de la derecha y pulsa Comparar."), Modifier.padding(12.dp), fontSize = 12.sp, color = c.textMuted)
             else {
                 val count = { s: RowStatus -> r.rows.count { it.status == s } }
                 Text(
-                    "Clave: ${r.key.joinToString()} · iguales ${r.same} · distintas ${count(RowStatus.DIFFERENT)} · solo a la izquierda ${count(RowStatus.ONLY_LEFT)} · solo a la derecha ${count(RowStatus.ONLY_RIGHT)}",
+                    tr("Clave: %s · iguales %s · distintas %s · solo a la izquierda %s · solo a la derecha %s", r.key.joinToString(), r.same, count(RowStatus.DIFFERENT), count(RowStatus.ONLY_LEFT), count(RowStatus.ONLY_RIGHT)),
                     Modifier.padding(horizontal = 12.dp, vertical = 6.dp).testTag("content-diff-summary"), fontSize = 12.sp, color = c.textSecondary,
                 )
                 if (r.onlyLeftColumns.isNotEmpty() || r.onlyRightColumns.isNotEmpty())
-                    Text("Columnas que no se comparan — solo a la izquierda: ${r.onlyLeftColumns.joinToString().ifEmpty { "—" }}; solo a la derecha: ${r.onlyRightColumns.joinToString().ifEmpty { "—" }}", Modifier.padding(horizontal = 12.dp, vertical = 2.dp), fontSize = 12.sp, color = c.textMuted)
-                if (r.truncated) Text("Alguna tabla tiene más filas de las que se leen: las que faltan a un lado pueden ser filas no leídas.", Modifier.padding(horizontal = 12.dp, vertical = 2.dp).testTag("content-diff-truncated"), fontSize = 12.sp, color = c.warning)
+                    Text(tr("Columnas que no se comparan — solo a la izquierda: %s; solo a la derecha: %s", r.onlyLeftColumns.joinToString().ifEmpty { "—" }, r.onlyRightColumns.joinToString().ifEmpty { "—" }), Modifier.padding(horizontal = 12.dp, vertical = 2.dp), fontSize = 12.sp, color = c.textMuted)
+                if (r.truncated) Text(tr("Alguna tabla tiene más filas de las que se leen: las que faltan a un lado pueden ser filas no leídas."), Modifier.padding(horizontal = 12.dp, vertical = 2.dp).testTag("content-diff-truncated"), fontSize = 12.sp, color = c.warning)
                 Separator()
-                if (r.rows.isEmpty()) Text("No hay diferencias.", Modifier.padding(12.dp).testTag("content-diff-none"), fontSize = 12.sp, color = c.textMuted)
+                if (r.rows.isEmpty()) Text(tr("No hay diferencias."), Modifier.padding(12.dp).testTag("content-diff-none"), fontSize = 12.sp, color = c.textMuted)
                 val scroll = rememberScrollState()
                 Column(Modifier.weight(1f).fillMaxWidth().horizontalScroll(scroll)) {
                     Row(Modifier.height(26.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -90,15 +91,15 @@ fun ContentDiffDialog(state: AppState) {
             Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (canSync) {
                     val ok = reason == null && !job.syncing
-                    KCheckbox(job.syncInsert, { job.syncInsert = it }, label = "Insertar (${job.count(RowStatus.ONLY_LEFT)})", enabled = ok, modifier = Modifier.testTag("content-diff-sync-insert"))
-                    KCheckbox(job.syncUpdate, { job.syncUpdate = it }, label = "Actualizar (${job.count(RowStatus.DIFFERENT)})", enabled = ok, modifier = Modifier.testTag("content-diff-sync-update"))
-                    KCheckbox(job.syncDelete, { job.syncDelete = it }, label = "Eliminar (${job.count(RowStatus.ONLY_RIGHT)})", enabled = ok, modifier = Modifier.testTag("content-diff-sync-delete"))
+                    KCheckbox(job.syncInsert, { job.syncInsert = it }, label = tr("Insertar (%s)", job.count(RowStatus.ONLY_LEFT)), enabled = ok, modifier = Modifier.testTag("content-diff-sync-insert"))
+                    KCheckbox(job.syncUpdate, { job.syncUpdate = it }, label = tr("Actualizar (%s)", job.count(RowStatus.DIFFERENT)), enabled = ok, modifier = Modifier.testTag("content-diff-sync-update"))
+                    KCheckbox(job.syncDelete, { job.syncDelete = it }, label = tr("Eliminar (%s)", job.count(RowStatus.ONLY_RIGHT)), enabled = ok, modifier = Modifier.testTag("content-diff-sync-delete"))
                     val any = job.syncInsert || job.syncUpdate || job.syncDelete
-                    TextAction("Ver SQL", state::previewContentSync, Modifier.testTag("content-diff-sync-sql"), enabled = ok && any)
-                    TextAction(if (job.syncing) "Sincronizando…" else "Sincronizar derecha", state::confirmContentSync, Modifier.testTag("content-diff-sync-apply"), enabled = ok && any)
+                    TextAction(tr("Ver SQL"), state::previewContentSync, Modifier.testTag("content-diff-sync-sql"), enabled = ok && any)
+                    TextAction(if (job.syncing) tr("Sincronizando…") else tr("Sincronizar derecha"), state::confirmContentSync, Modifier.testTag("content-diff-sync-apply"), enabled = ok && any)
                 }
                 Spacer(Modifier.weight(1f))
-                TextAction("Cerrar", state::closeContentDiff, primary = true)
+                TextAction(tr("Cerrar"), state::closeContentDiff, primary = true)
             }
         }
     }

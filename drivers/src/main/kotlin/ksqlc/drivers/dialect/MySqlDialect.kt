@@ -34,7 +34,7 @@ object MySqlDialect : MetaDialect() {
         val col = if (o.kind == DbObjectKind.ROUTINE) 3 else 2
         return conn.createStatement().use { st ->
             st.executeQuery("show create $what ${qualified(o)}").use { rs ->
-                if (rs.next()) rs.getString(col).trimEnd() + ";" else error("${o.name} no existe")
+                if (rs.next()) rs.getString(col).trimEnd() + ";" else error(tr("%s no existe", o.name))
             }
         }
     }
@@ -72,7 +72,7 @@ object MySqlDialect : MetaDialect() {
         val db = o.ns.catalog
         val mariaDb = conn.metaData.databaseProductVersion.contains("MariaDB", ignoreCase = true)
         val (comment, tableCollation) = conn.query("select table_comment, table_collation from information_schema.tables where table_schema = ? and table_name = ?", db, o.name) { it.getString(1) to it.getString(2) }
-            .firstOrNull() ?: error("${o.name} no existe")
+            .firstOrNull() ?: error(tr("%s no existe", o.name))
 
         val columns = conn.query(
             """select column_name, column_type, is_nullable, column_default, extra, generation_expression, column_comment, data_type, collation_name

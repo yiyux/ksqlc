@@ -47,7 +47,7 @@ object PostgresDialect : MetaDialect() {
             """select p.prokind, p.proargnames::text[], p.proargmodes::text[], p.pronargs from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                where n.nspname = ? and p.prokind in ('f','p') and p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' = ?""",
             o.ns.schema, o.name,
-        ) { rs -> Triple(rs.getString(1), rs.getArray(2)?.array as Array<*>?, rs.getArray(3)?.array as Array<*>?) to rs.getInt(4) }.firstOrNull() ?: error("${o.name} no existe")
+        ) { rs -> Triple(rs.getString(1), rs.getArray(2)?.array as Array<*>?, rs.getArray(3)?.array as Array<*>?) to rs.getInt(4) }.firstOrNull() ?: error(tr("%s no existe", o.name))
         val (kind, argNames, argModes) = row.first
         val count = argModes?.size ?: row.second
         // 'o' is an OUT argument (a procedure still wants a slot for it), 't' a column of the result table
@@ -66,7 +66,7 @@ object PostgresDialect : MetaDialect() {
             """select c.oid::bigint, obj_description(c.oid, 'pg_class') from pg_class c join pg_namespace n on n.oid = c.relnamespace
                where n.nspname = ? and c.relname = ? and c.relkind in ('r', 'p')""",
             o.ns.schema, o.name,
-        ) { it.getLong(1) to it.getString(2) }.firstOrNull() ?: error("${o.name} no existe")
+        ) { it.getLong(1) to it.getString(2) }.firstOrNull() ?: error(tr("%s no existe", o.name))
 
         val columns = conn.query(
             """select a.attname::text, format_type(a.atttypid, a.atttypmod), a.attnotnull, pg_get_expr(d.adbin, d.adrelid), a.attgenerated::text,
@@ -151,7 +151,7 @@ object PostgresDialect : MetaDialect() {
                 """select pg_get_viewdef(c.oid, true) from pg_class c join pg_namespace n on n.oid = c.relnamespace
                    where n.nspname = ? and c.relname = ?""",
                 o.ns.schema, o.name,
-            ) { it.getString(1) }.firstOrNull()?.trim() ?: error("${o.name} no existe")
+            ) { it.getString(1) }.firstOrNull()?.trim() ?: error(tr("%s no existe", o.name))
             val head = if (o.kind == DbObjectKind.VIEW) "create or replace view" else "create materialized view"
             "$head ${qualified(o)} as\n$def"
         }
@@ -160,6 +160,6 @@ object PostgresDialect : MetaDialect() {
                where n.nspname = ? and p.prokind in ('f','p')
                  and p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' = ?""",
             o.ns.schema, o.name,
-        ) { it.getString(1) }.firstOrNull() ?: error("${o.name} no existe")
+        ) { it.getString(1) }.firstOrNull() ?: error(tr("%s no existe", o.name))
     }
 }

@@ -1,6 +1,7 @@
 package ksqlc.storage
 
 import kotlinx.serialization.Serializable
+import ksqlc.core.Language
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.nio.file.Path
@@ -29,6 +30,8 @@ data class Settings(
     val passwordStorage: PasswordStorage = PasswordStorage.KEYCHAIN,
     /** The encrypted file for [PasswordStorage.FILE]; blank = `secrets.enc` in the data folder. */
     val passwordFile: String = "",
+    /** Interface language; null until the user has been asked on the first start. */
+    val language: Language? = null,
 )
 
 /** `settings.json` in [dir]. A missing or unreadable file yields the defaults instead of an error. */

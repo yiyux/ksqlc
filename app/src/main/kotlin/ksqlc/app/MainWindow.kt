@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -118,7 +119,7 @@ private fun TopBar(state: AppState, ws: Workspace?) {
                 }
                 DropdownMenu(menu, { menu = false }) {
                     state.saved.forEach { ds -> DropdownMenuItem(text = { Text("${ds.name}  (${ds.kind.label()})", fontSize = 13.sp) }, onClick = { menu = false; ws?.open(ds) ?: state.selectAndConnect(ds) }) }
-                    DropdownMenuItem(text = { Text("Nuevo data source…", fontSize = 13.sp) }, onClick = { menu = false; state.dataSourceDialog = true })
+                    DropdownMenuItem(text = { Text(tr("Nuevo data source…"), fontSize = 13.sp) }, onClick = { menu = false; state.dataSourceDialog = true })
                 }
             }
         }
@@ -127,14 +128,14 @@ private fun TopBar(state: AppState, ws: Workspace?) {
             ToolButton(IconKind.Play, "Services", { state.servicesVisible = !state.servicesVisible }, selected = state.servicesVisible)
         }
         Row(Modifier.align(Alignment.CenterEnd), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            ToolButton(IconKind.Contrast, "Tema: ${themeLabel(state.settings.themeMode)}", state::cycleTheme)
+            ToolButton(IconKind.Contrast, tr("Tema: %s", themeLabel(state.settings.themeMode)), state::cycleTheme)
             ToolButton(IconKind.Gear, "Data sources", { state.dataSourceDialog = true })
-            ToolButton(IconKind.Settings, "Ajustes", { state.settingsDialog = true }, modifier = Modifier.testTag("settings-button"))
+            ToolButton(IconKind.Settings, tr("Ajustes"), { state.settingsDialog = true }, modifier = Modifier.testTag("settings-button"))
         }
     }
 }
 
-private fun themeLabel(m: ThemeMode) = when (m) { ThemeMode.SYSTEM -> "sistema"; ThemeMode.LIGHT -> "claro"; ThemeMode.DARK -> "oscuro" }
+private fun themeLabel(m: ThemeMode) = when (m) { ThemeMode.SYSTEM -> tr("sistema"); ThemeMode.LIGHT -> tr("claro"); ThemeMode.DARK -> tr("oscuro") }
 
 @Composable
 private fun EditorIsland(state: AppState, ws: Workspace?) {
@@ -159,7 +160,7 @@ private fun EditorIsland(state: AppState, ws: Workspace?) {
                 }
             },
             Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 6.dp),
-            trailing = { if (ws != null) ToolButton(IconKind.Plus, "Nueva consola SQL sobre ${state.form.name}", { ws.newConsole(state.form.toDataSource()) }, Modifier.testTag("console-new")) },
+            trailing = { if (ws != null) ToolButton(IconKind.Plus, tr("Nueva consola SQL sobre %s", state.form.name), { ws.newConsole(state.form.toDataSource()) }, Modifier.testTag("console-new")) },
         )
         Separator()
         val data = state.dataTabs.getOrNull(state.activeEditor)
@@ -168,16 +169,16 @@ private fun EditorIsland(state: AppState, ws: Workspace?) {
             return
         }
         Row(Modifier.fillMaxWidth().height(34.dp).background(c.toolbarBg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            ToolButton(IconKind.Play, "Ejecutar (⌘↵)", state::runSelectionOrCurrent, enabled = !state.running, tint = c.success)
-            ToolButton(IconKind.PlayAll, "Ejecutar script (⌘⇧↵)", state::runScript, enabled = !state.running, tint = c.success)
-            ToolButton(IconKind.Stop, "Cancelar", state::cancel, enabled = state.running, tint = c.error)
-            ToolButton(IconKind.Explain, "Explain: plan de ejecución", { state.explain(false) }, Modifier.testTag("explain"), enabled = !state.running)
-            ToolButton(IconKind.Analyze, "Explain analyze: ejecuta y mide", { state.explain(true) }, Modifier.testTag("explain-analyze"), enabled = !state.running)
+            ToolButton(IconKind.Play, tr("Ejecutar (⌘↵)"), state::runSelectionOrCurrent, enabled = !state.running, tint = c.success)
+            ToolButton(IconKind.PlayAll, tr("Ejecutar script (⌘⇧↵)"), state::runScript, enabled = !state.running, tint = c.success)
+            ToolButton(IconKind.Stop, tr("Cancelar"), state::cancel, enabled = state.running, tint = c.error)
+            ToolButton(IconKind.Explain, tr("Explain: plan de ejecución"), { state.explain(false) }, Modifier.testTag("explain"), enabled = !state.running)
+            ToolButton(IconKind.Analyze, tr("Explain analyze: ejecuta y mide"), { state.explain(true) }, Modifier.testTag("explain-analyze"), enabled = !state.running)
             VSeparator()
-            ToolButton(IconKind.Notebook, "Modo notebook: una celda por sentencia, con su resultado debajo", { state.notebookMode = !state.notebookMode }, Modifier.testTag("notebook-toggle"), selected = state.notebookMode)
-            ToolButton(IconKind.Format, "Formatear SQL (⌘⌥L)", state::format)
-            ToolButton(IconKind.Folder, "Abrir archivo SQL…", state::openSqlFile)
-            ToolButton(IconKind.History, "Historial (⌥⌘E)", state::openHistory, Modifier.testTag("history-open"))
+            ToolButton(IconKind.Notebook, tr("Modo notebook: una celda por sentencia, con su resultado debajo"), { state.notebookMode = !state.notebookMode }, Modifier.testTag("notebook-toggle"), selected = state.notebookMode)
+            ToolButton(IconKind.Format, tr("Formatear SQL (⌘⌥L)"), state::format)
+            ToolButton(IconKind.Folder, tr("Abrir archivo SQL…"), state::openSqlFile)
+            ToolButton(IconKind.History, tr("Historial (⌥⌘E)"), state::openHistory, Modifier.testTag("history-open"))
             VSeparator()
             if (state.hasTransactions) TxControls(state.form.manualTx, state.consolePending, state::setTxManual, state::commitConsole, state::rollbackConsole, "console")
             if (state.running) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
@@ -217,9 +218,9 @@ private fun EditorIsland(state: AppState, ws: Workspace?) {
 private fun DialectMenu(state: AppState) {
     var open by remember { mutableStateOf(false) }
     Box {
-        DropdownField("Dialecto: " + (state.editorDialect?.label() ?: "auto"), { open = true }, Modifier.width(190.dp).testTag("dialect"))
+        DropdownField(tr("Dialecto: %s", state.editorDialect?.label() ?: tr("auto")), { open = true }, Modifier.width(190.dp).testTag("dialect"))
         DropdownMenu(open, { open = false }) {
-            DropdownMenuItem(text = { Text("Automático (el de la conexión)", fontSize = 13.sp) }, onClick = { open = false; state.editorDialect = null }, modifier = Modifier.testTag("dialect:auto"))
+            DropdownMenuItem(text = { Text(tr("Automático (el de la conexión)"), fontSize = 13.sp) }, onClick = { open = false; state.editorDialect = null }, modifier = Modifier.testTag("dialect:auto"))
             ksqlc.core.DbKind.entries.forEach { k ->
                 DropdownMenuItem(text = { Text(k.label(), fontSize = 13.sp) }, onClick = { open = false; state.editorDialect = k }, modifier = Modifier.testTag("dialect:${k.name}"))
             }
@@ -246,9 +247,9 @@ private fun AppStatusBar(state: AppState) {
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon)
-                Text("Exportando ${job.request.name}: ${job.progress} filas…", fontSize = 12.sp, color = c.textSecondary, maxLines = 1)
+                Text(tr("Exportando %s: %s filas…", job.request.name, job.progress), fontSize = 12.sp, color = c.textSecondary, maxLines = 1)
             }
-            ToolButton(IconKind.Close, "Cancelar exportación", state::cancelExport, Modifier.testTag("export-indicator-cancel"))
+            ToolButton(IconKind.Close, tr("Cancelar exportación"), state::cancelExport, Modifier.testTag("export-indicator-cancel"))
         }
         val problem = state.diagnosticAtCaret
         if (problem != null) Text(problem.message, fontSize = 12.sp, color = if (problem.severity == Severity.ERROR) c.error else c.warning, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).testTag("problem"))
@@ -270,10 +271,10 @@ private fun DataTabContent(state: AppState, data: DataTab) {
     Column(Modifier.fillMaxSize()) {
         val ed = data.editor
         Row(Modifier.fillMaxWidth().height(34.dp).background(c.toolbarBg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            ToolButton(IconKind.Refresh, "Recargar", { if (ed.hasChanges) state.status = "Envía o revierte los cambios pendientes antes de recargar" else state.applyFilters(data) }, enabled = !data.loading)
+            ToolButton(IconKind.Refresh, tr("Recargar"), { if (ed.hasChanges) state.status = tr("Envía o revierte los cambios pendientes antes de recargar") else state.applyFilters(data) }, enabled = !data.loading)
             VSeparator()
             EditButtons(state, data)
-            ToolButton(IconKind.Export, "Exportar datos…", { state.exportData(data) }, Modifier.testTag("export-open"), enabled = !data.loading)
+            ToolButton(IconKind.Export, tr("Exportar datos…"), { state.exportData(data) }, Modifier.testTag("export-open"), enabled = !data.loading)
             VSeparator()
             EditStatus(state, data, "tab")
         }
@@ -293,11 +294,11 @@ private fun DataTabContent(state: AppState, data: DataTab) {
 internal fun RowScope.EditButtons(state: AppState, data: DataTab) {
     val c = Ksqlc.colors
     val ed = data.editor
-    ToolButton(IconKind.Plus, "Añadir fila", { ed.addRow(data.grid.result.columns.size) }, enabled = ed.canInsert && !data.loading)
-    ToolButton(IconKind.Minus, "Borrar filas seleccionadas", { ed.deleteSelected(data.grid) }, enabled = ed.canInsert && !data.loading)
-    ToolButton(IconKind.Revert, "Revertir cambios", ed::revert, enabled = ed.hasChanges && !data.loading)
-    ToolButton(IconKind.Preview, "Ver SQL de los cambios", { state.previewChanges(data) }, enabled = ed.hasChanges)
-    ToolButton(IconKind.Submit, "Enviar cambios", { state.submitChanges(data) }, enabled = ed.hasChanges && !data.loading, tint = if (ed.hasChanges) c.success else null)
+    ToolButton(IconKind.Plus, tr("Añadir fila"), { ed.addRow(data.grid.result.columns.size) }, enabled = ed.canInsert && !data.loading)
+    ToolButton(IconKind.Minus, tr("Borrar filas seleccionadas"), { ed.deleteSelected(data.grid) }, enabled = ed.canInsert && !data.loading)
+    ToolButton(IconKind.Revert, tr("Revertir cambios"), ed::revert, enabled = ed.hasChanges && !data.loading)
+    ToolButton(IconKind.Preview, tr("Ver SQL de los cambios"), { state.previewChanges(data) }, enabled = ed.hasChanges)
+    ToolButton(IconKind.Submit, tr("Enviar cambios"), { state.submitChanges(data) }, enabled = ed.hasChanges && !data.loading, tint = if (ed.hasChanges) c.success else null)
 }
 
 /** Transaction controls, the count of unsent changes and the loading spinner of [data]; [scope] keeps test tags apart. */
@@ -305,7 +306,7 @@ internal fun RowScope.EditButtons(state: AppState, data: DataTab) {
 internal fun RowScope.EditStatus(state: AppState, data: DataTab, scope: String) {
     val c = Ksqlc.colors
     if (state.hasTransactions) TxControls(state.form.manualTx, data.pending, state::setTxManual, { state.commitTab(data) }, { state.rollbackTab(data) }, scope)
-    if (data.editor.hasChanges) Text("${data.editor.changeCount} cambio(s) sin enviar", fontSize = 12.sp, color = c.textSecondary, modifier = Modifier.padding(start = 8.dp).testTag(if (scope == "tab") "pending-count" else "pending-count:$scope"))
+    if (data.editor.hasChanges) Text(tr("%s cambio(s) sin enviar", data.editor.changeCount), fontSize = 12.sp, color = c.textSecondary, modifier = Modifier.padding(start = 8.dp).testTag(if (scope == "tab") "pending-count" else "pending-count:$scope"))
     if (data.loading) { Spacer(Modifier.width(6.dp)); CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 1.5.dp, color = c.accentIcon) }
 }
 
@@ -340,7 +341,7 @@ private fun FilterBox(icon: IconKind, keyword: String, value: String, columns: S
             },
             singleLine = true, textStyle = MonoStyle.copy(color = c.synIdent, fontSize = 13.sp), cursorBrush = SolidColor(c.text), visualTransformation = transformation,
         )
-        if (value.isNotEmpty()) ToolButton(IconKind.Close, "Borrar $keyword", { onChange(""); onApply() }, modifier = Modifier.testTag("$tag-clear"))
+        if (value.isNotEmpty()) ToolButton(IconKind.Close, tr("Borrar %s", keyword), { onChange(""); onApply() }, modifier = Modifier.testTag("$tag-clear"))
     }
 }
 
@@ -357,13 +358,13 @@ private fun TxControls(manual: Boolean, pending: Boolean, onMode: (Boolean) -> U
             Modifier.height(24.dp).clip(RoundedCornerShape(6.dp)).clickable { menu = true }.padding(horizontal = 6.dp).testTag("tx-mode:$scope"),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(if (manual) "Tx: Manual" else "Tx: Auto", fontSize = 12.sp, color = c.text)
+            Text(if (manual) tr("Tx: Manual") else tr("Tx: Auto"), fontSize = 12.sp, color = c.text)
             if (manual && pending) Box(Modifier.size(6.dp).clip(androidx.compose.foundation.shape.CircleShape).background(c.warning).testTag("tx-pending:$scope"))
             KIcon(IconKind.ChevronDown, tint = c.textSecondary, size = 10.dp)
         }
         DropdownMenu(menu, { menu = false }) {
-            DropdownMenuItem(text = { Text("Auto", fontSize = 13.sp) }, onClick = { menu = false; onMode(false) }, modifier = Modifier.testTag("tx-auto:$scope"))
-            DropdownMenuItem(text = { Text("Manual", fontSize = 13.sp) }, onClick = { menu = false; onMode(true) }, modifier = Modifier.testTag("tx-manual:$scope"))
+            DropdownMenuItem(text = { Text(tr("Auto"), fontSize = 13.sp) }, onClick = { menu = false; onMode(false) }, modifier = Modifier.testTag("tx-auto:$scope"))
+            DropdownMenuItem(text = { Text(tr("Manual"), fontSize = 13.sp) }, onClick = { menu = false; onMode(true) }, modifier = Modifier.testTag("tx-manual:$scope"))
         }
     }
     if (manual) {

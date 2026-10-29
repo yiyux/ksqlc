@@ -1,5 +1,6 @@
 package ksqlc.app.ui
 
+import ksqlc.core.tr
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -151,7 +152,7 @@ fun TabItem(title: String, selected: Boolean, onClick: () -> Unit, modifier: Mod
         Row(Modifier.fillMaxHeight().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             if (icon != null) KIcon(icon, tint = if (selected) c.text else c.textSecondary, size = 14.dp)
             Text(title, fontSize = 13.sp, maxLines = 1, color = if (selected) c.text else c.textSecondary)
-            if (onClose != null) ToolButton(IconKind.Close, "Cerrar $title", onClose, Modifier.size(18.dp))
+            if (onClose != null) ToolButton(IconKind.Close, tr("Cerrar %s", title), onClose, Modifier.size(18.dp))
         }
         if (selected) Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(2.dp).background(c.accent))
     }
@@ -298,7 +299,7 @@ fun PillTab(
     ) {
         if (icon != null) KIcon(icon, tint = if (selected) c.text else c.textSecondary, size = 14.dp)
         Text(title, fontSize = 13.sp, maxLines = 1, color = if (selected) c.text else c.textSecondary)
-        if (onClose != null) ToolButton(IconKind.Close, "Cerrar $title", onClose, Modifier.size(18.dp))
+        if (onClose != null) ToolButton(IconKind.Close, tr("Cerrar %s", title), onClose, Modifier.size(18.dp))
     }
 }
 

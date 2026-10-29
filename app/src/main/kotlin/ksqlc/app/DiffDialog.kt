@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -57,7 +58,7 @@ fun DiffDialog(state: AppState) {
     val clipboard = LocalClipboardManager.current
     ModalOverlay(state::closeDiff, Modifier.testTag("diff-dialog"), width = 1180.dp, height = 760.dp) {
         Column(Modifier.fillMaxSize()) {
-            PanelHeader("Comparar esquemas") { ToolButton(IconKind.Close, "Cerrar", state::closeDiff) }
+            PanelHeader(tr("Comparar esquemas")) { ToolButton(IconKind.Close, tr("Cerrar"), state::closeDiff) }
             Separator()
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(job.leftName, fontSize = 13.sp, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
@@ -65,10 +66,10 @@ fun DiffDialog(state: AppState) {
                 Text("↔", fontSize = 14.sp, color = c.textMuted)
                 Chooser(job.sources.getOrNull(job.rightIndexSource)?.name ?: "—", job.sources, { it.name }, "diff-right-source", 190.dp, job::chooseSource)
                 Chooser(job.rightNamespaces.getOrNull(job.rightIndex)?.label ?: "—", job.rightNamespaces, Namespace::label, "diff-right-ns", 170.dp) { job.rightIndex = it }
-                if (job.running) TextAction("Cancelar", job::cancel, Modifier.testTag("diff-cancel")) else TextAction("Comparar", job::compare, Modifier.testTag("diff-run"), primary = true)
+                if (job.running) TextAction(tr("Cancelar"), job::cancel, Modifier.testTag("diff-cancel")) else TextAction(tr("Comparar"), job::compare, Modifier.testTag("diff-run"), primary = true)
                 if (job.running) Text(job.progress, fontSize = 12.sp, color = c.textSecondary, modifier = Modifier.testTag("diff-progress"))
                 Spacer(Modifier.weight(1f))
-                KCheckbox(job.hideSame, { job.hideSame = it }, label = "Ocultar iguales", modifier = Modifier.testTag("diff-hide-same"))
+                KCheckbox(job.hideSame, { job.hideSame = it }, label = tr("Ocultar iguales"), modifier = Modifier.testTag("diff-hide-same"))
             }
             job.error?.let { Text(it, Modifier.padding(horizontal = 12.dp, vertical = 2.dp).testTag("diff-error"), fontSize = 12.sp, color = c.error) }
             Separator()
@@ -76,8 +77,8 @@ fun DiffDialog(state: AppState) {
                 val all = job.results
                 val shown = remember(all, job.hideSame) { all?.filter { !job.hideSame || it.status != ObjectStatus.SAME }.orEmpty() }
                 Column(Modifier.width(300.dp).fillMaxHeight()) {
-                    if (all == null) Text("Elige los dos lados y pulsa Comparar.", Modifier.padding(12.dp), fontSize = 12.sp, color = c.textMuted)
-                    else if (shown.isEmpty()) Text(if (all.isEmpty()) "No hay objetos que comparar." else "No hay diferencias.", Modifier.padding(12.dp).testTag("diff-none"), fontSize = 12.sp, color = c.textMuted)
+                    if (all == null) Text(tr("Elige los dos lados y pulsa Comparar."), Modifier.padding(12.dp), fontSize = 12.sp, color = c.textMuted)
+                    else if (shown.isEmpty()) Text(if (all.isEmpty()) tr("No hay objetos que comparar.") else tr("No hay diferencias."), Modifier.padding(12.dp).testTag("diff-none"), fontSize = 12.sp, color = c.textMuted)
                     LazyColumn(Modifier.fillMaxSize()) {
                         items(shown.size) { i ->
                             val d = shown[i]
@@ -105,8 +106,8 @@ fun DiffDialog(state: AppState) {
                     val list = rememberLazyListState()
                     Column(Modifier.weight(1f).fillMaxHeight().background(c.editorBg)) {
                         Row(Modifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(if (sel.left == null) "— (no existe)" else job.leftName, Modifier.weight(1f).padding(start = 40.dp), fontSize = 12.sp, color = c.textSecondary, maxLines = 1)
-                            Text(if (sel.right == null) "— (no existe)" else job.sources.getOrNull(job.rightIndexSource)?.name.orEmpty(), Modifier.weight(1f).padding(start = 40.dp), fontSize = 12.sp, color = c.textSecondary, maxLines = 1)
+                            Text(if (sel.left == null) tr("— (no existe)") else job.leftName, Modifier.weight(1f).padding(start = 40.dp), fontSize = 12.sp, color = c.textSecondary, maxLines = 1)
+                            Text(if (sel.right == null) tr("— (no existe)") else job.sources.getOrNull(job.rightIndexSource)?.name.orEmpty(), Modifier.weight(1f).padding(start = 40.dp), fontSize = 12.sp, color = c.textSecondary, maxLines = 1)
                         }
                         Separator()
                         LazyColumn(Modifier.fillMaxSize(), state = list) {
@@ -132,10 +133,10 @@ fun DiffDialog(state: AppState) {
             Separator()
             Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val sel = job.selected
-                TextAction("Copiar DDL izquierdo", { sel?.left?.let { clipboard.setText(AnnotatedString(it)) } }, enabled = sel?.left != null)
-                TextAction("Copiar DDL derecho", { sel?.right?.let { clipboard.setText(AnnotatedString(it)) } }, enabled = sel?.right != null)
+                TextAction(tr("Copiar DDL izquierdo"), { sel?.left?.let { clipboard.setText(AnnotatedString(it)) } }, enabled = sel?.left != null)
+                TextAction(tr("Copiar DDL derecho"), { sel?.right?.let { clipboard.setText(AnnotatedString(it)) } }, enabled = sel?.right != null)
                 Spacer(Modifier.weight(1f))
-                TextAction("Cerrar", state::closeDiff, primary = true)
+                TextAction(tr("Cerrar"), state::closeDiff, primary = true)
             }
         }
     }

@@ -178,7 +178,7 @@ class AppState(
             val out = formatSql(text.substring(sel.min, sel.max))
             applyEdit(TextFieldValue(text.replaceRange(sel.min, sel.max, out), TextRange(sel.min, sel.min + out.length)))
         }
-        status = "SQL formateado"
+        status = tr("SQL formateado")
     }
 
     var lastRun by mutableStateOf<RunMarker?>(null)
@@ -198,7 +198,7 @@ class AppState(
     val log = mutableStateListOf<String>()
     var lastMillis by mutableStateOf<Long?>(null)
         private set
-    var status by mutableStateOf("Listo")
+    var status by mutableStateOf(tr("Listo"))
     var running by mutableStateOf(false)
         private set
 
@@ -208,7 +208,7 @@ class AppState(
 
     fun closeTab(i: Int) {
         val tab = tabs.getOrNull(i) ?: return
-        confirmDiscard(tab.edit?.unsaved == true, "«${tab.title}» tiene cambios sin enviar o sin confirmar.") { closeTabNow(i) }
+        confirmDiscard(tab.edit?.unsaved == true, tr("«%s» tiene cambios sin enviar o sin confirmar.", tab.title)) { closeTabNow(i) }
     }
 
     private fun closeTabNow(i: Int) {
@@ -244,7 +244,7 @@ class AppState(
         if (!settings.explorerVisible) updateSettings { it.copy(explorerVisible = true) }
         scope.launch {
             val id = m.reveal(o, target.column)
-            if (id != null) { explorerSelectedId = id; revealTick++ } else status = "${o.name} no está en el explorador"
+            if (id != null) { explorerSelectedId = id; revealTick++ } else status = tr("%s no está en el explorador", o.name)
         }
     }
 
@@ -259,15 +259,15 @@ class AppState(
 
     /** ⌘B: jumps from the name at [offset] in the editor to its place in the explorer. */
     fun gotoDeclaration(offset: Int) {
-        val cat = catalog ?: run { status = "Sin esquema cargado"; return }
+        val cat = catalog ?: run { status = tr("Sin esquema cargado"); return }
         val t = resolveTarget(editor.text, offset, cat)
-        if (t == null) status = "No se encontró la declaración" else revealInExplorer(t)
+        if (t == null) status = tr("No se encontró la declaración") else revealInExplorer(t)
     }
 
     /** ⌘⌥B: opens the DDL of the table the name at [offset] refers to. */
     fun showDdlAt(offset: Int) {
         val cat = catalog ?: return
-        val t = resolveTarget(editor.text, offset, cat) ?: run { status = "No se encontró la declaración"; return }
+        val t = resolveTarget(editor.text, offset, cat) ?: run { status = tr("No se encontró la declaración"); return }
         cat.objectOf(t.table)?.let(::showDdl)
     }
     var connecting by mutableStateOf(false)
@@ -295,7 +295,7 @@ class AppState(
 
     /** Makes [c] the active connection and reads its schema, once its password has been fetched from the keychain. */
     fun selectAndConnect(c: DataSource) {
-        confirmDiscard(hasUnsaved, "Hay cambios sin enviar o transacciones sin confirmar.") { switchTo(c) }
+        confirmDiscard(hasUnsaved, tr("Hay cambios sin enviar o transacciones sin confirmar.")) { switchTo(c) }
     }
 
     private fun switchTo(c: DataSource) {
@@ -313,13 +313,13 @@ class AppState(
     fun applyDraft(draft: ConnectionForm) {
         val id = draft.currentId ?: UUID.randomUUID().toString().also { draft.currentId = it }
         val changed = form.toDataSource().url != draft.toDataSource().url || form.user != draft.user || form.password != draft.password || form.options != draft.options || form.schemas != draft.schemas || form.ssh != draft.ssh || form.sshSecret != draft.sshSecret
-        persist({ store.save(draft.toDataSource().copy(id = id), draft.password) }, "Conexión \"${draft.name}\" guardada")
+        persist({ store.save(draft.toDataSource().copy(id = id), draft.password) }, tr("Conexión \"%s\" guardada", draft.name))
         form.copyFrom(draft)
         if (changed || explorer == null) { disconnect(); connect() }
     }
 
     fun deleteConnection(id: String) {
-        persist({ store.delete(id) }, "Conexión eliminada")
+        persist({ store.delete(id) }, tr("Conexión eliminada"))
         runCatching { history?.clear(id) }
         if (form.currentId == id) form.currentId = null
     }
@@ -330,7 +330,7 @@ class AppState(
     private fun persist(block: () -> Unit, ok: String) {
         runCatching(block)
             .onSuccess { saved = store.list(); status = ok }
-            .onFailure { status = "No se pudo guardar: ${it.message}" }
+            .onFailure { status = tr("No se pudo guardar: %s", it.message) }
     }
 
     /** Tries to open [draft]'s connection; [onResult] receives the product name or the error, on the UI thread. */
@@ -402,9 +402,9 @@ class AppState(
     private fun runCells(indexes: List<Int>) {
         if (running) return
         val sources = indexes.mapNotNull { cellText(it) }
-        if (sources.isEmpty()) { status = "Nada que ejecutar"; return }
+        if (sources.isEmpty()) { status = tr("Nada que ejecutar"); return }
         withParams(sources) { filled ->
-            running = true; status = "Ejecutando…"
+            running = true; status = tr("Ejecutando…")
             val target = form.toDataSource(); val pw = form.passwordOrNull
             scope.launch {
                 var failed = false
@@ -415,13 +415,13 @@ class AppState(
                         withContext(Dispatchers.IO) {
                             val r = sessions.get(target, pw).runScript(listOf(filled[n]), PAGE).single()
                             // only the last result of a session keeps its cursor, so a cell keeps the first page it read and lets go of the cursor
-                            r to (r as? StatementResult.Rows)?.let { ResultTab("Celda ${i + 1}", it).also { t -> t.loadMore(PAGE); t.close() } }
+                            r to (r as? StatementResult.Rows)?.let { ResultTab(tr("Celda %d", i + 1), it).also { t -> t.loadMore(PAGE); t.close() } }
                         }
                     }
                     outcome.onSuccess { (r, tab) ->
                         cellRuns[i] = when (r) {
                             is StatementResult.Rows -> CellRun(source, tab = tab, millis = r.millis)
-                            is StatementResult.Updated -> CellRun(source, message = "${r.count} filas afectadas", millis = r.millis)
+                            is StatementResult.Updated -> CellRun(source, message = tr("%d filas afectadas", r.count), millis = r.millis)
                             is StatementResult.Failed -> CellRun(source, message = r.message, ok = false, millis = r.millis)
                         }
                         record(target.id, listOf(r.toHistory(tab)))
@@ -430,7 +430,7 @@ class AppState(
                     }.onFailure { cellRuns[i] = CellRun(source, message = it.message ?: it.toString(), ok = false); failed = true }
                     if (failed) break
                 }
-                status = if (failed) "Error en una celda" else "${indexes.size} celda(s) ejecutada(s)"
+                status = if (failed) tr("Error en una celda") else tr("%d celda(s) ejecutada(s)", indexes.size)
                 running = false
                 consolePending = sessions.peek()?.pending == true
                 if (explorer == null || explorerKey != keyOf(target, pw)) connect(announce = false)
@@ -459,12 +459,12 @@ class AppState(
         val text = editor.text
         val sel = editor.selection
         val sql = (if (notebookMode) cellText(notebookCell) else if (!sel.collapsed) text.substring(sel.min, sel.max) else statementAt(text, sel.start, slashBlocks, goBatches)?.text(text))?.trim()?.trimEnd(';')?.trim()
-        if (sql.isNullOrBlank()) { status = "Nada que explicar"; return }
+        if (sql.isNullOrBlank()) { status = tr("Nada que explicar"); return }
         val kind = form.effectiveKind
-        val script = explainScript(kind, sql, analyze) ?: run { status = "${if (analyze) "Explain analyze" else "Explain"} no está disponible para ${kind.label()}"; return }
+        val script = explainScript(kind, sql, analyze) ?: run { status = tr("%s no está disponible para %s", if (analyze) "Explain analyze" else "Explain", kind.label()); return }
         val go = { run(script.statements, title = "Plan", plan = true, cleanup = script.cleanup) }
         if (analyze && firstKeyword(sql) !in READ_ONLY_START)
-            confirmation = Confirmation("Explain analyze", "Esta sentencia se ejecutará de verdad para medirla y puede modificar datos.", "Ejecutar") { confirmation = null; go() }
+            confirmation = Confirmation("Explain analyze", tr("Esta sentencia se ejecutará de verdad para medirla y puede modificar datos."), tr("Ejecutar")) { confirmation = null; go() }
         else go()
     }
 
@@ -485,14 +485,14 @@ class AppState(
     fun run(statements: List<String>, title: String? = null, range: StatementRange? = null, discardEdits: Boolean = false, filled: Boolean = false,
         plan: Boolean = false, cleanup: List<String> = emptyList(),
     ) {
-        if (statements.isEmpty()) { status = "Nada que ejecutar"; return }
+        if (statements.isEmpty()) { status = tr("Nada que ejecutar"); return }
         if (running) return
         if (!discardEdits && tabs.any { it.edit?.unsaved == true }) {
-            confirmDiscard(true, "Los resultados editados tienen cambios sin enviar o sin confirmar.") { run(statements, title, range, discardEdits = true, filled = filled, plan = plan, cleanup = cleanup) }
+            confirmDiscard(true, tr("Los resultados editados tienen cambios sin enviar o sin confirmar.")) { run(statements, title, range, discardEdits = true, filled = filled, plan = plan, cleanup = cleanup) }
             return
         }
         if (!filled) { withParams(statements) { run(it, title, range, discardEdits = true, filled = true, plan = plan, cleanup = cleanup) }; return }
-        running = true; status = "Ejecutando…"
+        running = true; status = tr("Ejecutando…")
         val target = form.toDataSource(); val pw = form.passwordOrNull
         val textAtStart = editor.text
         scope.launch {
@@ -503,7 +503,7 @@ class AppState(
                     val session = sessions.get(target, pw)
                     try {
                         session.runScript(statements, PAGE).mapIndexed { i, r ->
-                            r to (r as? StatementResult.Rows)?.let { ResultTab(title ?: "Resultado ${i + 1}", it).also { t -> t.plan = plan; t.loadMore(PAGE) } }
+                            r to (r as? StatementResult.Rows)?.let { ResultTab(title ?: tr("Resultado %d", i + 1), it).also { t -> t.plan = plan; t.loadMore(PAGE) } }
                         }
                     } finally {
                         if (cleanup.isNotEmpty()) runCatching { session.runScript(cleanup) }      // e.g. SHOWPLAN off, also after an error
@@ -526,9 +526,9 @@ class AppState(
                 val last = results.lastOrNull()?.first
                 lastMillis = last?.millis
                 status = when {
-                    last is StatementResult.Failed && last.cancelled -> "Cancelada"
-                    last is StatementResult.Failed -> "Error en la sentencia ${results.size} de ${statements.size}"
-                    else -> "${results.size} sentencia(s) ejecutada(s)"
+                    last is StatementResult.Failed && last.cancelled -> tr("Cancelada")
+                    last is StatementResult.Failed -> tr("Error en la sentencia %d de %d", results.size, statements.size)
+                    else -> tr("%d sentencia(s) ejecutada(s)", results.size)
                 }
                 if (last is StatementResult.Failed && !last.cancelled) selectedTab = OUTPUT_TAB
                 if (range != null && results.size == 1 && last != null && editor.text == textAtStart) {
@@ -539,7 +539,7 @@ class AppState(
                     explorerKey != keyOf(target, pw) -> connect(announce = false)   // first run, or the connection changed
                     ddlRan && target.options.autoSync -> refreshExplorer()
                 }
-            }.onFailure { status = "Error: ${it.message}"; logLine("", "ERROR: ${it.message}"); selectedTab = OUTPUT_TAB }
+            }.onFailure { status = tr("Error: %s", it.message); logLine("", "ERROR: ${it.message}"); selectedTab = OUTPUT_TAB }
             running = false
             consolePending = sessions.peek()?.pending == true
         }
@@ -554,10 +554,10 @@ class AppState(
         val ds = form.toDataSource(); val pw = form.passwordOrNull
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { TreeModel(introspectors.get(ds, pw).also { it.includeSystem = settings.showSystemSchemas; it.onlyNamespace = singleDatabaseName(ds); it.schemaFilter = ds.schemas }).also { it.load() } } }
-                .onSuccess { explorer = it; explorerKey = keyOf(ds, pw); if (announce) status = "Esquema cargado: ${ds.name}"; loadCatalog(it) }
+                .onSuccess { explorer = it; explorerKey = keyOf(ds, pw); if (announce) status = tr("Esquema cargado: %s", ds.name); loadCatalog(it) }
                 .onFailure {
                     explorer = null; explorerKey = null; catalog = null
-                    status = "No se pudo leer el esquema: ${it.message}"
+                    status = tr("No se pudo leer el esquema: %s", it.message)
                     scope.launch(Dispatchers.IO) { introspectors.close() }
                 }
             connecting = false
@@ -573,7 +573,7 @@ class AppState(
     fun disconnect() {
         explorer = null; explorerKey = null; catalog = null
         scope.launch(Dispatchers.IO) { sessions.close(); introspectors.close() }
-        status = "Desconectado"
+        status = tr("Desconectado")
     }
 
     /** Shows or hides the engine's own schemas in the explorer (and in what the editor completes), and reads the tree again. */
@@ -586,7 +586,7 @@ class AppState(
     fun refreshExplorer() {
         val m = explorer ?: return
         scope.launch {
-            runCatching { m.refresh() }.onFailure { status = "No se pudo refrescar: ${it.message}" }
+            runCatching { m.refresh() }.onFailure { status = tr("No se pudo refrescar: %s", it.message) }
             loadCatalog(m)
         }
     }
@@ -597,7 +597,7 @@ class AppState(
         dataTabs.indexOfFirst { it.obj == o }.let { if (it >= 0) { activeEditor = it; return } }
         val target = form.toDataSource(); val pw = form.passwordOrNull
         val sql = m.source.dialect.selectAll(o)
-        status = "Abriendo ${o.name}…"
+        status = tr("Abriendo %s…", o.name)
         scope.launch {
             val session = Session(target, pw)
             runCatching {
@@ -606,15 +606,15 @@ class AppState(
                     val tab = when (val r = session.runScript(listOf(sql), PAGE).single()) {
                         is StatementResult.Rows -> ResultTab(o.name, r).also { it.loadMore(PAGE) }
                         is StatementResult.Failed -> error(r.message)
-                        else -> error("sin resultado")
+                        else -> error(tr("sin resultado"))
                     }
                     tab to TableEditor(o, m.source.dialect, target.kind, key, target.options.readOnly)
                 }
             }.onSuccess { (tab, editor) ->
                 dataTabs += DataTab(o, tab, session, sql, editor); activeEditor = dataTabs.lastIndex
-                status = editor.readOnlyReason() ?: "${o.name}: ${tab.rows.size} filas${if (tab.exhausted) "" else "+"}"
+                status = editor.readOnlyReason() ?: tr("%s: %d filas%s", o.name, tab.rows.size, if (tab.exhausted) "" else "+")
             }.onFailure {
-                status = "No se pudo abrir ${o.name}: ${it.message}"
+                status = tr("No se pudo abrir %s: %s", o.name, it.message)
                 withContext(Dispatchers.IO) { session.close() }
             }
         }
@@ -649,17 +649,17 @@ class AppState(
     /** Re-runs a table tab with the WHERE / ORDER BY currently typed in it. */
     fun applyFilters(tab: DataTab) {
         if (tab.loading) return
-        status = "Consultando ${tab.obj.name}…"
+        status = tr("Consultando %s…", tab.obj.name)
         scope.launch {
             val error = withContext(Dispatchers.IO) { runCatching { tab.reload() }.getOrElse { it.message ?: it.toString() } }
-            status = if (error != null) "Error: $error" else "${tab.obj.name}: ${tab.grid.rows.size} filas${if (tab.grid.exhausted) "" else "+"}"
+            status = if (error != null) tr("Error: %s", error) else tr("%s: %d filas%s", tab.obj.name, tab.grid.rows.size, if (tab.grid.exhausted) "" else "+")
         }
     }
 
     /** Header arrows of a table tab: orders on the server by rewriting its ORDER BY ([asc] null = no order) and reloading. */
     fun sortBy(tab: DataTab, column: Int, asc: Boolean?) {
         if (tab.loading) return
-        if (tab.editor.hasChanges) { status = "Envía o revierte los cambios pendientes antes de ordenar"; return }
+        if (tab.editor.hasChanges) { status = tr("Envía o revierte los cambios pendientes antes de ordenar"); return }
         val name = tab.grid.result.columns[column].name
         val quote = explorer?.source?.dialect?.let { d -> d::quote } ?: { it }
         tab.orderBy = if (asc == null) "" else "${quote(name)} ${if (asc) "asc" else "desc"}"
@@ -670,16 +670,16 @@ class AppState(
     /** Sends a tab's pending edits (see [DataTab.submit]) and reports the outcome in the status bar. */
     fun submitChanges(tab: DataTab) {
         if (tab.loading || !tab.editor.hasChanges) return
-        status = "Enviando cambios…"
+        status = tr("Enviando cambios…")
         scope.launch {
             val sent = runCatching { tab.editor.statements(tab.grid) }.getOrDefault(emptyList())
             val error = withContext(Dispatchers.IO) { runCatching { tab.submit() }.getOrElse { it.message ?: it.toString() } }
             val now = System.currentTimeMillis()
             record(form.currentId ?: "unsaved", sent.map { HistoryEntry(now, it.preview.trimEnd(';') + ";", 0, error == null) })
             status = when {
-                error != null -> "Error: $error"
-                form.manualTx -> "${tab.affected} fila(s) modificadas, pendientes de confirmar (Commit)"
-                else -> "${tab.affected} fila(s) modificadas"
+                error != null -> tr("Error: %s", error)
+                form.manualTx -> tr("%s fila(s) modificadas, pendientes de confirmar (Commit)", tab.affected)
+                else -> tr("%s fila(s) modificadas", tab.affected)
             }
         }
     }
@@ -687,16 +687,16 @@ class AppState(
     /** Shows the SQL that submitting the pending edits would run. */
     fun previewChanges(tab: DataTab) {
         val text = try { tab.editor.statements(tab.grid).joinToString("\n") { it.preview.trimEnd(';') + ";" } }
-        catch (e: ksqlc.drivers.DmlException) { status = "Columna ${e.column}: ${e.message}"; return }
-        ddlView = DdlView(tab.obj.name, text.ifBlank { "-- sin cambios pendientes" }, heading = "SQL pendiente")
+        catch (e: ksqlc.drivers.DmlException) { status = tr("Columna %s: %s", e.column, e.message); return }
+        ddlView = DdlView(tab.obj.name, text.ifBlank { tr("-- sin cambios pendientes") }, heading = tr("SQL pendiente"))
     }
 
     fun commitTab(tab: DataTab) = scope.launch {
-        runCatching { withContext(Dispatchers.IO) { tab.commit() } }.onSuccess { status = "Commit: ${tab.obj.name}" }.onFailure { status = "Error en el commit: ${it.message}" }
+        runCatching { withContext(Dispatchers.IO) { tab.commit() } }.onSuccess { status = tr("Commit: %s", tab.obj.name) }.onFailure { status = tr("Error en el commit: %s", it.message) }
     }
 
     fun rollbackTab(tab: DataTab) = scope.launch {
-        runCatching { withContext(Dispatchers.IO) { tab.rollback() } }.onSuccess { status = "Rollback: ${tab.obj.name}" }.onFailure { status = "Error en el rollback: ${it.message}" }
+        runCatching { withContext(Dispatchers.IO) { tab.rollback() } }.onSuccess { status = tr("Rollback: %s", tab.obj.name) }.onFailure { status = tr("Error en el rollback: %s", it.message) }
     }
 
     // --- transactions -----------------------------------------------------------------
@@ -706,12 +706,12 @@ class AppState(
         private set
 
     fun commitConsole() = scope.launch {
-        runCatching { withContext(Dispatchers.IO) { sessions.peek()?.commit() } }.onSuccess { status = "Commit" }.onFailure { status = "Error en el commit: ${it.message}" }
+        runCatching { withContext(Dispatchers.IO) { sessions.peek()?.commit() } }.onSuccess { status = tr("Commit") }.onFailure { status = tr("Error en el commit: %s", it.message) }
         consolePending = sessions.peek()?.pending == true
     }
 
     fun rollbackConsole() = scope.launch {
-        runCatching { withContext(Dispatchers.IO) { sessions.peek()?.rollback() } }.onSuccess { status = "Rollback" }.onFailure { status = "Error en el rollback: ${it.message}" }
+        runCatching { withContext(Dispatchers.IO) { sessions.peek()?.rollback() } }.onSuccess { status = tr("Rollback") }.onFailure { status = tr("Error en el rollback: %s", it.message) }
         consolePending = sessions.peek()?.pending == true
     }
 
@@ -724,20 +724,20 @@ class AppState(
      */
     fun setTxManual(manual: Boolean) {
         if (manual == form.manualTx) return
-        if (!manual && hasUnsaved) { status = "Confirma (Commit) o descarta (Rollback) los cambios antes de pasar a Auto"; return }
+        if (!manual && hasUnsaved) { status = tr("Confirma (Commit) o descarta (Rollback) los cambios antes de pasar a Auto"); return }
         form.manualTx = manual
         scope.launch(Dispatchers.IO) { sessions.peek()?.setAutoCommit(!manual); dataTabs.forEach { it.session.setAutoCommit(!manual) }; tabs.forEach { it.edit?.session?.setAutoCommit(!manual) } }
         val id = form.currentId
         if (id != null && saved.any { it.id == id }) {
             val pw = form.password.ifEmpty { storedPassword(id).orEmpty() }
-            persist({ store.save(form.toDataSource(), pw) }, "Transacciones: ${if (manual) "manual" else "auto"}")
-        } else status = "Transacciones: ${if (manual) "manual" else "auto"}"
+            persist({ store.save(form.toDataSource(), pw) }, tr("Transacciones: %s", if (manual) tr("manual") else tr("auto")))
+        } else status = tr("Transacciones: %s", if (manual) tr("manual") else tr("auto"))
     }
 
     /** Runs [action], first asking for confirmation when [unsaved] work would be thrown away. */
     fun confirmDiscard(unsaved: Boolean, what: String, action: () -> Unit) {
         if (!unsaved) { action(); return }
-        confirmation = Confirmation("Cambios sin guardar", "$what Si continúas se descartan.", "Descartar") { confirmation = null; action() }
+        confirmation = Confirmation(tr("Cambios sin guardar"), tr("%s Si continúas se descartan.", what), tr("Descartar")) { confirmation = null; action() }
     }
 
     var confirmation by mutableStateOf<Confirmation?>(null)
@@ -767,14 +767,14 @@ class AppState(
         }
     }
 
-    fun requestDisconnect() = confirmDiscard(hasUnsaved, "Hay cambios sin enviar o transacciones sin confirmar.") { disconnect() }
+    fun requestDisconnect() = confirmDiscard(hasUnsaved, tr("Hay cambios sin enviar o transacciones sin confirmar.")) { disconnect() }
 
     /** For the window's close button: [exit] runs at once, or after the user agrees to drop unsaved work. */
-    fun requestExit(exit: () -> Unit) = confirmDiscard(hasUnsaved, "Hay cambios sin enviar o transacciones sin confirmar.", exit)
+    fun requestExit(exit: () -> Unit) = confirmDiscard(hasUnsaved, tr("Hay cambios sin enviar o transacciones sin confirmar."), exit)
 
     fun closeDataTab(i: Int) {
         val tab = dataTabs.getOrNull(i) ?: return
-        confirmDiscard(tab.unsaved, "«${tab.obj.name}» tiene cambios sin enviar o sin confirmar.") { closeDataTabNow(i) }
+        confirmDiscard(tab.unsaved, tr("«%s» tiene cambios sin enviar o sin confirmar.", tab.obj.name)) { closeDataTabNow(i) }
     }
 
     private fun closeDataTabNow(i: Int) {
@@ -789,7 +789,7 @@ class AppState(
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { m.source.ddl(o) } }
                 .onSuccess { ddlView = DdlView(o.name, it) }
-                .onFailure { status = "No se pudo obtener el DDL de ${o.name}: ${it.message}" }
+                .onFailure { status = tr("No se pudo obtener el DDL de %s: %s", o.name, it.message) }
         }
     }
 
@@ -799,7 +799,7 @@ class AppState(
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { m.source.call(o) } }
                 .onSuccess { run(it) }
-                .onFailure { status = "No se puede ejecutar ${o.name}: ${it.message}" }
+                .onFailure { status = tr("No se puede ejecutar %s: %s", o.name, it.message) }
         }
     }
 
@@ -814,11 +814,11 @@ class AppState(
     fun openModify(o: DbObject) {
         val m = explorer ?: return
         val target = form.toDataSource() to form.passwordOrNull
-        status = "Leyendo ${o.name}…"
+        status = tr("Leyendo %s…", o.name)
         scope.launch {
-            runCatching { withContext(Dispatchers.IO) { m.source.tableModel(o) ?: error("Este motor todavía no permite modificar tablas") } }
+            runCatching { withContext(Dispatchers.IO) { m.source.tableModel(o) ?: error(tr("Este motor todavía no permite modificar tablas")) } }
                 .onSuccess { modifyError = null; modifyTarget = target; modifyDraft = ModifyDraft(o, it, m.source.dialect) }
-                .onFailure { status = "No se pudo leer ${o.name}: ${it.message}" }
+                .onFailure { status = tr("No se pudo leer %s: %s", o.name, it.message) }
         }
     }
 
@@ -831,7 +831,7 @@ class AppState(
         if (statements.isEmpty() || modifyBusy) return
         val losses = destructiveChanges(d.before, d.model)
         if (losses.isEmpty()) runModify(statements)
-        else confirmation = Confirmation("Cambios que pierden datos", losses.joinToString("\n"), "Aplicar") { confirmation = null; runModify(statements) }
+        else confirmation = Confirmation(tr("Cambios que pierden datos"), losses.joinToString("\n"), tr("Aplicar")) { confirmation = null; runModify(statements) }
     }
 
     private fun runModify(statements: List<String>) {
@@ -849,15 +849,15 @@ class AppState(
                 }.getOrElse { ApplyResult(0, it.message ?: it.toString(), preludeFailed = !atomic) }
             }
             val error = result.error?.let {
-                if (it.contains("lock timeout", true) || it.contains("Lock wait timeout", true) || it.contains("Lock request time out", true)) "$it\nOtra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla." else it
+                if (it.contains("lock timeout", true) || it.contains("Lock wait timeout", true) || it.contains("Lock request time out", true)) it + "\n" + tr("Otra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla.") else it
             }
             val ran = if (atomic) 0 else result.applied
             val now = System.currentTimeMillis()
             modifyHistory(statements, atomic, ran, error, result.preludeFailed, now).takeIf { it.isNotEmpty() }?.let { record(target.id, it) }
             val open = modifyDraft === d
             if (error != null) {
-                val partial = if (!atomic && ran > 0) "Se aplicaron $ran de ${statements.size} sentencias; el resto no se ejecutó.\n" else ""
-                if (open) modifyError = partial + error else status = "No se pudo modificar la tabla: $partial$error"
+                val partial = if (!atomic && ran > 0) tr("Se aplicaron %d de %d sentencias; el resto no se ejecutó.\n", ran, statements.size) else ""
+                if (open) modifyError = partial + error else status = tr("No se pudo modificar la tabla: %s%s", partial, error)
                 if (!atomic && ran > 0) {
                     refreshExplorer()
                     // busy stays on until the draft is fresh, so the stale one cannot be applied again
@@ -867,7 +867,7 @@ class AppState(
             }
             modifyBusy = false
             if (open) closeModify()
-            status = "Tabla modificada"
+            status = tr("Tabla modificada")
             refreshExplorer()
         }
     }
@@ -881,12 +881,12 @@ class AppState(
             try {
                 val fresh = withContext(Dispatchers.IO) { m.source.tableModel(d.obj) }
                 if (fresh != null && modifyDraft === d) { modifyDraft = ModifyDraft(d.obj, fresh, m.source.dialect); modifyError = error }
-                else if (modifyDraft === d) { modifyDraft = null; modifyError = null; status = "No se pudo releer ${d.obj.name}" }
+                else if (modifyDraft === d) { modifyDraft = null; modifyError = null; status = tr("No se pudo releer %s", d.obj.name) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (modifyDraft === d) { modifyDraft = null; modifyError = null }
-                status = "No se pudo releer ${d.obj.name}: ${e.message}"
+                status = tr("No se pudo releer %s: %s", d.obj.name, e.message)
             } finally {
                 modifyBusy = false      // whatever happened, the dialog must never stay locked
             }
@@ -895,15 +895,15 @@ class AppState(
 
     /** Asks to run the alteration [sql] (shown as is), runs it on the console's connection, logs it and reloads the explorer. */
     fun alter(title: String, sql: String) {
-        confirmation = Confirmation(title, sql, "Ejecutar") {
+        confirmation = Confirmation(title, sql, tr("Ejecutar")) {
             confirmation = null
             val target = form.toDataSource(); val pw = form.passwordOrNull
-            status = "Ejecutando…"
+            status = tr("Ejecutando…")
             scope.launch {
                 val r = runCatching { withContext(Dispatchers.IO) { sessions.get(target, pw).runScript(listOf(sql)).single() } }
                     .getOrElse { StatementResult.Failed(sql, 0, it.message ?: it.toString()) }
                 record(target.id, listOf(r.toHistory(null)))
-                status = if (r is StatementResult.Failed) "Error: ${r.message}" else "Hecho: $sql"
+                status = if (r is StatementResult.Failed) tr("Error: %s", r.message) else tr("Hecho: %s", sql)
                 refreshExplorer()   // not only on success: a failed batch may still have changed something, and changesSchema misses TRUNCATE and REFRESH
             }
         }
@@ -924,7 +924,7 @@ class AppState(
         private set
 
     internal fun openExport(r: ExportRequest) {
-        if (exportJob?.running == true) { exportDialogOpen = true; status = "Ya hay una exportación en curso"; return }
+        if (exportJob?.running == true) { exportDialogOpen = true; status = tr("Ya hay una exportación en curso"); return }
         exportJob = ExportJob(r, scope) { status = it; logLine("exportar ${r.name}", it); if (!exportDialogOpen) exportJob = null }
         exportDialogOpen = true
     }
@@ -944,7 +944,7 @@ class AppState(
             when (val r = s.stream(sql, PREVIEW_ROWS_EXPORT)) {
                 is StatementResult.Rows -> try { ExportSample(r.columns.map { it.name }, r.cursor.fetch(PREVIEW_ROWS_EXPORT)) } finally { r.cursor.close() }
                 is StatementResult.Failed -> error(r.message)
-                else -> error("la consulta no devuelve filas")
+                else -> error(tr("la consulta no devuelve filas"))
             }
         }
     }
@@ -967,8 +967,8 @@ class AppState(
         val rerunnable = ksqlc.drivers.readOnlyViolation(tab.result.sql) == null
         openExport(ExportRequest(
             tab.title, "${form.name} · ${tab.title}", "resultado", dialect::quote,
-            if (rerunnable) "Todas las filas vuelve a ejecutar la consulta en una conexión aparte (no ve tablas temporales ni ajustes hechos en la consola)."
-            else "Esta sentencia puede escribir datos y no se ejecuta de nuevo: solo se exportan las filas cargadas.",
+            if (rerunnable) tr("Todas las filas vuelve a ejecutar la consulta en una conexión aparte (no ve tablas temporales ni ajustes hechos en la consola).")
+            else tr("Esta sentencia puede escribir datos y no se ejecuta de nuevo: solo se exportan las filas cargadas."),
             sample = { ExportSample(names, loaded.take(PREVIEW_ROWS_EXPORT)) },
             loaded = loaded.size,
             writeLoaded = writeLoaded.takeIf { rerunnable },
@@ -993,15 +993,15 @@ class AppState(
 
     /** Reads the next page of [tab] (blocking: call it off the UI thread); a failed read ends the grid and says why in the status bar. */
     fun loadMore(tab: ResultTab) {
-        runCatching { tab.loadMore(PAGE) }.onFailure { status = "Error al leer más filas: ${it.message ?: it}" }
+        runCatching { tab.loadMore(PAGE) }.onFailure { status = tr("Error al leer más filas: %s", it.message ?: it) }
     }
 
     /** Loads a .sql file into the console (run it with "Ejecutar script"). */
     fun openSqlFile() {
-        val f = chooseFile(false, "Abrir archivo SQL") ?: return
+        val f = chooseFile(false, tr("Abrir archivo SQL")) ?: return
         runCatching { java.nio.file.Files.readString(java.nio.file.Path.of(f)) }
-            .onSuccess { setEditorText(it); activeEditor = CONSOLE_TAB; status = "Abierto $f" }
-            .onFailure { status = "No se pudo leer $f: ${it.message}" }
+            .onSuccess { setEditorText(it); activeEditor = CONSOLE_TAB; status = tr("Abierto %s", f) }
+            .onFailure { status = tr("No se pudo leer %s: %s", f, it.message) }
     }
 
     // --- schema diff -------------------------------------------------------------------
@@ -1010,7 +1010,7 @@ class AppState(
 
     /** Opens the schema comparison; [ns] and [objectName] say where it was opened from. The left side is the active connection. */
     fun openDiff(ns: Namespace?, objectName: String? = null) {
-        val src = explorer?.source ?: run { status = "Conéctate primero"; return }
+        val src = explorer?.source ?: run { status = tr("Conéctate primero"); return }
         val active = form.toDataSource()
         val others = saved.filter { it.id != active.id }
         val sources = listOf(active) + others
@@ -1027,7 +1027,7 @@ class AppState(
 
     /** Opens the row comparison of table [o] of the active connection with a table of any saved connection. */
     fun openContentDiff(o: DbObject) {
-        val src = explorer?.source ?: run { status = "Conéctate primero"; return }
+        val src = explorer?.source ?: run { status = tr("Conéctate primero"); return }
         val active = form.toDataSource()
         val sources = listOf(active) + saved.filter { it.id != active.id }
         contentDiffJob?.close()
@@ -1042,7 +1042,7 @@ class AppState(
         val statements = job.syncStatements()
         val shown = statements.take(SYNC_PREVIEW_MAX).joinToString("\n") { it.preview.trimEnd(';') + ";" }
         val more = statements.size - SYNC_PREVIEW_MAX
-        ddlView = DdlView(job.rightObj?.name.orEmpty(), (shown + if (more > 0) "\n-- … y $more sentencias más" else "").ifBlank { "-- sin cambios que aplicar" }, heading = "SQL de la sincronización")
+        ddlView = DdlView(job.rightObj?.name.orEmpty(), (shown + if (more > 0) tr("\n-- … y %d sentencias más", more) else "").ifBlank { tr("-- sin cambios que aplicar") }, heading = tr("SQL de la sincronización"))
     }
 
     /** Asks before changing the right table, saying how many rows of each kind. */
@@ -1053,9 +1053,9 @@ class AppState(
         val u = if (job.syncUpdate) job.count(RowStatus.DIFFERENT) else 0
         val d = if (job.syncDelete) job.count(RowStatus.ONLY_RIGHT) else 0
         confirmation = Confirmation(
-            "Sincronizar la tabla de la derecha",
-            "En ${job.rightSource.name}, ${job.rightObj?.name}: se insertarán $i filas, se actualizarán $u y se borrarán $d.\nSe aplica todo o nada.",
-            "Aplicar",
+            tr("Sincronizar la tabla de la derecha"),
+            tr("En %s, %s: se insertarán %s filas, se actualizarán %s y se borrarán %s.\nSe aplica todo o nada.", job.rightSource.name, job.rightObj?.name, i, u, d),
+            tr("Aplicar"),
         ) { confirmation = null; job.applySync(::record) }
     }
 
@@ -1065,7 +1065,7 @@ class AppState(
 
     /** Opens the copy of table [o] of the active connection into a table of any saved connection. */
     fun openCopyTable(o: DbObject) {
-        val src = explorer?.source ?: run { status = "Conéctate primero"; return }
+        val src = explorer?.source ?: run { status = tr("Conéctate primero"); return }
         val active = form.toDataSource()
         val sources = listOf(active) + saved.filter { it.id != active.id }
         copyTableJob?.close()
@@ -1081,8 +1081,8 @@ class AppState(
         val job = copyTableJob ?: return
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { job.plan().let { it to job.sqlOf(it) } } }
-                .onSuccess { (p, sql) -> ddlView = DdlView(p.target.name, p.problem?.let { "-- $it" } ?: sql, heading = "SQL de la copia") }
-                .onFailure { status = "No se pudo preparar la copia: ${it.message}" }
+                .onSuccess { (p, sql) -> ddlView = DdlView(p.target.name, p.problem?.let { "-- $it" } ?: sql, heading = tr("SQL de la copia")) }
+                .onFailure { status = tr("No se pudo preparar la copia: %s", it.message) }
         }
     }
 
@@ -1090,11 +1090,11 @@ class AppState(
     fun confirmCopyTable() {
         val job = copyTableJob ?: return
         if (job.blocked || job.running) return
-        val what = if (job.existing != null) "se añadirán a la tabla ${job.existing!!.name}" else "se creará la tabla ${job.targetName.trim()} y se copiarán a ella"
+        val what = if (job.existing != null) tr("se añadirán a la tabla %s", job.existing!!.name) else tr("se creará la tabla %s y se copiarán a ella", job.targetName.trim())
         confirmation = Confirmation(
-            "Copiar tabla",
-            "Las filas de ${job.sourceObj.name} $what en ${job.targetSource.name}.\nSe aplica todo o nada.",
-            "Copiar",
+            tr("Copiar tabla"),
+            tr("Las filas de %s %s en %s.\nSe aplica todo o nada.", job.sourceObj.name, what, job.targetSource.name),
+            tr("Copiar"),
         ) { confirmation = null; job.copy(::record) }
     }
 
@@ -1103,7 +1103,7 @@ class AppState(
         private set
 
     /** Why dump/restore is not available for the active connection, or null. */
-    val nativeBlocker: String? get() = if (form.ssh.enabled) "La conexión usa un túnel SSH: las herramientas de volcado se conectarían directamente" else nativeDumpBlocker(form.effectiveKind, if (form.customUrl) null else JdbcUrl.parse(form.url))
+    val nativeBlocker: String? get() = if (form.ssh.enabled) tr("La conexión usa un túnel SSH: las herramientas de volcado se conectarían directamente") else nativeDumpBlocker(form.effectiveKind, if (form.customUrl) null else JdbcUrl.parse(form.url))
 
     /** Opens the dump (or restore) dialog. [o] is the table the menu was opened on, [ns] its schema or database. */
     fun openNative(restore: Boolean, o: DbObject? = null, ns: Namespace? = o?.ns) {
@@ -1112,9 +1112,9 @@ class AppState(
         val parts = JdbcUrl.parse(form.url) ?: return
         val schemaName = if (kind == DbKind.MYSQL || kind == DbKind.MARIADB) ns?.catalog else if (kind == DbKind.POSTGRES) ns?.schema else null
         val scopes = buildList {
-            if (o != null) add("Tabla ${o.name}" to DumpScope(schemaName, o.name))
-            if (schemaName != null) add((if (kind == DbKind.POSTGRES) "Esquema $schemaName" else "Base de datos $schemaName") to DumpScope(schemaName))
-            if (kind != DbKind.MYSQL && kind != DbKind.MARIADB || schemaName == null) add((if (kind == DbKind.SQLITE) "Toda la base de datos" else "Base de datos ${parts.database}") to DumpScope())
+            if (o != null) add(tr("Tabla %s", o.name) to DumpScope(schemaName, o.name))
+            if (schemaName != null) add((if (kind == DbKind.POSTGRES) tr("Esquema %s", schemaName) else tr("Base de datos %s", schemaName)) to DumpScope(schemaName))
+            if (kind != DbKind.MYSQL && kind != DbKind.MARIADB || schemaName == null) add((if (kind == DbKind.SQLITE) tr("Toda la base de datos") else tr("Base de datos %s", parts.database)) to DumpScope())
         }
         nativeJob = NativeJob(restore, kind, parts, form.user.ifBlank { null }, form.passwordOrNull, scopes, settings.toolPaths, scope,
             { name, path -> updateSettings { it.copy(toolPaths = it.toolPaths + (name to path)) } }, { log += "[${LocalTime.now().format(clock)}] $it" })
@@ -1125,7 +1125,7 @@ class AppState(
     /** After a restore the schema changed under the explorer. */
     fun nativeFinished(restore: Boolean) {
         if (restore) refreshExplorer()
-        status = if (restore) "Restauración terminada" else "Dump terminado"
+        status = if (restore) tr("Restauración terminada") else tr("Dump terminado")
         closeNative()
     }
 
@@ -1140,7 +1140,7 @@ class AppState(
         scope.launch {
             runCatching { withContext(Dispatchers.IO) { src.details(o).columns } }
                 .onSuccess { importJob = ImportJob(o, it, target, pw, scope) { msg -> status = msg; logLine("importar ${o.name}", msg) } }
-                .onFailure { status = "No se pudieron leer las columnas de ${o.name}: ${it.message}" }
+                .onFailure { status = tr("No se pudieron leer las columnas de %s: %s", o.name, it.message) }
         }
     }
 
@@ -1168,7 +1168,7 @@ class AppState(
 
     /** Opens the history of the active connection. */
     fun openHistory() {
-        val h = history ?: run { status = "El historial no está disponible"; return }
+        val h = history ?: run { status = tr("El historial no está disponible"); return }
         val id = form.currentId ?: "unsaved"
         scope.launch { historyEntries = withContext(Dispatchers.IO) { runCatching { h.load(id) }.getOrDefault(emptyList()) } }
     }
@@ -1206,7 +1206,7 @@ class AppState(
             }
             if (o.autoDisconnectSeconds > 0 && session != null && !running && !consolePending && !session.busy && now - session.lastUsed >= o.autoDisconnectSeconds * 1000L) {
                 withContext(Dispatchers.IO) { sessions.close() }
-                status = "Conexión de la consola cerrada por inactividad; se abre de nuevo al ejecutar"
+                status = tr("Conexión de la consola cerrada por inactividad; se abre de nuevo al ejecutar")
             }
             if (o.introspectionMinutes > 0 && explorer != null && !connecting && now - lastIntrospection >= o.introspectionMinutes * introspectionUnitMillis) {
                 lastIntrospection = now
@@ -1219,7 +1219,7 @@ class AppState(
     internal fun askHostKey(message: String): Boolean {
         val answer = java.util.concurrent.CompletableFuture<Boolean>()
         confirmation = Confirmation(
-            "Servidor SSH desconocido", "$message\n\nSi continúas, su clave se recuerda y se avisará si cambia.", "Confiar y continuar",
+            tr("Servidor SSH desconocido"), tr("%s\n\nSi continúas, su clave se recuerda y se avisará si cambia.", message), tr("Confiar y continuar"),
             onCancel = { answer.complete(false) }, onConfirm = { confirmation = null; answer.complete(true) },
         )
         return runCatching { answer.get(2, java.util.concurrent.TimeUnit.MINUTES) }.getOrDefault(false).also { if (!it) confirmation = null }

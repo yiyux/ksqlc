@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -90,7 +91,7 @@ class DataTab(val obj: ksqlc.core.DbObject, first: ResultTab, val session: ksqlc
 
     /** Sends the pending edits and reloads. Blocking. Returns an error message, or null on success (then [affected] holds the row count). */
     fun submit(): String? {
-        val statements = try { editor.statements(grid) } catch (e: ksqlc.drivers.DmlException) { return "columna ${e.column}: ${e.message}" }
+        val statements = try { editor.statements(grid) } catch (e: ksqlc.drivers.DmlException) { return tr("columna %s: %s", e.column, e.message) }
         if (statements.isEmpty()) { editor.clear(); return null }
         loading = true
         try {
@@ -129,7 +130,7 @@ class DataTab(val obj: ksqlc.core.DbObject, first: ResultTab, val session: ksqlc
                     return null
                 }
                 is StatementResult.Failed -> { pendingSort = null; return r.message }
-                else -> { pendingSort = null; return "sin resultado" }
+                else -> { pendingSort = null; return tr("sin resultado") }
             }
         } finally { loading = false }
     }

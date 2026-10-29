@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -46,8 +47,8 @@ class NativeJob(
 
     fun start(onDone: (ok: Boolean) -> Unit) {
         if (running) return
-        val tool = found ?: run { error = "No se encontró ${toolNames.joinToString(" ni ")}: indica su ruta"; return }
-        if (file.isBlank()) { error = if (restore) "Elige el archivo que restaurar" else "Indica el archivo de destino"; return }
+        val tool = found ?: run { error = tr("No se encontró %s: indica su ruta", toolNames.joinToString(tr(" ni "))); return }
+        if (file.isBlank()) { error = if (restore) tr("Elige el archivo que restaurar") else tr("Indica el archivo de destino"); return }
         val path = Path.of(file.trim().replaceFirst(Regex("^~"), System.getProperty("user.home")))
         val spec = try {
             if (restore) restoreCommand(tool.toString(), kind, parts, user, password, path, custom)
@@ -65,7 +66,7 @@ class NativeJob(
             code.onSuccess { c ->
                 val ok = c == 0 && !stopped
                 log("[$label] " + if (stopped) "cancelado" else if (c == 0) "terminado" else "terminó con el código $c")
-                if (ok) onDone(true) else error = if (stopped) "Cancelado" else "La herramienta terminó con el código $c (ver Output)"
+                if (ok) onDone(true) else error = if (stopped) tr("Cancelado") else tr("La herramienta terminó con el código %s (ver Output)", c)
             }.onFailure { error = it.message ?: it.toString(); log("[$label] error: $error") }
         }
     }

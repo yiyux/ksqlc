@@ -68,7 +68,7 @@ object CassandraDialect : MetaDialect() {
     }
 
     override fun ddl(conn: Connection, o: DbObject): String {
-        val ks = o.ns.schema ?: error("${o.name} no tiene keyspace")
+        val ks = o.ns.schema ?: error(tr("%s no tiene keyspace", o.name))
         return ddl(conn, o, ks)
     }
 
@@ -87,7 +87,7 @@ object CassandraDialect : MetaDialect() {
         DbObjectKind.MATERIALIZED_VIEW -> {
             val v = conn.query("select base_table_name, where_clause, include_all_columns from system_schema.views where keyspace_name = ? and view_name = ?", o.ns.schema, o.name) {
                 Triple(it.getString(1), it.getString(2), it.getBoolean(3))
-            }.firstOrNull() ?: error("${o.name} no existe")
+            }.firstOrNull() ?: error(tr("%s no existe", o.name))
             val cols = cqlColumnOrder(columns(conn, o))
             val partition = cols.filter { it.kind == "partition_key" }.map { quote(it.name) }
             val clustering = cols.filter { it.kind == "clustering" }.map { quote(it.name) }
@@ -101,7 +101,7 @@ object CassandraDialect : MetaDialect() {
             val names = (rs.getObject(1) as? Collection<*>).orEmpty(); val types = (rs.getObject(2) as? Collection<*>).orEmpty()
             val args = names.zip(types).joinToString(", ") { (n, t) -> "$n $t" }
             "CREATE OR REPLACE FUNCTION ${quote(ks)}.${quote(o.name)} ($args)\n    ${if (rs.getBoolean(6)) "CALLED ON NULL INPUT" else "RETURNS NULL ON NULL INPUT"}\n    RETURNS ${rs.getString(3)}\n    LANGUAGE ${rs.getString(4)}\n    AS \$\$${rs.getString(5)}\$\$;"
-        }.joinToString("\n\n").ifBlank { error("${o.name} no existe") }
+        }.joinToString("\n\n").ifBlank { error(tr("%s no existe", o.name)) }
         DbObjectKind.VIEW, DbObjectKind.SEQUENCE -> error("Cassandra no tiene ${if (o.kind == DbObjectKind.VIEW) "vistas simples" else "secuencias"}")
     }
 }

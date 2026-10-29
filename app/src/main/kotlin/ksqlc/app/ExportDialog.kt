@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -35,13 +36,13 @@ fun ExportDialog(state: AppState) {
     val preview = job.previewText()
     ModalOverlay(state::closeExport, Modifier.testTag("export-dialog"), width = 860.dp, height = 590.dp) {
         Column(Modifier.fillMaxSize()) {
-            PanelHeader("Exportar datos") { ToolButton(IconKind.Close, "Cerrar", state::closeExport) }
+            PanelHeader(tr("Exportar datos")) { ToolButton(IconKind.Close, tr("Cerrar"), state::closeExport) }
             Separator()
             Row(Modifier.weight(1f).fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.width(380.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FieldLabel("Origen:")
+                    FieldLabel(tr("Origen:"))
                     CompactTextField(job.request.source, {}, Modifier.fillMaxWidth(), readOnly = true, testTag = "export-source", height = 30.dp)
-                    FieldLabel("Extractor:")
+                    FieldLabel(tr("Extractor:"))
                     Box {
                         DropdownField(job.format.label, { formats = true }, Modifier.fillMaxWidth().testTag("export-format"))
                         DropdownMenu(formats, { formats = false }) {
@@ -51,26 +52,26 @@ fun ExportDialog(state: AppState) {
                         }
                     }
                     if (job.request.writeLoaded != null) {
-                        FieldLabel("Filas:")
-                        KCheckbox(job.allRows, { job.allRows = true }, label = "Todas las filas de la consulta", enabled = !job.running, modifier = Modifier.testTag("export-all"))
-                        KCheckbox(!job.allRows, { job.allRows = false }, label = "Solo las ${job.request.loaded} cargadas", enabled = !job.running, modifier = Modifier.testTag("export-loaded"))
+                        FieldLabel(tr("Filas:"))
+                        KCheckbox(job.allRows, { job.allRows = true }, label = tr("Todas las filas de la consulta"), enabled = !job.running, modifier = Modifier.testTag("export-all"))
+                        KCheckbox(!job.allRows, { job.allRows = false }, label = tr("Solo las %s cargadas", job.request.loaded), enabled = !job.running, modifier = Modifier.testTag("export-loaded"))
                     }
-                    KCheckbox(job.transpose, { job.transpose = it }, label = "Transponer", enabled = job.delimited, modifier = Modifier.testTag("export-transpose"))
-                    KCheckbox(job.header, { job.header = it }, label = "Añadir cabecera de columnas", enabled = job.delimited, modifier = Modifier.testTag("export-header"))
-                    KCheckbox(job.rowHeader, { job.rowHeader = it }, label = "Añadir cabecera de filas", enabled = job.delimited, modifier = Modifier.testTag("export-rowheader"))
+                    KCheckbox(job.transpose, { job.transpose = it }, label = tr("Transponer"), enabled = job.delimited, modifier = Modifier.testTag("export-transpose"))
+                    KCheckbox(job.header, { job.header = it }, label = tr("Añadir cabecera de columnas"), enabled = job.delimited, modifier = Modifier.testTag("export-header"))
+                    KCheckbox(job.rowHeader, { job.rowHeader = it }, label = tr("Añadir cabecera de filas"), enabled = job.delimited, modifier = Modifier.testTag("export-rowheader"))
                     Spacer(Modifier.height(2.dp))
-                    FieldLabel("Archivo de salida:")
+                    FieldLabel(tr("Archivo de salida:"))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         CompactTextField(job.path, job::editPath, Modifier.weight(1f), testTag = "export-path", height = 30.dp)
-                        ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(true, "Exportar", job.path.substringAfterLast('/'))?.let(job::editPath) }, Modifier.testTag("export-browse"))
+                        ToolButton(IconKind.Folder, tr("Elegir archivo…"), { chooseFile(true, tr("Exportar"), job.path.substringAfterLast('/'))?.let(job::editPath) }, Modifier.testTag("export-browse"))
                     }
                     job.request.note?.let { Text(it, fontSize = 12.sp, color = c.textSecondary) }
-                    Text("Al portapapeles van como máximo $CLIPBOARD_ROWS filas.", fontSize = 12.sp, color = c.textSecondary)
-                    if (job.running) Text("${job.progress} filas…", Modifier.testTag("export-progress"), fontSize = 12.sp, color = c.textSecondary)
+                    Text(tr("Al portapapeles van como máximo %s filas.", CLIPBOARD_ROWS), fontSize = 12.sp, color = c.textSecondary)
+                    if (job.running) Text(tr("%s filas…", job.progress), Modifier.testTag("export-progress"), fontSize = 12.sp, color = c.textSecondary)
                     job.error?.let { Text(it, Modifier.testTag("export-error"), fontSize = 12.sp, color = c.error) }
                 }
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FieldLabel("Vista previa:")
+                    FieldLabel(tr("Vista previa:"))
                     Row(Modifier.weight(1f).fillMaxWidth().background(c.editorBg).verticalScroll(rememberScrollState()).padding(vertical = 4.dp)) {
                         val lines = preview.lines().let { if (it.size > 1 && it.last().isEmpty()) it else it }
                         val mono = MonoStyle.copy(fontSize = 12.sp, lineHeight = 18.sp)
@@ -87,11 +88,11 @@ fun ExportDialog(state: AppState) {
             Separator()
             Row(Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 if (job.running) {
-                    TextAction("Cancelar exportación", job::cancel, Modifier.testTag("export-cancel"))
-                    TextAction("Ocultar", state::closeExport, Modifier.testTag("export-hide"))
-                } else TextAction("Cancelar", state::closeExport, Modifier.testTag("export-close"))
-                TextAction("Copiar al portapapeles", { job.start(true, { clipboard.setText(AnnotatedString(it)) }, state::closeExport) }, Modifier.testTag("export-clipboard"), enabled = !job.running)
-                TextAction("Exportar a archivo", { job.start(false, {}, state::closeExport) }, Modifier.testTag("export-file"), enabled = !job.running, primary = true)
+                    TextAction(tr("Cancelar exportación"), job::cancel, Modifier.testTag("export-cancel"))
+                    TextAction(tr("Ocultar"), state::closeExport, Modifier.testTag("export-hide"))
+                } else TextAction(tr("Cancelar"), state::closeExport, Modifier.testTag("export-close"))
+                TextAction(tr("Copiar al portapapeles"), { job.start(true, { clipboard.setText(AnnotatedString(it)) }, state::closeExport) }, Modifier.testTag("export-clipboard"), enabled = !job.running)
+                TextAction(tr("Exportar a archivo"), { job.start(false, {}, state::closeExport) }, Modifier.testTag("export-file"), enabled = !job.running, primary = true)
             }
         }
     }

@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.JSchException
 import com.jcraft.jsch.Session
@@ -27,7 +29,7 @@ object Tunnels {
 
     /** The local port that reaches [remoteHost]:[remotePort] through [ssh]; opens the SSH connection and the forward if they are not there yet. */
     @Synchronized fun forward(ssh: SshSettings, secret: String?, remoteHost: String, remotePort: Int): Int {
-        require(ssh.host.isNotBlank()) { "Falta el host del servidor SSH" }
+        require(ssh.host.isNotBlank()) { tr("Falta el host del servidor SSH") }
         val key = "${ssh.user}@${ssh.host}:${ssh.port}:${ssh.auth}:${ssh.keyFile}"
         var hop = hops[key]?.takeIf { it.session.isConnected }
         if (hop == null) { hop = Hop(connect(ssh, secret)); hops[key] = hop }
@@ -45,7 +47,7 @@ object Tunnels {
         if (!Files.exists(knownHosts)) Files.createFile(knownHosts)
         jsch.setKnownHosts(knownHosts.toString())
         if (ssh.auth == SshAuth.KEY) {
-            require(ssh.keyFile.isNotBlank()) { "Falta el archivo de la clave privada" }
+            require(ssh.keyFile.isNotBlank()) { tr("Falta el archivo de la clave privada") }
             val path = ssh.keyFile.replaceFirst(Regex("^~"), System.getProperty("user.home"))
             if (secret.isNullOrEmpty()) jsch.addIdentity(path) else jsch.addIdentity(path, secret)
         }
@@ -72,9 +74,9 @@ object Tunnels {
     }
 
     private fun describe(e: JSchException): String = when {
-        listOf("Auth fail", "Auth cancel", "authentication failures").any { it in e.message.orEmpty() } -> "el servidor SSH rechazó las credenciales"
-        "HostKey has been changed" in e.message.orEmpty() || "REMOTE HOST IDENTIFICATION" in e.message.orEmpty() -> "la clave del servidor SSH ha cambiado respecto a la guardada: puede ser un ataque; borra su línea de ${knownHosts} si el cambio es legítimo"
-        "UnknownHostKey" in e.message.orEmpty() || "reject HostKey" in e.message.orEmpty() -> "no se confió en la clave del servidor SSH"
+        listOf("Auth fail", "Auth cancel", "authentication failures").any { it in e.message.orEmpty() } -> tr("el servidor SSH rechazó las credenciales")
+        "HostKey has been changed" in e.message.orEmpty() || "REMOTE HOST IDENTIFICATION" in e.message.orEmpty() -> tr("la clave del servidor SSH ha cambiado respecto a la guardada: puede ser un ataque; borra su línea de %s si el cambio es legítimo", knownHosts)
+        "UnknownHostKey" in e.message.orEmpty() || "reject HostKey" in e.message.orEmpty() -> tr("no se confió en la clave del servidor SSH")
         else -> e.message ?: e.toString()
     }
 }
