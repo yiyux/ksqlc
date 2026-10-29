@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -59,9 +60,9 @@ class TableEditor(val obj: DbObject, private val dialect: Dialect, private val k
 
     /** Why existing rows cannot be edited, for the status bar; null when they can. */
     fun readOnlyReason(): String? = when {
-        connectionReadOnly -> "La conexión es de solo lectura"
-        obj.kind != DbObjectKind.TABLE -> "${obj.name} es una vista: solo lectura"
-        primaryKey.isEmpty() -> "${obj.name} no tiene clave primaria: se pueden añadir filas, pero no editar ni borrar las existentes"
+        connectionReadOnly -> tr("La conexión es de solo lectura")
+        obj.kind != DbObjectKind.TABLE -> tr("%s es una vista: solo lectura", obj.name)
+        primaryKey.isEmpty() -> tr("%s no tiene clave primaria: se pueden añadir filas, pero no editar ni borrar las existentes", obj.name)
         else -> null
     }
 

@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import ksqlc.core.DbKind
 import java.nio.file.Files
 import java.nio.file.Path
@@ -17,9 +19,9 @@ fun nativeDumpSupported(kind: DbKind) = kind == DbKind.POSTGRES || kind == DbKin
 
 /** Why a dump or restore cannot be offered for this connection, or null when it can. */
 fun nativeDumpBlocker(kind: DbKind, parts: JdbcUrl.Parts?): String? = when {
-    !nativeDumpSupported(kind) -> "${kind.name.lowercase().replaceFirstChar { it.uppercase() }} no tiene una herramienta de volcado compatible"
-    parts == null -> "La conexión usa una URL manual: define host, puerto y base de datos en el formulario"
-    kind == DbKind.SQLITE && parts.database.isBlank() -> "La base SQLite está en memoria"
+    !nativeDumpSupported(kind) -> tr("%s no tiene una herramienta de volcado compatible", kind.name.lowercase().replaceFirstChar { it.uppercase() })
+    parts == null -> tr("La conexión usa una URL manual: define host, puerto y base de datos en el formulario")
+    kind == DbKind.SQLITE && parts.database.isBlank() -> tr("La base SQLite está en memoria")
     else -> null
 }
 
@@ -60,7 +62,7 @@ private fun pgPattern(s: String) = "\"" + s.replace("\"", "\"\"") + "\""
 
 /** The command that dumps [scope] of the database [parts] into [out]. Throws [IllegalArgumentException] for an option the engine lacks. */
 fun dumpCommand(tool: String, kind: DbKind, parts: JdbcUrl.Parts, user: String?, password: String?, scope: DumpScope, options: DumpOptions, out: Path): ProcessSpec {
-    require(!(options.schemaOnly && options.dataOnly)) { "«solo esquema» y «solo datos» a la vez no tienen sentido" }
+    require(!(options.schemaOnly && options.dataOnly)) { tr("«solo esquema» y «solo datos» a la vez no tienen sentido") }
     val host = parts.host.ifBlank { "localhost" }
     val port = (parts.port ?: JdbcUrl.defaultPort(kind))?.toString()
     return when (kind) {
@@ -79,7 +81,7 @@ fun dumpCommand(tool: String, kind: DbKind, parts: JdbcUrl.Parts, user: String?,
             env = listOfNotNull(password?.let { "PGPASSWORD" to it }).toMap(),
         )
         DbKind.MYSQL, DbKind.MARIADB -> {
-            require(!options.custom) { "el formato personalizado es solo de PostgreSQL" }
+            require(!options.custom) { tr("el formato personalizado es solo de PostgreSQL") }
             ProcessSpec(
                 buildList {
                     add(tool); add("-h"); add(host); port?.let { add("-P"); add(it) }; user?.let { add("-u"); add(it) }; add("--protocol=tcp")
@@ -95,14 +97,14 @@ fun dumpCommand(tool: String, kind: DbKind, parts: JdbcUrl.Parts, user: String?,
             )
         }
         DbKind.SQLITE -> {
-            require(!options.dataOnly) { "SQLite no puede volcar solo los datos" }
-            require(!options.custom) { "el formato personalizado es solo de PostgreSQL" }
+            require(!options.dataOnly) { tr("SQLite no puede volcar solo los datos") }
+            require(!options.custom) { tr("el formato personalizado es solo de PostgreSQL") }
             // the shell runs each argument as a command, so the table goes inside the dot-command
             // shortcut: the name is a LIKE pattern for .dump, so `_` and `%` in a table name also match other tables
-            val cmd = (if (options.schemaOnly) ".schema" else ".dump") + (scope.table?.let { require('\'' !in it) { "el nombre de la tabla lleva una comilla simple" }; " '$it'" } ?: "")
+            val cmd = (if (options.schemaOnly) ".schema" else ".dump") + (scope.table?.let { require('\'' !in it) { tr("el nombre de la tabla lleva una comilla simple") }; " '$it'" } ?: "")
             ProcessSpec(listOf(tool, parts.database, cmd), stdout = out)
         }
-        else -> throw IllegalArgumentException("no hay herramienta de volcado para $kind")
+        else -> throw IllegalArgumentException(tr("no hay herramienta de volcado para %s", kind))
     }
 }
 
@@ -124,7 +126,7 @@ fun restoreCommand(tool: String, kind: DbKind, parts: JdbcUrl.Parts, user: Strin
             env = listOfNotNull(password?.let { "MYSQL_PWD" to it }).toMap(), stdin = input,
         )
         DbKind.SQLITE -> ProcessSpec(listOf(tool, parts.database), stdin = input)
-        else -> throw IllegalArgumentException("no hay herramienta de restauración para $kind")
+        else -> throw IllegalArgumentException(tr("no hay herramienta de restauración para %s", kind))
     }
 }
 

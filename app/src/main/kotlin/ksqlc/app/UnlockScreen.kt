@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
@@ -40,14 +41,14 @@ fun UnlockScreen(settings: Settings, dir: Path, onOpen: (SecretStore) -> Unit) =
 
     Box(Modifier.fillMaxSize().background(c.windowBg), contentAlignment = Alignment.Center) {
         Column(Modifier.width(360.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Contraseñas protegidas", fontSize = 14.sp, color = c.text)
-            FieldLabel("Contraseña maestra")
+            Text(tr("Contraseñas protegidas"), fontSize = 14.sp, color = c.text)
+            FieldLabel(tr("Contraseña maestra"))
             CompactTextField(master, { master = it }, Modifier.fillMaxWidth(), password = true, testTag = "unlock-master")
             error?.let { Text(it, fontSize = 12.sp, color = c.error, modifier = Modifier.testTag("unlock-error")) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 // the file stays untouched; passwords typed this session live in memory only
-                TextAction("Continuar sin contraseñas", { onOpen(InMemorySecretStore()) }, Modifier.testTag("unlock-skip"))
-                TextAction("Desbloquear", ::unlock, Modifier.testTag("unlock-ok"), enabled = !busy && master.isNotEmpty(), primary = true)
+                TextAction(tr("Continuar sin contraseñas"), { onOpen(InMemorySecretStore()) }, Modifier.testTag("unlock-skip"))
+                TextAction(tr("Desbloquear"), ::unlock, Modifier.testTag("unlock-ok"), enabled = !busy && master.isNotEmpty(), primary = true)
             }
         }
     }

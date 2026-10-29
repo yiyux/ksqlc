@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -72,10 +73,10 @@ fun ObjectSearchDialog(state: AppState) {
                         else -> false
                     }
                 },
-                placeholder = "Buscar tabla o vista", testTag = "object-search-input", height = 30.dp,
+                placeholder = tr("Buscar tabla o vista"), testTag = "object-search-input", height = 30.dp,
             )
-            if (state.catalog == null) Text("Conecta para buscar objetos.", fontSize = 13.sp, color = c.textMuted)
-            else if (hits.isEmpty()) Text("Sin resultados", fontSize = 13.sp, color = c.textMuted, modifier = Modifier.testTag("object-search-empty"))
+            if (state.catalog == null) Text(tr("Conecta para buscar objetos."), fontSize = 13.sp, color = c.textMuted)
+            else if (hits.isEmpty()) Text(tr("Sin resultados"), fontSize = 13.sp, color = c.textMuted, modifier = Modifier.testTag("object-search-empty"))
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list) {
                 itemsIndexed(hits) { i, o ->
                     Row(
@@ -89,7 +90,7 @@ fun ObjectSearchDialog(state: AppState) {
                     }
                 }
             }
-            Text("↵ abrir datos · ⇧↵ mostrar en el explorador · Esc cerrar", fontSize = 11.sp, color = c.textMuted)
+            Text(tr("↵ abrir datos · ⇧↵ mostrar en el explorador · Esc cerrar"), fontSize = 11.sp, color = c.textMuted)
         }
     }
 }

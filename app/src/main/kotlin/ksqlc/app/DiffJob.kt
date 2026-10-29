@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -81,20 +82,20 @@ class DiffJob(
                 rightNamespaces = ns
                 val want = leftNamespaces.getOrNull(leftIndex)?.label
                 rightIndex = ns.indexOfFirst { it.label == want }.takeIf { it >= 0 } ?: 0
-            }.onFailure { if (gen == generation) { rightNamespaces = emptyList(); error = "No se pudo abrir ${ds.name}: ${it.message}" } }
+            }.onFailure { if (gen == generation) { rightNamespaces = emptyList(); error = tr("No se pudo abrir %s: %s", ds.name, it.message) } }
         }
     }
 
     fun compare() {
         val l = leftNamespaces.getOrNull(leftIndex); val r = rightNamespaces.getOrNull(rightIndex); val rs = right
-        if (l == null || r == null || rs == null || running) { error = error ?: "Elige un esquema a cada lado"; return }
+        if (l == null || r == null || rs == null || running) { error = error ?: tr("Elige un esquema a cada lado"); return }
         running = true; error = null; cancelled = false; results = null; selected = null; progress = "0"
         scope.launch {
-            runCatching { withContext(Dispatchers.IO) { diffSchemas(left, l, rs, r, { d, t -> progress = "$d/$t objetos" }, { cancelled }) } }
+            runCatching { withContext(Dispatchers.IO) { diffSchemas(left, l, rs, r, { d, t -> progress = tr("%s/%s objetos", d, t) }, { cancelled }) } }
                 .onSuccess { list ->
                     results = list
                     selected = list.firstOrNull { it.name.equals(initialObject, ignoreCase = true) } ?: list.firstOrNull { it.status != ksqlc.drivers.ObjectStatus.SAME }
-                    if (cancelled) error = "Comparación cancelada: solo se muestran ${list.size} objetos"
+                    if (cancelled) error = tr("Comparación cancelada: solo se muestran %d objetos", list.size)
                 }
                 .onFailure { error = it.message ?: it.toString() }
             running = false

@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,7 +39,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import ksqlc.drivers.JdbcUrl
 
-private fun newDraft() = ConnectionForm().apply { name = "Nueva conexión"; kind = DbKind.POSTGRES; portText = "5432"; user = "" }
+private fun newDraft() = ConnectionForm().apply { name = tr("Nueva conexión"); kind = DbKind.POSTGRES; portText = "5432"; user = "" }
 
 @Composable
 private fun Field(label: String, content: @Composable RowScope.() -> Unit) {
@@ -76,42 +77,42 @@ private fun OptionsTab(draft: ConnectionForm, modifier: Modifier) {
     val c = Ksqlc.colors
     val kind = draft.effectiveKind
     Column(modifier.verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle("Conexión")
-        KCheckbox(draft.readOnly, { draft.readOnly = it }, label = "Solo lectura", modifier = Modifier.testTag("ds-readonly"))
-        if (supportsTransactions(kind)) OField("Control de transacciones:") {
-            SegmentedControl(listOf("Auto", "Manual"), if (draft.manualTx) 1 else 0, { draft.manualTx = it == 1 }, tag = "ds-tx")
+        SectionTitle(tr("Conexión"))
+        KCheckbox(draft.readOnly, { draft.readOnly = it }, label = tr("Solo lectura"), modifier = Modifier.testTag("ds-readonly"))
+        if (supportsTransactions(kind)) OField(tr("Control de transacciones:")) {
+            SegmentedControl(listOf(tr("Auto"), tr("Manual")), if (draft.manualTx) 1 else 0, { draft.manualTx = it == 1 }, tag = "ds-tx")
         }
-        if (supportsTimeZone(kind)) OField("Zona horaria:") {
-            CompactTextField(draft.timeZone, { draft.timeZone = it }, Modifier.weight(1f), placeholder = "p. ej. Europe/Madrid o +01:00; vacía = la del servidor", testTag = "ds-tz", height = 28.dp)
+        if (supportsTimeZone(kind)) OField(tr("Zona horaria:")) {
+            CompactTextField(draft.timeZone, { draft.timeZone = it }, Modifier.weight(1f), placeholder = tr("p. ej. Europe/Madrid o +01:00; vacía = la del servidor"), testTag = "ds-tz", height = 28.dp)
         }
         Row(Modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            KCheckbox(draft.keepAliveOn, { draft.keepAliveOn = it }, label = "Consulta de keep-alive cada", modifier = Modifier.testTag("ds-keepalive"))
+            KCheckbox(draft.keepAliveOn, { draft.keepAliveOn = it }, label = tr("Consulta de keep-alive cada"), modifier = Modifier.testTag("ds-keepalive"))
             CompactTextField(draft.keepAliveText, { draft.keepAliveText = it.filter(Char::isDigit) }, Modifier.width(80.dp), enabled = draft.keepAliveOn, testTag = "ds-keepalive-sec", height = 28.dp)
             Text("s", fontSize = 13.sp, color = c.text)
         }
         Row(Modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            KCheckbox(draft.autoDisconnectOn, { draft.autoDisconnectOn = it }, label = "Cerrar la consola tras", modifier = Modifier.testTag("ds-autodisconnect"))
+            KCheckbox(draft.autoDisconnectOn, { draft.autoDisconnectOn = it }, label = tr("Cerrar la consola tras"), modifier = Modifier.testTag("ds-autodisconnect"))
             CompactTextField(draft.autoDisconnectText, { draft.autoDisconnectText = it.filter(Char::isDigit) }, Modifier.width(80.dp), enabled = draft.autoDisconnectOn, testTag = "ds-autodisconnect-sec", height = 28.dp)
-            Text("s sin uso", fontSize = 13.sp, color = c.text)
+            Text(tr("s sin uso"), fontSize = 13.sp, color = c.text)
         }
         if (supportsSingleDatabase(kind)) KCheckbox(
             draft.singleDatabase, { draft.singleDatabase = it },
-            label = when (kind) { DbKind.CASSANDRA -> "Modo de un solo keyspace"; DbKind.ORACLE -> "Mostrar solo el esquema del usuario"; else -> "Modo de una sola base de datos" },
+            label = when (kind) { DbKind.CASSANDRA -> tr("Modo de un solo keyspace"); DbKind.ORACLE -> tr("Mostrar solo el esquema del usuario"); else -> tr("Modo de una sola base de datos") },
             modifier = Modifier.testTag("ds-single"),
         )
-        OField("Script de inicio:") {
+        OField(tr("Script de inicio:")) {
             BasicTextField(
                 draft.startupScript, { draft.startupScript = it },
                 Modifier.weight(1f).height(90.dp).clip(RoundedCornerShape(4.dp)).border(1.dp, c.border, RoundedCornerShape(4.dp)).background(c.editorBg).padding(6.dp).testTag("ds-startup"),
                 textStyle = MonoStyle.copy(color = c.text, fontSize = 12.sp), cursorBrush = SolidColor(c.text),
             )
         }
-        Text("Se ejecuta cada vez que se abre una conexión (consola y pestañas de tabla).", Modifier.padding(start = 220.dp), fontSize = 11.sp, color = c.textMuted)
-        SectionTitle("Introspección")
-        KCheckbox(draft.autoSync, { draft.autoSync = it }, label = "Sincronizar el explorador tras cambiar el esquema", modifier = Modifier.testTag("ds-autosync"))
-        OField("Intervalo de introspección automática:") {
+        Text(tr("Se ejecuta cada vez que se abre una conexión (consola y pestañas de tabla)."), Modifier.padding(start = 220.dp), fontSize = 11.sp, color = c.textMuted)
+        SectionTitle(tr("Introspección"))
+        KCheckbox(draft.autoSync, { draft.autoSync = it }, label = tr("Sincronizar el explorador tras cambiar el esquema"), modifier = Modifier.testTag("ds-autosync"))
+        OField(tr("Intervalo de introspección automática:")) {
             CompactTextField(draft.introspectionText, { draft.introspectionText = it.filter(Char::isDigit) }, Modifier.width(80.dp), testTag = "ds-introspect", height = 28.dp)
-            Text("minutos (vacío = nunca)", fontSize = 13.sp, color = c.text)
+            Text(tr("minutos (vacío = nunca)"), fontSize = 13.sp, color = c.text)
         }
     }
 }
@@ -130,19 +131,19 @@ private fun SchemasTab(state: AppState, draft: ConnectionForm, modifier: Modifie
     val names = (loaded + chosen).distinctBy { it.lowercase() }.sortedBy { it.lowercase() }
     val picking = !draft.schemasAll
     Column(modifier.padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OField("Mostrar:") { SegmentedControl(listOf("Todos", "Solo los elegidos"), if (draft.schemasAll) 0 else 1, { draft.schemasAll = it == 0 }, tag = "ds-schemas-mode") }
-        OField("Patrón:") {
-            CompactTextField(draft.schemaPattern, { draft.schemaPattern = it }, Modifier.weight(1f), placeholder = "p. ej. app_*, ventas (con * y ?; vacío = ninguno)", testTag = "ds-schema-pattern", height = 28.dp)
+        OField(tr("Mostrar:")) { SegmentedControl(listOf(tr("Todos"), tr("Solo los elegidos")), if (draft.schemasAll) 0 else 1, { draft.schemasAll = it == 0 }, tag = "ds-schemas-mode") }
+        OField(tr("Patrón:")) {
+            CompactTextField(draft.schemaPattern, { draft.schemaPattern = it }, Modifier.weight(1f), placeholder = tr("p. ej. app_*, ventas (con * y ?; vacío = ninguno)"), testTag = "ds-schema-pattern", height = 28.dp)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextAction(if (loading) "Leyendo…" else "Leer esquemas del servidor", {
+            TextAction(if (loading) tr("Leyendo…") else tr("Leer esquemas del servidor"), {
                 loading = true; error = null
                 state.loadNamespaces(draft) { r -> loading = false; r.onSuccess { loaded = it }.onFailure { error = it.message ?: it.toString() } }
             }, Modifier.testTag("ds-schemas-load"), enabled = !loading)
-            if (picking) Text("${chosen.size} elegidos", fontSize = 12.sp, color = c.textSecondary)
+            if (picking) Text(tr("%d elegidos", chosen.size), fontSize = 12.sp, color = c.textSecondary)
         }
         error?.let { Text(it, fontSize = 12.sp, color = c.error, modifier = Modifier.testTag("ds-schemas-error")) }
-        if (names.isEmpty()) Text("Lee los esquemas del servidor para elegir cuáles mostrar; los de sistema también salen en la lista.", fontSize = 12.sp, color = c.textMuted)
+        if (names.isEmpty()) Text(tr("Lee los esquemas del servidor para elegir cuáles mostrar; los de sistema también salen en la lista."), fontSize = 12.sp, color = c.textMuted)
         LazyColumn(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(4.dp)).border(1.dp, c.border, RoundedCornerShape(4.dp))) {
             items(names, key = { it }) { name ->
                 Row(Modifier.fillMaxWidth().height(26.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -159,8 +160,8 @@ private fun SchemasTab(state: AppState, draft: ConnectionForm, modifier: Modifie
 
 /** Which of the four SSL modes (off, encrypted, verify CA, verify CA and name) an engine offers. */
 private fun sslModesFor(kind: DbKind): List<String> = when (kind) {
-    DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.MSSQL -> listOf("Desactivado", "Cifrado", "Verificar CA", "CA y host")
-    DbKind.CASSANDRA, DbKind.TRINO -> listOf("Desactivado", "Cifrado")
+    DbKind.POSTGRES, DbKind.MYSQL, DbKind.MARIADB, DbKind.MSSQL -> listOf(tr("Desactivado"), tr("Cifrado"), tr("Verificar CA"), tr("CA y host"))
+    DbKind.CASSANDRA, DbKind.TRINO -> listOf(tr("Desactivado"), tr("Cifrado"))
     else -> emptyList()
 }
 
@@ -172,64 +173,64 @@ private fun SshSslTab(draft: ConnectionForm, modifier: Modifier) {
     val c = Ksqlc.colors
     val network = draft.effectiveKind != DbKind.SQLITE
     Column(modifier.verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle("Túnel SSH")
-        if (!network) Text("SQLite abre un archivo local: no usa red.", fontSize = 13.sp, color = c.textMuted)
-        else if (draft.customUrl) Text("El túnel necesita una conexión definida con host y puerto; con «Solo URL» no está disponible.", fontSize = 13.sp, color = c.textMuted)
+        SectionTitle(tr("Túnel SSH"))
+        if (!network) Text(tr("SQLite abre un archivo local: no usa red."), fontSize = 13.sp, color = c.textMuted)
+        else if (draft.customUrl) Text(tr("El túnel necesita una conexión definida con host y puerto; con «Solo URL» no está disponible."), fontSize = 13.sp, color = c.textMuted)
         else {
             val on = draft.sshEnabled
-            KCheckbox(draft.sshEnabled, { draft.sshEnabled = it }, label = "Usar túnel SSH", modifier = Modifier.testTag("ds-ssh-on"))
+            KCheckbox(draft.sshEnabled, { draft.sshEnabled = it }, label = tr("Usar túnel SSH"), modifier = Modifier.testTag("ds-ssh-on"))
             OField("Host:") {
-                CompactTextField(draft.sshHost, { draft.sshHost = it }, Modifier.weight(1f), enabled = on, placeholder = "servidor intermedio", testTag = "ds-ssh-host", height = 28.dp)
-                Text("Puerto:", fontSize = 13.sp, color = c.text)
+                CompactTextField(draft.sshHost, { draft.sshHost = it }, Modifier.weight(1f), enabled = on, placeholder = tr("servidor intermedio"), testTag = "ds-ssh-host", height = 28.dp)
+                Text(tr("Puerto:"), fontSize = 13.sp, color = c.text)
                 CompactTextField(draft.sshPortText, { draft.sshPortText = it.filter(Char::isDigit) }, Modifier.width(80.dp), enabled = on, testTag = "ds-ssh-port", height = 28.dp)
             }
-            OField("Usuario:") { CompactTextField(draft.sshUser, { draft.sshUser = it }, Modifier.weight(1f), enabled = on, testTag = "ds-ssh-user", height = 28.dp) }
-            OField("Autenticación:") {
-                SegmentedControl(listOf("Contraseña", "Clave privada"), if (draft.sshAuth == ksqlc.core.SshAuth.KEY) 1 else 0, { draft.sshAuth = if (it == 1) ksqlc.core.SshAuth.KEY else ksqlc.core.SshAuth.PASSWORD }, tag = "ds-ssh-auth")
+            OField(tr("Usuario:")) { CompactTextField(draft.sshUser, { draft.sshUser = it }, Modifier.weight(1f), enabled = on, testTag = "ds-ssh-user", height = 28.dp) }
+            OField(tr("Autenticación:")) {
+                SegmentedControl(listOf(tr("Contraseña"), tr("Clave privada")), if (draft.sshAuth == ksqlc.core.SshAuth.KEY) 1 else 0, { draft.sshAuth = if (it == 1) ksqlc.core.SshAuth.KEY else ksqlc.core.SshAuth.PASSWORD }, tag = "ds-ssh-auth")
             }
-            if (draft.sshAuth == ksqlc.core.SshAuth.KEY) OField("Archivo de clave:") {
+            if (draft.sshAuth == ksqlc.core.SshAuth.KEY) OField(tr("Archivo de clave:")) {
                 CompactTextField(draft.sshKeyFile, { draft.sshKeyFile = it }, Modifier.weight(1f), enabled = on, placeholder = "~/.ssh/id_ed25519", testTag = "ds-ssh-key", height = 28.dp)
-                ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(false, "Clave privada SSH")?.let { draft.sshKeyFile = it } }, Modifier.testTag("ds-ssh-browse"), enabled = on)
+                ToolButton(IconKind.Folder, tr("Elegir archivo…"), { chooseFile(false, tr("Clave privada SSH"))?.let { draft.sshKeyFile = it } }, Modifier.testTag("ds-ssh-browse"), enabled = on)
             }
-            OField(if (draft.sshAuth == ksqlc.core.SshAuth.KEY) "Frase de la clave:" else "Contraseña:") {
-                CompactTextField(draft.sshSecret, { draft.sshSecret = it }, Modifier.weight(1f), enabled = on, password = true, placeholder = "<oculta>", testTag = "ds-ssh-secret", height = 28.dp)
+            OField(if (draft.sshAuth == ksqlc.core.SshAuth.KEY) tr("Frase de la clave:") else tr("Contraseña:")) {
+                CompactTextField(draft.sshSecret, { draft.sshSecret = it }, Modifier.weight(1f), enabled = on, password = true, placeholder = tr("<oculta>"), testTag = "ds-ssh-secret", height = 28.dp)
             }
             Text(
-                "La base de datos se alcanza desde el servidor SSH (el host y puerto de General son los que ve ese servidor). Un servidor nuevo se confirma la primera vez y su clave se guarda en ~/.ksqlc/known_hosts. La contraseña se guarda en el llavero.",
+                tr("La base de datos se alcanza desde el servidor SSH (el host y puerto de General son los que ve ese servidor). Un servidor nuevo se confirma la primera vez y su clave se guarda en ~/.ksqlc/known_hosts. La contraseña se guarda en el llavero."),
                 Modifier.padding(start = 220.dp), fontSize = 11.sp, color = c.textMuted,
             )
         }
         SectionTitle("SSL")
         val modes = sslModesFor(draft.effectiveKind)
-        if (modes.isEmpty()) Text(if (network) "Oracle necesita un listener TCPS y una cartera de certificados, que aquí no se configuran." else "SQLite abre un archivo local: no usa red.", fontSize = 13.sp, color = c.textMuted)
-        else if (draft.customUrl) Text("Con «Solo URL» los parámetros SSL van en la propia URL.", fontSize = 13.sp, color = c.textMuted)
+        if (modes.isEmpty()) Text(if (network) tr("Oracle necesita un listener TCPS y una cartera de certificados, que aquí no se configuran.") else tr("SQLite abre un archivo local: no usa red."), fontSize = 13.sp, color = c.textMuted)
+        else if (draft.customUrl) Text(tr("Con «Solo URL» los parámetros SSL van en la propia URL."), fontSize = 13.sp, color = c.textMuted)
         else {
-            OField("Modo:") { SegmentedControl(modes, draft.sslMode.coerceAtMost(modes.lastIndex), { draft.sslMode = it }, tag = "ds-ssl-mode") }
+            OField(tr("Modo:")) { SegmentedControl(modes, draft.sslMode.coerceAtMost(modes.lastIndex), { draft.sslMode = it }, tag = "ds-ssl-mode") }
             val verifying = draft.sslMode >= 2
             val kind = draft.effectiveKind
             if (modes.size > 2) {
-                OField("Certificado de la CA:") {
+                OField(tr("Certificado de la CA:")) {
                     CompactTextField(draft.sslCa, { draft.sslCa = it }, Modifier.weight(1f), enabled = verifying, placeholder = "ca.pem (PEM)", testTag = "ds-ssl-ca", height = 28.dp)
-                    ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(false, "Certificado de la CA")?.let { draft.sslCa = it } }, Modifier.testTag("ds-ssl-ca-browse"), enabled = verifying)
+                    ToolButton(IconKind.Folder, tr("Elegir archivo…"), { chooseFile(false, tr("Certificado de la CA"))?.let { draft.sslCa = it } }, Modifier.testTag("ds-ssl-ca-browse"), enabled = verifying)
                 }
                 if (kind != DbKind.MSSQL) {
-                    OField("Certificado de cliente:") {
-                        CompactTextField(draft.sslCert, { draft.sslCert = it }, Modifier.weight(1f), enabled = draft.sslMode != 0, placeholder = "opcional (PEM)", testTag = "ds-ssl-cert", height = 28.dp)
-                        ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(false, "Certificado de cliente")?.let { draft.sslCert = it } }, Modifier.testTag("ds-ssl-cert-browse"), enabled = draft.sslMode != 0)
+                    OField(tr("Certificado de cliente:")) {
+                        CompactTextField(draft.sslCert, { draft.sslCert = it }, Modifier.weight(1f), enabled = draft.sslMode != 0, placeholder = tr("opcional (PEM)"), testTag = "ds-ssl-cert", height = 28.dp)
+                        ToolButton(IconKind.Folder, tr("Elegir archivo…"), { chooseFile(false, tr("Certificado de cliente"))?.let { draft.sslCert = it } }, Modifier.testTag("ds-ssl-cert-browse"), enabled = draft.sslMode != 0)
                     }
-                    OField("Clave de cliente:") {
-                        CompactTextField(draft.sslKey, { draft.sslKey = it }, Modifier.weight(1f), enabled = draft.sslMode != 0, placeholder = "opcional (PEM sin frase de paso)", testTag = "ds-ssl-key", height = 28.dp)
-                        ToolButton(IconKind.Folder, "Elegir archivo…", { chooseFile(false, "Clave de cliente")?.let { draft.sslKey = it } }, Modifier.testTag("ds-ssl-key-browse"), enabled = draft.sslMode != 0)
+                    OField(tr("Clave de cliente:")) {
+                        CompactTextField(draft.sslKey, { draft.sslKey = it }, Modifier.weight(1f), enabled = draft.sslMode != 0, placeholder = tr("opcional (PEM sin frase de paso)"), testTag = "ds-ssl-key", height = 28.dp)
+                        ToolButton(IconKind.Folder, tr("Elegir archivo…"), { chooseFile(false, tr("Clave de cliente"))?.let { draft.sslKey = it } }, Modifier.testTag("ds-ssl-key-browse"), enabled = draft.sslMode != 0)
                     }
                 }
             }
             Text(
                 when (kind) {
-                    DbKind.TRINO -> "«Cifrado» usa HTTPS con el almacén de confianza de Java; Trino exige HTTPS para enviar una contraseña."
-                    DbKind.CASSANDRA -> "Cassandra cifra con el almacén de confianza de Java; no se comprueban archivos propios."
-                    DbKind.MSSQL -> "«Cifrado» acepta cualquier certificado del servidor; «Verificar» lo comprueba con la CA indicada, o con el almacén de Java si no hay ninguna."
-                    else -> "«Cifrado» no comprueba el certificado del servidor. «Verificar CA» lo comprueba con la CA indicada; «y nombre» exige además que el certificado sea para el host."
-                } + if (draft.sshEnabled) " Con túnel SSH el nombre que se comprueba es 127.0.0.1, el extremo local del túnel." else "",
+                    DbKind.TRINO -> tr("«Cifrado» usa HTTPS con el almacén de confianza de Java; Trino exige HTTPS para enviar una contraseña.")
+                    DbKind.CASSANDRA -> tr("Cassandra cifra con el almacén de confianza de Java; no se comprueban archivos propios.")
+                    DbKind.MSSQL -> tr("«Cifrado» acepta cualquier certificado del servidor; «Verificar» lo comprueba con la CA indicada, o con el almacén de Java si no hay ninguna.")
+                    else -> tr("«Cifrado» no comprueba el certificado del servidor. «Verificar CA» lo comprueba con la CA indicada; «y nombre» exige además que el certificado sea para el host.")
+                } + if (draft.sshEnabled) tr(" Con túnel SSH el nombre que se comprueba es 127.0.0.1, el extremo local del túnel.") else "",
                 Modifier.padding(start = 220.dp), fontSize = 11.sp, color = c.textMuted,
             )
         }
@@ -257,24 +258,24 @@ fun DataSourceDialog(state: AppState) {
         Column(Modifier.fillMaxSize().background(c.dialogBg)) {
             Box(Modifier.fillMaxWidth().height(29.dp).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
                 Text("Data Sources", fontSize = 13.sp, color = c.textSecondary)
-                Box(Modifier.align(Alignment.CenterEnd)) { ToolButton(IconKind.Close, "Cerrar", ::close) }
+                Box(Modifier.align(Alignment.CenterEnd)) { ToolButton(IconKind.Close, tr("Cerrar"), ::close) }
             }
             Separator()
             Row(Modifier.weight(1f)) {
                 Column(Modifier.width(250.dp).fillMaxHeight()) {
                     Text("Data Sources", Modifier.padding(start = 12.dp, top = 10.dp, bottom = 6.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.text)
                     Row(Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        ToolButton(IconKind.Plus, "Añadir data source", { draft.copyFrom(newDraft()); test = null })
-                        ToolButton(IconKind.Minus, "Eliminar data source", {
+                        ToolButton(IconKind.Plus, tr("Añadir data source"), { draft.copyFrom(newDraft()); test = null })
+                        ToolButton(IconKind.Minus, tr("Eliminar data source"), {
                             draft.currentId?.let { state.deleteConnection(it) }
                             draft.copyFrom(newDraft()); test = null
                         }, enabled = draft.currentId != null)
-                        ToolButton(IconKind.Copy, "Duplicar data source", {
-                            val copy = ConnectionForm().also { it.copyFrom(draft); it.currentId = null; it.name = it.name + " (copia)" }
+                        ToolButton(IconKind.Copy, tr("Duplicar data source"), {
+                            val copy = ConnectionForm().also { it.copyFrom(draft); it.currentId = null; it.name = it.name + tr(" (copia)") }
                             draft.copyFrom(copy); test = null
                         })
                     }
-                    Text("Data sources del proyecto", Modifier.padding(start = 12.dp, top = 6.dp, bottom = 4.dp), fontSize = 12.sp, color = c.textSecondary)
+                    Text(tr("Data sources del proyecto"), Modifier.padding(start = 12.dp, top = 6.dp, bottom = 4.dp), fontSize = 12.sp, color = c.textSecondary)
                     LazyColumn(Modifier.fillMaxSize()) {
                         if (draft.currentId == null) item(key = "new") { DsRow(draft.name, draft.effectiveKind.label(), draft.color, selected = true) {} }
                         items(state.saved, key = { it.id }) { ds ->
@@ -290,10 +291,10 @@ fun DataSourceDialog(state: AppState) {
                 }
                 Separator(vertical = true)
                 Column(Modifier.weight(1f).fillMaxHeight().padding(start = 12.dp, end = 12.dp, top = 12.dp)) {
-                    Field("Nombre:") { CompactTextField(draft.name, { draft.name = it }, Modifier.weight(1f), testTag = "ds-name", height = 28.dp) }
+                    Field(tr("Nombre:")) { CompactTextField(draft.name, { draft.name = it }, Modifier.weight(1f), testTag = "ds-name", height = 28.dp) }
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("General", "Opciones", "SSH/SSL", "Esquemas").forEachIndexed { i, label ->
+                        listOf("General", tr("Opciones"), "SSH/SSL", tr("Esquemas")).forEachIndexed { i, label ->
                             val on = tab == i
                             Box(
                                 Modifier.height(26.dp).clip(RoundedCornerShape(6.dp)).then(if (on) Modifier.background(c.selection).border(1.dp, c.accent.copy(alpha = 0.45f), RoundedCornerShape(6.dp)) else Modifier)
@@ -308,8 +309,8 @@ fun DataSourceDialog(state: AppState) {
                     else if (tab == 2) SshSslTab(draft, Modifier.weight(1f))
                     else if (tab == 3) SchemasTab(state, draft, Modifier.weight(1f))
                     else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Field("Carpeta:") { CompactTextField(draft.folder, { draft.folder = it }, Modifier.weight(1f), placeholder = "ninguna", testTag = "ds-folder", height = 28.dp) }
-                        Field("Color:") {
+                        Field(tr("Carpeta:")) { CompactTextField(draft.folder, { draft.folder = it }, Modifier.weight(1f), placeholder = tr("ninguna"), testTag = "ds-folder", height = 28.dp) }
+                        Field(tr("Color:")) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 (listOf<String?>(null) + CONNECTION_COLORS.keys).forEach { key ->
                                     val on = draft.color == key
@@ -321,7 +322,7 @@ fun DataSourceDialog(state: AppState) {
                                 }
                             }
                         }
-                        Field("Motor:") {
+                        Field(tr("Motor:")) {
                             Box(Modifier.weight(1f)) {
                                 DropdownField(draft.kind.label(), { kindMenu = true }, Modifier.fillMaxWidth().testTag("ds-kind"), icon = IconKind.Database, enabled = !draft.customUrl)
                                 DropdownMenu(kindMenu, { kindMenu = false }) {
@@ -333,28 +334,28 @@ fun DataSourceDialog(state: AppState) {
                                 }
                             }
                         }
-                        Field("Tipo de conexión:") {
-                            SegmentedControl(listOf("predeterminado", "Solo URL"), if (draft.customUrl) 1 else 0, { i ->
+                        Field(tr("Tipo de conexión:")) {
+                            SegmentedControl(listOf(tr("predeterminado"), tr("Solo URL")), if (draft.customUrl) 1 else 0, { i ->
                                 if (i == 1) { draft.urlText = draft.url; draft.customUrl = true } else draft.customUrl = false
                             }, tag = "ds-conn-type")
                         }
                         Field("Host:") {
                             CompactTextField(draft.host, { draft.host = it }, Modifier.weight(1f), enabled = network && !draft.customUrl, testTag = "ds-host", height = 28.dp)
-                            Text("Puerto:", fontSize = 13.sp, color = c.text)
+                            Text(tr("Puerto:"), fontSize = 13.sp, color = c.text)
                             CompactTextField(draft.portText, { draft.portText = it.filter(Char::isDigit) }, Modifier.width(90.dp), enabled = network && !draft.customUrl, testTag = "ds-port", height = 28.dp)
                         }
-                        Field("Usuario:") { CompactTextField(draft.user, { draft.user = it }, Modifier.weight(1f), testTag = "ds-user", height = 28.dp) }
-                        Field("Contraseña:") { CompactTextField(draft.password, { draft.password = it }, Modifier.weight(1f), password = true, placeholder = "<oculta>", testTag = "ds-pass", height = 28.dp) }
-                        Field(if (draft.kind == DbKind.CASSANDRA) "Keyspace:" else if (draft.kind == DbKind.TRINO) "Catálogo/esquema:" else if (network) "Base de datos:" else "Archivo:") {
-                            CompactTextField(draft.database, { draft.database = it }, Modifier.weight(1f), enabled = !draft.customUrl, placeholder = if (network) null else "vacío = memoria compartida", testTag = "ds-db", height = 28.dp)
+                        Field(tr("Usuario:")) { CompactTextField(draft.user, { draft.user = it }, Modifier.weight(1f), testTag = "ds-user", height = 28.dp) }
+                        Field(tr("Contraseña:")) { CompactTextField(draft.password, { draft.password = it }, Modifier.weight(1f), password = true, placeholder = tr("<oculta>"), testTag = "ds-pass", height = 28.dp) }
+                        Field(if (draft.kind == DbKind.CASSANDRA) "Keyspace:" else if (draft.kind == DbKind.TRINO) tr("Catálogo/esquema:") else if (network) tr("Base de datos:") else tr("Archivo:")) {
+                            CompactTextField(draft.database, { draft.database = it }, Modifier.weight(1f), enabled = !draft.customUrl, placeholder = if (network) null else tr("vacío = memoria compartida"), testTag = "ds-db", height = 28.dp)
                         }
-                        if (draft.kind == DbKind.CASSANDRA) Field("Datacenter local:") {
+                        if (draft.kind == DbKind.CASSANDRA) Field(tr("Datacenter local:")) {
                             CompactTextField(draft.datacenter, { draft.datacenter = it.trim() }, Modifier.weight(1f), enabled = !draft.customUrl, testTag = "ds-dc", height = 28.dp)
                         }
                         Field("URL:") {
                             Column(Modifier.weight(1f)) {
                                 CompactTextField(draft.url, { draft.urlText = it }, Modifier.fillMaxWidth(), readOnly = !draft.customUrl, testTag = "ds-url", height = 28.dp)
-                                if (draft.customUrl) Text("Sustituye los ajustes anteriores", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = c.textSecondary)
+                                if (draft.customUrl) Text(tr("Sustituye los ajustes anteriores"), Modifier.padding(top = 4.dp), fontSize = 12.sp, color = c.textSecondary)
                             }
                         }
                     }
@@ -362,7 +363,7 @@ fun DataSourceDialog(state: AppState) {
             }
             Separator()
             Row(Modifier.fillMaxWidth().height(38.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                LinkAction(if (testing) "Probando…" else "Probar conexión", {
+                LinkAction(if (testing) tr("Probando…") else tr("Probar conexión"), {
                     testing = true; test = null
                     state.testConnection(draft) { test = it; testing = false }
                 }, enabled = !testing, modifier = Modifier.testTag("ds-test"))
@@ -376,8 +377,8 @@ fun DataSourceDialog(state: AppState) {
             Separator()
             Row(Modifier.fillMaxWidth().height(50.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 val btn = Modifier.height(28.dp)
-                TextAction("Cancelar", ::close, modifier = btn.testTag("ds-cancel"))
-                TextAction("Aplicar", { state.applyDraft(draft) }, modifier = btn.testTag("ds-apply"))
+                TextAction(tr("Cancelar"), ::close, modifier = btn.testTag("ds-cancel"))
+                TextAction(tr("Aplicar"), { state.applyDraft(draft) }, modifier = btn.testTag("ds-apply"))
                 TextAction("OK", { state.applyDraft(draft); close() }, primary = true, modifier = btn.testTag("ds-ok"))
             }
         }
@@ -406,17 +407,17 @@ fun DdlDialog(state: AppState) {
     fun close() { state.ddlView = null }
     ModalOverlay(::close, Modifier.testTag(if (view.heading == "DDL") "ddl-dialog" else "sql-dialog"), width = 700.dp, height = 460.dp) {
         Column(Modifier.fillMaxSize()) {
-            PanelHeader("${view.heading} — ${view.title}") { ToolButton(IconKind.Close, "Cerrar", ::close) }
+            PanelHeader("${view.heading} — ${view.title}") { ToolButton(IconKind.Close, tr("Cerrar"), ::close) }
             Separator()
             Box(Modifier.weight(1f).fillMaxWidth().background(c.editorBg).verticalScroll(rememberScrollState()).padding(12.dp)) {
                 SelectionContainer { Text(view.text, style = MonoStyle.copy(fontSize = 12.sp, lineHeight = 18.sp), color = c.gridText) }
             }
             Separator()
             Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextAction("Copiar", { clipboard.setText(AnnotatedString(view.text)) })
-                TextAction("Abrir en consola", { state.appendToEditor(view.text); close() })
+                TextAction(tr("Copiar"), { clipboard.setText(AnnotatedString(view.text)) })
+                TextAction(tr("Abrir en consola"), { state.appendToEditor(view.text); close() })
                 Spacer(Modifier.weight(1f))
-                TextAction("Cerrar", ::close, primary = true)
+                TextAction(tr("Cerrar"), ::close, primary = true)
             }
         }
     }
@@ -434,7 +435,7 @@ fun ConfirmDialog(state: AppState) {
             Text(q.message, fontSize = 13.sp, color = c.textSecondary)
             Spacer(Modifier.weight(1f))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                TextAction("Cancelar", ::cancel, Modifier.testTag("confirm-cancel"))
+                TextAction(tr("Cancelar"), ::cancel, Modifier.testTag("confirm-cancel"))
                 TextAction(q.confirmLabel, q.onConfirm, Modifier.testTag("confirm-ok"), primary = true)
             }
         }

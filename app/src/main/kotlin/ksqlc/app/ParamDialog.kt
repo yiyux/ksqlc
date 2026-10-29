@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -31,8 +32,8 @@ fun ParamDialog(state: AppState) {
     LaunchedEffect(p) { runCatching { first.requestFocus() } }
     ModalOverlay({ state.paramPrompt = null }, Modifier.testTag("param-dialog"), width = 460.dp, height = (150 + 54 * p.names.size).dp.coerceAtMost(520.dp)) {
         Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Parámetros", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.text)
-            Text("Escribe cada valor como SQL: 5, 'texto', now(), NULL.", fontSize = 12.sp, color = c.textSecondary)
+            Text(tr("Parámetros"), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.text)
+            Text(tr("Escribe cada valor como SQL: 5, 'texto', now(), NULL."), fontSize = 12.sp, color = c.textSecondary)
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 p.names.forEachIndexed { i, name ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -48,8 +49,8 @@ fun ParamDialog(state: AppState) {
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                TextAction("Cancelar", { state.paramPrompt = null }, Modifier.testTag("param-cancel"))
-                TextAction("Ejecutar", ::run, Modifier.testTag("param-ok"), enabled = ready, primary = true)
+                TextAction(tr("Cancelar"), { state.paramPrompt = null }, Modifier.testTag("param-cancel"))
+                TextAction(tr("Ejecutar"), ::run, Modifier.testTag("param-ok"), enabled = ready, primary = true)
             }
         }
     }

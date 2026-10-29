@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -107,14 +108,14 @@ class ContentDiffJob(
                 listOfNotNull(statements.size.takeIf { it > HISTORY_MAX }?.let { HistoryEntry(now, "-- y ${it - HISTORY_MAX} sentencias más de la sincronización", 0, outcome.isSuccess) })
             record(ds.id, shown)
             syncing = false
-            outcome.onSuccess { compare(); syncMessage = "Sincronizado: ${statements.size} sentencias aplicadas en ${ds.name}" }
-                .onFailure { error = "No se aplicó nada: ${it.message}" }
+            outcome.onSuccess { compare(); syncMessage = tr("Sincronizado: %d sentencias aplicadas en %s", statements.size, ds.name) }
+                .onFailure { error = tr("No se aplicó nada: %s", it.message) }
         }
     }
 
     fun compare() {
         val r = rightTables.getOrNull(rightTableIndex); val rs = right
-        if (r == null || rs == null || running) { error = error ?: "Elige la tabla de la derecha"; return }
+        if (r == null || rs == null || running) { error = error ?: tr("Elige la tabla de la derecha"); return }
         running = true; error = null; syncMessage = null; cancelled = false; result = null; partial = false
         scope.launch {
             runCatching {
@@ -126,7 +127,7 @@ class ContentDiffJob(
                 }
             }.onSuccess { (diff, target) ->
                 comparedRight = r; comparedTarget = target; partial = cancelled; result = diff
-                if (cancelled) error = "Comparación cancelada: el resultado es parcial"
+                if (cancelled) error = tr("Comparación cancelada: el resultado es parcial")
             }
                 .onFailure { error = it.message ?: it.toString() }
             running = false

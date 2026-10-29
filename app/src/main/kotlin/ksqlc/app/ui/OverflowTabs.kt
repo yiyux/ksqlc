@@ -1,5 +1,6 @@
 package ksqlc.app.ui
 
+import ksqlc.core.tr
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +48,7 @@ fun OverflowTabs(tabs: List<TabSpec>, modifier: Modifier = Modifier, height: Dp 
             }
         }
         if (hiddenTabs.isNotEmpty()) Box {
-            ToolButton(IconKind.ChevronDown, "Mostrar pestañas ocultas", { menu = true }, Modifier.testTag("tabs-overflow"))
+            ToolButton(IconKind.ChevronDown, tr("Mostrar pestañas ocultas"), { menu = true }, Modifier.testTag("tabs-overflow"))
             DropdownMenu(menu, { menu = false }) {
                 hiddenTabs.forEach { i ->
                     val t = tabs[i]
@@ -56,7 +57,7 @@ fun OverflowTabs(tabs: List<TabSpec>, modifier: Modifier = Modifier, height: Dp 
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 t.icon?.let { KIcon(it, tint = Ksqlc.colors.textSecondary, size = 14.dp) }
                                 Text(t.title, fontSize = 13.sp, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                                t.onClose?.let { close -> ToolButton(IconKind.Close, "Cerrar ${t.title}", { close(); if (hiddenTabs.size <= 1) menu = false }, Modifier.size(18.dp)) }
+                                t.onClose?.let { close -> ToolButton(IconKind.Close, tr("Cerrar %s", t.title), { close(); if (hiddenTabs.size <= 1) menu = false }, Modifier.size(18.dp)) }
                             }
                         },
                         modifier = Modifier.testTag("tabs-hidden:$i"),

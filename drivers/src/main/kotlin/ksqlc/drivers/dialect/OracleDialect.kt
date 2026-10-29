@@ -114,10 +114,10 @@ object OracleDialect : MetaDialect() {
     }
 
     override fun call(conn: Connection, o: DbObject): List<String> {
-        val type = conn.query("select object_type from all_objects where owner = ? and object_name = ? and object_type in ('PROCEDURE','FUNCTION')", o.ns.schema, o.name) { it.getString(1) }.firstOrNull() ?: error("${o.name} no existe")
+        val type = conn.query("select object_type from all_objects where owner = ? and object_name = ? and object_type in ('PROCEDURE','FUNCTION')", o.ns.schema, o.name) { it.getString(1) }.firstOrNull() ?: error(tr("%s no existe", o.name))
         // position 0 is a function's return value
         val params = conn.query("select argument_name, in_out from all_arguments where owner = ? and object_name = ? and package_name is null and data_level = 0 and position > 0 order by position", o.ns.schema, o.name) { it.getString(1) to it.getString(2) }
-        if (params.any { it.second != "IN" }) error("tiene parámetros de salida y todavía no se pueden pedir")
+        if (params.any { it.second != "IN" }) error(tr("tiene parámetros de salida y todavía no se pueden pedir"))
         val args = placeholders(params.map { it.first }).joinToString(", ")
         return listOf(if (type == "FUNCTION") "select ${qualified(o)}($args) as ${quote(o.name)} from dual" else "begin ${qualified(o)}($args); end;")
     }
@@ -128,7 +128,7 @@ object OracleDialect : MetaDialect() {
             DbObjectKind.VIEW -> "VIEW"
             DbObjectKind.MATERIALIZED_VIEW -> "MATERIALIZED_VIEW"
             DbObjectKind.SEQUENCE -> "SEQUENCE"
-            DbObjectKind.ROUTINE -> conn.query("select object_type from all_objects where owner = ? and object_name = ? and object_type in ('PROCEDURE','FUNCTION')", o.ns.schema, o.name) { it.getString(1) }.firstOrNull() ?: error("${o.name} no existe")
+            DbObjectKind.ROUTINE -> conn.query("select object_type from all_objects where owner = ? and object_name = ? and object_type in ('PROCEDURE','FUNCTION')", o.ns.schema, o.name) { it.getString(1) }.firstOrNull() ?: error(tr("%s no existe", o.name))
         }
         // readable text: no storage or tablespace clauses, statements ended with ';'
         conn.createStatement().use { st ->
@@ -142,7 +142,7 @@ object OracleDialect : MetaDialect() {
             )
         }
         fun get(type: String, name: String) = conn.query("select dbms_metadata.get_ddl(?, ?, ?) from dual", type, name, o.ns.schema) { it.getString(1) }.firstOrNull()?.trim()
-        val own = get(type, o.name) ?: error("${o.name} no existe")
+        val own = get(type, o.name) ?: error(tr("%s no existe", o.name))
         if (o.kind != DbObjectKind.TABLE) return own
         val extra = details(conn, o).indexes.filter { ix -> !conn.query("select 1 from all_constraints where owner = ? and constraint_name = ?", o.ns.schema, ix.name) { 1 }.any() }
             .mapNotNull { ix -> try { get("INDEX", ix.name) } catch (e: SQLException) { null } }

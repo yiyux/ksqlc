@@ -1,0 +1,603 @@
+SQL formateado	SQL formatted
+Listo	Ready
+«%s» tiene cambios sin enviar o sin confirmar.	"%s" has unsent or uncommitted changes.
+%s no está en el explorador	%s is not in the explorer
+Sin esquema cargado	No schema loaded
+No se encontró la declaración	Declaration not found
+Hay cambios sin enviar o transacciones sin confirmar.	There are unsent changes or uncommitted transactions.
+Conexión "%s" guardada	Connection "%s" saved
+Conexión eliminada	Connection deleted
+No se pudo guardar: %s	Could not save: %s
+Nada que ejecutar	Nothing to run
+Ejecutando…	Running…
+Celda %d	Cell %d
+%d filas afectadas	%d rows affected
+Error en una celda	Error in a cell
+%d celda(s) ejecutada(s)	%d cell(s) executed
+Nada que explicar	Nothing to explain
+%s no está disponible para %s	%s is not available for %s
+Esta sentencia se ejecutará de verdad para medirla y puede modificar datos.	This statement will actually be executed to measure it and may modify data.
+Ejecutar	Run
+Los resultados editados tienen cambios sin enviar o sin confirmar.	The edited results have unsent or uncommitted changes.
+Resultado %d	Result %d
+Cancelada	Cancelled
+Error en la sentencia %d de %d	Error in statement %d of %d
+%d sentencia(s) ejecutada(s)	%d statement(s) executed
+Error: %s	Error: %s
+Esquema cargado: %s	Schema loaded: %s
+No se pudo leer el esquema: %s	Could not read the schema: %s
+Desconectado	Disconnected
+No se pudo refrescar: %s	Could not refresh: %s
+Abriendo %s…	Opening %s…
+sin resultado	no result
+%s: %d filas%s	%s: %d rows%s
+No se pudo abrir %s: %s	Could not open %s: %s
+Consultando %s…	Querying %s…
+Envía o revierte los cambios pendientes antes de ordenar	Send or revert the pending changes before sorting
+Enviando cambios…	Sending changes…
+%s fila(s) modificadas, pendientes de confirmar (Commit)	%s row(s) modified, pending commit (Commit)
+%s fila(s) modificadas	%s row(s) modified
+Columna %s: %s	Column %s: %s
+-- sin cambios pendientes	-- no pending changes
+SQL pendiente	Pending SQL
+Commit: %s	Commit: %s
+Error en el commit: %s	Error on commit: %s
+Rollback: %s	Rollback: %s
+Error en el rollback: %s	Error on rollback: %s
+Commit	Commit
+Rollback	Rollback
+Confirma (Commit) o descarta (Rollback) los cambios antes de pasar a Auto	Commit or roll back the changes before switching to Auto
+Transacciones: %s	Transactions: %s
+manual	manual
+auto	auto
+Cambios sin guardar	Unsaved changes
+%s Si continúas se descartan.	%s If you continue, they will be discarded.
+Descartar	Discard
+No se pudo obtener el DDL de %s: %s	Could not get the DDL of %s: %s
+No se puede ejecutar %s: %s	Cannot run %s: %s
+Leyendo %s…	Reading %s…
+Este motor todavía no permite modificar tablas	This engine does not support modifying tables yet
+No se pudo leer %s: %s	Could not read %s: %s
+Cambios que pierden datos	Changes that lose data
+Aplicar	Apply
+Otra transacción (quizá una abierta en esta aplicación: confírmala o deshazla) tiene bloqueada la tabla.	Another transaction (perhaps one open in this application: commit or roll it back) has locked the table.
+Se aplicaron %d de %d sentencias; el resto no se ejecutó.\n	Applied %d of %d statements; the rest was not executed.\n
+No se pudo modificar la tabla: %s%s	Could not modify the table: %s%s
+Tabla modificada	Table modified
+No se pudo releer %s	Could not re-read %s
+No se pudo releer %s: %s	Could not re-read %s: %s
+Hecho: %s	Done: %s
+Ya hay una exportación en curso	An export is already in progress
+la consulta no devuelve filas	the query returns no rows
+Todas las filas vuelve a ejecutar la consulta en una conexión aparte (no ve tablas temporales ni ajustes hechos en la consola).	All rows re-runs the query on a separate connection (it does not see temporary tables or settings made in the console).
+Esta sentencia puede escribir datos y no se ejecuta de nuevo: solo se exportan las filas cargadas.	This statement may write data and is not run again: only the loaded rows are exported.
+Error al leer más filas: %s	Error reading more rows: %s
+Abrir archivo SQL	Open SQL file
+Abierto %s	Opened %s
+Conéctate primero	Connect first
+\n-- … y %d sentencias más	\n-- … and %d more statements
+-- sin cambios que aplicar	-- no changes to apply
+SQL de la sincronización	Synchronization SQL
+Sincronizar la tabla de la derecha	Synchronize the right-hand table
+En %s, %s: se insertarán %s filas, se actualizarán %s y se borrarán %s.\nSe aplica todo o nada.	In %s, %s: %s rows will be inserted, %s updated and %s deleted.\nEverything is applied or nothing is.
+SQL de la copia	Copy SQL
+No se pudo preparar la copia: %s	Could not prepare the copy: %s
+se añadirán a la tabla %s	will be added to table %s
+se creará la tabla %s y se copiarán a ella	table %s will be created and the rows copied to it
+Copiar tabla	Copy table
+Las filas de %s %s en %s.\nSe aplica todo o nada.	Rows from %s %s in %s.\nEverything is applied or nothing is.
+Copiar	Copy
+La conexión usa un túnel SSH: las herramientas de volcado se conectarían directamente	The connection uses an SSH tunnel: the dump tools would connect directly
+Tabla %s	Table %s
+Esquema %s	Schema %s
+Base de datos %s	Database %s
+Toda la base de datos	Entire database
+Restauración terminada	Restore finished
+Dump terminado	Dump finished
+No se pudieron leer las columnas de %s: %s	Could not read the columns of %s: %s
+El historial no está disponible	History is not available
+Conexión de la consola cerrada por inactividad; se abre de nuevo al ejecutar	Console connection closed due to inactivity; it reopens on the next run
+Servidor SSH desconocido	Unknown SSH server
+%s\n\nSi continúas, su clave se recuerda y se avisará si cambia.	%s\n\nIf you continue, its key is remembered and you will be warned if it changes.
+Confiar y continuar	Trust and continue
+Nueva conexión	New connection
+Conexión	Connection
+Solo lectura	Read-only
+Control de transacciones:	Transaction control:
+Zona horaria:	Time zone:
+p. ej. Europe/Madrid o +01:00; vacía = la del servidor	e.g. Europe/Madrid or +01:00; empty = the server's
+Consulta de keep-alive cada	Keep-alive query every
+Cerrar la consola tras	Close the console after
+s sin uso	s idle
+Modo de un solo keyspace	Single keyspace mode
+Mostrar solo el esquema del usuario	Show only the user's schema
+Modo de una sola base de datos	Single database mode
+Script de inicio:	Startup script:
+Se ejecuta cada vez que se abre una conexión (consola y pestañas de tabla).	Runs every time a connection is opened (console and table tabs).
+Introspección	Introspection
+Sincronizar el explorador tras cambiar el esquema	Sync the explorer after changing the schema
+Intervalo de introspección automática:	Automatic introspection interval:
+minutos (vacío = nunca)	minutes (empty = never)
+Mostrar:	Show:
+Patrón:	Pattern:
+Todos	All
+Solo los elegidos	Only the selected
+p. ej. app_*, ventas (con * y ?; vacío = ninguno)	e.g. app_*, sales (with * and ?; empty = none)
+Leyendo…	Reading…
+Leer esquemas del servidor	Read schemas from the server
+%d elegidos	%d selected
+Lee los esquemas del servidor para elegir cuáles mostrar; los de sistema también salen en la lista.	Read the schemas from the server to choose which ones to show; system schemas also appear in the list.
+Desactivado	Disabled
+Cifrado	Encrypted
+Verificar CA	Verify CA
+CA y host	CA and host
+Túnel SSH	SSH tunnel
+SQLite abre un archivo local: no usa red.	SQLite opens a local file: it does not use the network.
+El túnel necesita una conexión definida con host y puerto; con «Solo URL» no está disponible.	The tunnel needs a connection defined with host and port; it is not available with "URL only".
+Usar túnel SSH	Use SSH tunnel
+Puerto:	Port:
+Usuario:	User:
+Autenticación:	Authentication:
+Contraseña	Password
+Clave privada	Private key
+Archivo de clave:	Key file:
+Elegir archivo…	Choose file…
+Clave privada SSH	SSH private key
+servidor intermedio	jump server
+Frase de la clave:	Key passphrase:
+Contraseña:	Password:
+<oculta>	<hidden>
+La base de datos se alcanza desde el servidor SSH (el host y puerto de General son los que ve ese servidor). Un servidor nuevo se confirma la primera vez y su clave se guarda en ~/.ksqlc/known_hosts. La contraseña se guarda en el llavero.	The database is reached from the SSH server (the host and port in General are the ones that server sees). A new server is confirmed the first time and its key is saved in ~/.ksqlc/known_hosts. The password is saved in the keychain.
+Oracle necesita un listener TCPS y una cartera de certificados, que aquí no se configuran.	Oracle needs a TCPS listener and a certificate wallet, which are not configured here.
+Con «Solo URL» los parámetros SSL van en la propia URL.	With "URL only", the SSL parameters go in the URL itself.
+Modo:	Mode:
+Certificado de la CA:	CA certificate:
+Certificado de la CA	CA certificate
+Certificado de cliente:	Client certificate:
+Certificado de cliente	Client certificate
+opcional (PEM)	optional (PEM)
+Clave de cliente:	Client key:
+Clave de cliente	Client key
+opcional (PEM sin frase de paso)	optional (PEM without passphrase)
+«Cifrado» usa HTTPS con el almacén de confianza de Java; Trino exige HTTPS para enviar una contraseña.	"Encrypted" uses HTTPS with the Java trust store; Trino requires HTTPS to send a password.
+Cassandra cifra con el almacén de confianza de Java; no se comprueban archivos propios.	Cassandra encrypts with the Java trust store; custom files are not checked.
+«Cifrado» acepta cualquier certificado del servidor; «Verificar» lo comprueba con la CA indicada, o con el almacén de Java si no hay ninguna.	"Encrypted" accepts any server certificate; "Verify" checks it against the given CA, or against the Java trust store if there is none.
+«Cifrado» no comprueba el certificado del servidor. «Verificar CA» lo comprueba con la CA indicada; «y nombre» exige además que el certificado sea para el host.	"Encrypted" does not check the server certificate. "Verify CA" checks it against the given CA; "and host" also requires the certificate to be for the host.
+ Con túnel SSH el nombre que se comprueba es 127.0.0.1, el extremo local del túnel.	 With an SSH tunnel the name that is checked is 127.0.0.1, the local end of the tunnel.
+Cerrar	Close
+Añadir data source	Add data source
+Eliminar data source	Remove data source
+Duplicar data source	Duplicate data source
+ (copia)	 (copy)
+Data sources del proyecto	Project data sources
+Nombre:	Name:
+Opciones	Options
+Esquemas	Schemas
+Carpeta:	Folder:
+ninguna	none
+Color:	Color:
+Motor:	Engine:
+Tipo de conexión:	Connection type:
+predeterminado	default
+Solo URL	URL only
+Catálogo/esquema:	Catalog/schema:
+Base de datos:	Database:
+Archivo:	File:
+vacío = memoria compartida	empty = shared memory
+Datacenter local:	Local datacenter:
+Sustituye los ajustes anteriores	Overrides the settings above
+Probando…	Testing…
+Probar conexión	Test connection
+Cancelar	Cancel
+Abrir en consola	Open in console
+Cargar «%s» desde un archivo	Load "%s" from a file
+El archivo pesa más de %d MB: no se carga en una celda	The file is larger than %d MB: it is not loaded into a cell
+No se pudo leer el archivo: %s	Could not read the file: %s
+Guardar «%s» en un archivo	Save "%s" to a file
+%d bytes guardados en %s	%d bytes saved to %s
+«%s» es una columna binaria (%s): no se puede editar como texto	"%s" is a binary column (%s): it cannot be edited as text
+%s de 	%s of 
+%d filas%s	%d rows%s
+La celda no tiene contenido binario	The cell has no binary content
+No se pueden editar las filas de esta tabla	The rows of this table cannot be edited
+La fila está marcada para borrar: revierte los cambios para editarla	The row is marked for deletion: revert the changes to edit it
+Editar	Edit
+Editar en ventana…	Edit in window…
+Cargar desde archivo…	Load from file…
+Guardar en archivo…	Save to file…
+Poner NULL	Set NULL
+Valor por defecto	Default value
+Cargando…	Loading…
+Cargar más	Load more
+recortado	truncated
+Nuevo data source…	New data source…
+Ajustes	Settings
+sistema	system
+claro	light
+oscuro	dark
+Tema: %s	Theme: %s
+Nueva consola SQL sobre %s	New SQL console on %s
+Ejecutar (⌘↵)	Run (⌘↵)
+Ejecutar script (⌘⇧↵)	Run script (⌘⇧↵)
+Explain: plan de ejecución	Explain: execution plan
+Explain analyze: ejecuta y mide	Explain analyze: runs and measures
+Modo notebook: una celda por sentencia, con su resultado debajo	Notebook mode: one cell per statement, with its result below
+Formatear SQL (⌘⌥L)	Format SQL (⌘⌥L)
+Abrir archivo SQL…	Open SQL file…
+Historial (⌥⌘E)	History (⌥⌘E)
+Dialecto: %s	Dialect: %s
+Automático (el de la conexión)	Automatic (the connection's)
+Exportando %s: %s filas…	Exporting %s: %s rows…
+Cancelar exportación	Cancel export
+Recargar	Reload
+Envía o revierte los cambios pendientes antes de recargar	Submit or revert the pending changes before reloading
+Exportar datos…	Export data…
+Añadir fila	Add row
+Borrar filas seleccionadas	Delete selected rows
+Revertir cambios	Revert changes
+Ver SQL de los cambios	View SQL of the changes
+Enviar cambios	Submit changes
+%s cambio(s) sin enviar	%s unsubmitted change(s)
+Borrar %s	Clear %s
+Tx: Manual	Tx: Manual
+Tx: Auto	Tx: Auto
+Auto	Auto
+Manual	Manual
+Nuevo data source	New data source
+Propiedades del data source	Data source properties
+Refrescar	Refresh
+Filtrar	Filter
+Mostrar esquemas de sistema	Show system schemas
+Buscar tabla o vista (⌘⇧O)	Find table or view (⌘⇧O)
+Desconectar	Disconnect
+Leyendo el esquema…	Reading the schema…
+Sin data sources. Añade uno, o ejecuta SQL en la consola para conectar.	No data sources. Add one, or run SQL in the console to connect.
+Conectar	Connect
+Nueva consola SQL	New SQL console
+Sin esquemas	No schemas
+Nada coincide con «%s» (solo se filtra lo ya cargado)	Nothing matches "%s" (only what is already loaded is filtered)
+Abrir datos	Open data
+Importar CSV…	Import CSV…
+Dump con la herramienta del motor…	Dump with the engine's tool…
+Ejecutar…	Run…
+Modificar…	Modify…
+Comparar esquema con…	Compare schema with…
+Comparar contenido con…	Compare content with…
+Copiar tabla a…	Copy table to…
+Ver DDL	View DDL
+Copiar nombre	Copy name
+Eliminar índice…	Drop index…
+Eliminar el índice %s	Drop index %s
+Eliminar clave foránea…	Drop foreign key…
+Eliminar la clave foránea %s	Drop foreign key %s
+Vaciar tabla…	Truncate table…
+Vaciar %s	Truncate %s
+Refrescar vista materializada	Refresh materialized view
+Refrescar %s	Refresh %s
+Eliminar…	Drop…
+Eliminar %s	Drop %s
+Restaurar con la herramienta del motor…	Restore with the engine's tool…
+Comparar con…	Compare with…
+Tablas	Tables
+Vistas	Views
+Vistas materializadas	Materialized views
+Secuencias	Sequences
+Rutinas	Routines
+Columnas (%d)	Columns (%d)
+Índices (%d)	Indexes (%d)
+Claves foráneas (%d)	Foreign keys (%d)
+Contraseñas protegidas	Protected passwords
+Contraseña maestra	Master password
+Continuar sin contraseñas	Continue without passwords
+Desbloquear	Unlock
+Filtro local de '%s'	Local filter for '%s'
+Valor	Value
+Cantidad	Count
+Marca una casilla para filtrar las filas	Check a box to filter the rows
+Hoy	Today
+Ahora	Now
+Aceptar	OK
+Formatear JSON	Format JSON
+No es un JSON válido	Not valid JSON
+Cerrar %s	Close %s
+Mostrar pestañas ocultas	Show hidden tabs
+ (cancelado)	 (cancelled)
+ (límite de %s filas)	 (limit of %s rows)
+ ni 	 or 
+ · %s filas	 · %s rows
+ · desactualizado	 · outdated
+%d filas	%d rows
+%s es una vista: solo lectura	%s is a view: read-only
+%s filas exportadas a %s	%s rows exported to %s
+%s filas importadas en %s	%s rows imported into %s
+%s filas…	%s rows…
+%s no tiene clave primaria: se pueden añadir filas, pero no editar ni borrar las existentes	%s has no primary key: rows can be added, but existing ones cannot be edited or deleted
+%s/%s objetos	%s/%s objects
+(omitir)	(skip)
+(sin nombre)	(unnamed)
++ Celda	+ Cell
+-- sin cambios	-- no changes
+A	To
+Actualizar (%s)	Update (%s)
+Al portapapeles van como máximo %s filas.	At most %s rows go to the clipboard.
+Alguna tabla tiene más filas de las que se leen: las que faltan a un lado pueden ser filas no leídas.	A table has more rows than are read: rows missing on one side may be rows that were not read.
+Almacenada	Stored
+Aquí aparece el registro de las sentencias ejecutadas.	The log of executed statements appears here.
+Archivo de contraseñas	Password file
+Archivo de salida:	Output file:
+Añadir	Add
+Añadir cabecera de columnas	Add column header
+Añadir cabecera de filas	Add row header
+Añadir columna	Add column
+Aún no se ha ejecutado nada.	Nothing has been run yet.
+Bajar	Move down
+Base de datos referida:	Referenced database:
+Buscar tabla o vista	Search table or view
+Buscar…	Search…
+Caché:	Cache:
+Cancelado	Cancelled
+Cifrado con AES-256-GCM; la clave sale de la contraseña maestra, que no se guarda en ningún sitio. Si la olvidas, las contraseñas de ese archivo no se pueden recuperar.	Encrypted with AES-256-GCM; the key is derived from the master password, which is not stored anywhere. If you forget it, the passwords in that file cannot be recovered.
+Clave: %s · iguales %s · distintas %s · solo a la izquierda %s · solo a la derecha %s	Key: %s · same %s · different %s · only on the left %s · only on the right %s
+Columna %d	Column %d
+Columnas	Columns
+Columnas que no se comparan — solo a la izquierda: %s; solo a la derecha: %s	Columns that are not compared — only on the left: %s; only on the right: %s
+Columnas referidas:	Referenced columns:
+Columnas:	Columns:
+Coma	Comma
+Comentario:	Comment:
+Comparación cancelada: el resultado es parcial	Comparison cancelled: the result is partial
+Comparación cancelada: solo se muestran %d objetos	Comparison cancelled: only %d objects are shown
+Comparar	Compare
+Comparar contenido	Compare content
+Comparar esquemas	Compare schemas
+Con error	With error
+Condición:	Condition:
+Conecta para buscar objetos.	Connect to search for objects.
+Contraseña maestra:	Master password:
+Contraseñas	Passwords
+Copia cancelada: no se aplicó nada	Copy cancelled: nothing was applied
+Copiadas %s filas a %s en %s	%s rows copied to %s in %s
+Copiadas %s filas…	%s rows copied…
+Copiar DDL derecho	Copy right DDL
+Copiar DDL izquierdo	Copy left DDL
+Copiar al portapapeles	Copy to clipboard
+Cíclica	Cycle
+De %s · %s.%s	From %s · %s.%s
+Diferible	Deferrable
+Dump con la herramienta del motor	Dump with the engine tool
+Duplicar	Duplicate
+Ejecutar celda (⇧↵)	Run cell (⇧↵)
+El cambio se aplica al reiniciar la aplicación.	The change takes effect when the application restarts.
+Elige el archivo que restaurar	Choose the file to restore
+Elige el archivo.	Choose the file.
+Elige el esquema de destino	Choose the destination schema
+Elige la tabla de destino	Choose the destination table
+Elige la tabla de la derecha	Choose the table on the right
+Elige la tabla de la derecha y pulsa Comparar.	Choose the table on the right and press Compare.
+Elige los dos lados y pulsa Comparar.	Choose both sides and press Compare.
+Elige un archivo CSV que se pueda leer	Choose a CSV file that can be read
+Elige un archivo para ver su contenido.	Choose a file to see its contents.
+Elige un elemento de la lista o pulsa + para añadir uno.	Select an item from the list or press + to add one.
+Elige un esquema a cada lado	Choose a schema on each side
+Eliminar (%s)	Delete (%s)
+Eliminar celda	Delete cell
+En curso…	In progress…
+En el llavero del sistema	In the system keychain
+En un archivo cifrado	In an encrypted file
+Error al exportar: %s	Export error: %s
+Error al importar: %s	Import error: %s
+Escribe cada valor como SQL: 5, 'texto', now(), NULL.	Enter each value as SQL: 5, 'text', now(), NULL.
+Escribe la contraseña maestra.	Enter the master password.
+Esquema referido:	Referenced schema:
+Exportar	Export
+Exportar a archivo	Export to file
+Exportar datos	Export data
+Exportar resultado…	Export result…
+Expresión:	Expression:
+Extractor:	Format:
+Fecha de hoy	Today's date
+Fecha y hora actual	Current date and time
+Filas:	Rows:
+Formato personalizado (-F c)	Custom format (-F c)
+Formato personalizado (pg_restore)	Custom format (pg_restore)
+Fuera de este diálogo y sin tocar: %s.	Outside this dialog and left untouched: %s.
+Generada como:	Generated as:
+Generar UUID	Generate UUID
+Guardar contraseñas:	Save passwords:
+Guardar dump	Save dump
+Herramienta:	Tool:
+Historial — %s	History — %s
+Idioma:	Language:
+Importar	Import
+Importar CSV	Import CSV
+Importar CSV — %s	Import CSV — %s
+Incluir DROP antes de crear	Include DROP before CREATE
+Incluir columnas:	Include columns:
+Indica el archivo de destino	Specify the destination file
+Inicialmente diferida	Initially deferred
+Insertar (%s)	Insert (%s)
+Insertar en consola	Insert into console
+Instálala (por ejemplo con Homebrew) o escribe su ruta completa.	Install it (for example with Homebrew) or enter its full path.
+Interfaz	Interface
+La conexión es de solo lectura	The connection is read-only
+La herramienta terminó con el código %s (ver Output)	The tool exited with code %s (see Output)
+La primera fila es la cabecera	The first row is the header
+La salida de la herramienta aparece en Output. La contraseña se pasa por variable de entorno, no en la línea de comandos.	The tool output appears in Output. The password is passed through an environment variable, not on the command line.
+La salida de la herramienta aparece en Output. Usa una herramienta de la misma versión mayor que el servidor o más nueva para volcar, y del servidor o más nueva para restaurar.	The tool output appears in Output. Use a tool of the same major version as the server or newer to dump, and the server's version or newer to restore.
+Las contraseñas maestras no coinciden.	The master passwords do not match.
+Leyendo las filas…	Reading rows…
+Modificar %s	Modify %s
+MySQL y MariaDB confirman cada sentencia: si una falla, las anteriores quedan aplicadas.	MySQL and MariaDB commit each statement: if one fails, the previous ones stay applied.
+Máximo:	Maximum:
+Método de acceso:	Access method:
+Mínimo:	Minimum:
+No guardar, olvidar las contraseñas al reiniciar	Do not save, forget passwords on restart
+No hay diferencias.	No differences.
+No hay objetos que comparar.	There are no objects to compare.
+No se aplicó nada: %s	Nothing was applied: %s
+No se encontró %s: indica su ruta	%s not found: specify its path
+Ocultar	Hide
+Ocultar Services	Hide Services
+Ocultar iguales	Hide identical
+Origen:	Source:
+Parámetros	Parameters
+Paso:	Step:
+Primaria	Primary
+Primeras %d filas	First %d rows
+Punto y coma	Semicolon
+Quitar	Remove
+Repetir:	Repeat:
+Restaurar	Restore
+Restaurar con la herramienta del motor	Restore with the engine tool
+Salir	Quit
+Salir de ksqlc	Quit ksqlc
+Se añadirán las filas a %s	The rows will be added to %s
+Se borran las %d sentencias guardadas de %s.	The %d saved statements of %s will be deleted.
+Se creará la tabla %s	Table %s will be created
+Se ejecutará %s sobre la base de datos activa (%s). Puede sobrescribir datos.	%s will be run against the active database (%s). It may overwrite data.
+Separador:	Separator:
+Siempre (always)	Always (always)
+Sin coincidencias.	No matches.
+Sin resultados	No results
+Sincronizado: %d sentencias aplicadas en %s	Synchronized: %d statements applied in %s
+Sincronizando…	Synchronizing…
+Sincronizar derecha	Synchronize right
+Solo datos	Data only
+Solo esquema	Schema only
+Solo las %s cargadas	Only the %s loaded
+Subir	Move up
+Tabla referida:	Referenced table:
+Tabulador	Tab
+Tipo de dato:	Data type:
+Todas las filas de la consulta	All rows of the query
+Transponer	Transpose
+Un campo vacío entra como NULL. Todo se inserta en una transacción: si una fila falla, no se guarda ninguna.	An empty field is inserted as NULL. Everything is inserted in one transaction: if a row fails, none is saved.
+Vaciar	Clear
+Vaciar historial	Clear history
+Valor por defecto:	Default value:
+Ver SQL	View SQL
+Vista previa	Preview
+Vista previa:	Preview:
+Volcar	Dump
+archivo .sql o .dump	.sql or .dump file
+clase op.	op. class
+claves	keys
+claves foráneas	foreign keys
+colación	collation
+columna %s: %s	column %s: %s
+columna o expresión	column or expression
+columnas	columns
+destino del volcado	dump destination
+el portapapeles	the clipboard
+error	error
+no se encuentra %s	%s not found
+nombre de la tabla	table name
+p. ej. (activo)	e.g. (active)
+p. ej. (precio > 0)	e.g. (price > 0)
+primaria 	primary 
+ruta del archivo .csv	path of the .csv file
+solo al crear la columna	only when creating the column
+¿Seguro que quieres cerrar la aplicación?	Are you sure you want to close the application?
+Ámbito:	Scope:
+Ámbito: %s	Scope: %s
+Único	Unique
+índices	indexes
+único 	unique 
+— (no existe)	— (does not exist)
+↵ abrir datos · ⇧↵ mostrar en el explorador · Esc cerrar	↵ open data · ⇧↵ show in explorer · Esc close
+%s es una tabla temporal (system-versioned) y todavía no se puede modificar	%s is a temporal (system-versioned) table and cannot be modified yet
+%s está optimizada para memoria y todavía no se puede modificar	%s is memory-optimized and cannot be modified yet
+%s no existe	%s does not exist
+%s no existe o su definición está cifrada	%s does not exist or its definition is encrypted
+%s no tiene keyspace	%s has no keyspace
+%s no tiene una herramienta de volcado compatible	%s has no supported dump tool
+%s: la consulta no devolvió filas	%s: the query returned no rows
+Alguna tabla tiene más filas de las que se leen: lo que parece faltar a un lado puede ser una fila sin leer	A table has more rows than are read: what seems to be missing on one side may be a row that was not read
+Cassandra y Trino no tienen transacciones: una copia que falle a medias dejaría filas	Cassandra and Trino have no transactions: a copy that fails halfway would leave rows behind
+Contraseña maestra incorrecta	Incorrect master password
+Copia cancelada	Copy cancelled
+El check %s no tiene expresión	Check %s has no expression
+El nombre de restricción %s está repetido	Constraint name %s is duplicated
+El túnel SSH necesita una conexión definida con host y puerto, no una URL manual	The SSH tunnel needs a connection defined with host and port, not a manual URL
+El índice %s tiene una columna vacía o ninguna	Index %s has an empty column or none
+El índice %s usa la columna %s, que no existe	Index %s uses column %s, which does not exist
+Este motor no puede crear tablas	This engine cannot create tables
+Este motor no puede modificar tablas	This engine cannot modify tables
+Este motor no tiene rutinas que ejecutar	This engine has no routines to run
+Falló el script de inicio: %s	The startup script failed: %s
+Falta el archivo de la clave privada	The private key file is missing
+Falta el host del servidor SSH	The SSH server host is missing
+Falta la columna de la clave %s	Key column %s is missing
+Hay %d filas distintas y se sincronizan %d como mucho de una vez	There are %d differing rows and at most %d are synced at a time
+La base SQLite está en memoria	The SQLite database is in memory
+La clave %s no tiene columnas	Key %s has no columns
+La clave %s usa la columna %s, que no existe	Key %s uses column %s, which does not exist
+La clave foránea %s necesita tantas columnas referidas como propias	Foreign key %s needs as many referenced columns as its own
+La clave foránea %s necesita una clave o un índice que empiece por sus columnas	Foreign key %s needs a key or an index that starts with its columns
+La clave foránea %s no dice a qué tabla apunta	Foreign key %s does not say which table it points to
+La clave foránea %s no tiene columnas	Foreign key %s has no columns
+La clave foránea %s usa la columna %s, que no existe	Foreign key %s uses column %s, which does not exist
+La clave primaria de la derecha (%s) no es la de la izquierda (%s): un cambio podría tocar varias filas	The right-hand primary key (%s) is not the left-hand one (%s): a change could touch several rows
+La clave se repite en la tabla de la derecha: %s	The key is repeated in the right-hand table: %s
+La columna %s es %s y tiene que ser la primera de una clave o de un índice	Column %s is %s and must be the first column of a key or an index
+La columna %s es identity y tiene que ser not null	Column %s is identity and must be not null
+La columna %s está repetida	Column %s is duplicated
+La columna %s no tiene tipo	Column %s has no type
+La columna de la clave %s no existe en %s	Key column %s does not exist in %s
+La comparación se canceló: faltan filas por leer y no se puede sincronizar	The comparison was cancelled: some rows were not read, so it cannot be synced
+La conexión de destino es de solo lectura	The target connection is read-only
+La conexión de la derecha es de solo lectura	The right-hand connection is read-only
+La conexión es de solo lectura: solo se permiten consultas (SELECT, WITH, SHOW, EXPLAIN…)	The connection is read-only: only queries are allowed (SELECT, WITH, SHOW, EXPLAIN…)
+La conexión usa una URL manual: define host, puerto y base de datos en el formulario	The connection uses a manual URL: set host, port and database in the form
+La tabla %s no tiene clave primaria	Table %s has no primary key
+La tabla de destino no existe y no se crea entre motores distintos: los tipos no se traducen	The target table does not exist and is not created between different engines: types are not translated
+La tabla necesita al menos una columna	The table needs at least one column
+La tabla necesita un nombre	The table needs a name
+La tabla no tiene esquema	The table has no schema
+Las tablas no tienen ninguna columna con el mismo nombre	The tables have no column with the same name
+No hay diferencias que sincronizar	There are no differences to sync
+No se pudo abrir el túnel SSH: %s	Could not open the SSH tunnel: %s
+SQL Server no puede añadir ni quitar identity a la columna %s, que ya existe	SQL Server cannot add or remove identity on column %s, which already exists
+SQLite no puede volcar solo los datos	SQLite cannot dump data only
+Se cambia el tipo de la columna %s de %s a %s; los valores que no quepan darán error o se perderán.	The type of column %s changes from %s to %s; values that do not fit will cause errors or be lost.
+Se elimina la columna %s con todos sus datos.	Column %s is dropped along with all its data.
+Solo puede haber una clave primaria	There can be only one primary key
+Solo puede haber una columna %s	There can be only one %s column
+Trino no tiene %s como objeto con DDL	Trino has no %s as an object with DDL
+Un check no tiene nombre	A check has no name
+Un índice no tiene nombre	An index has no name
+Una clave foránea no tiene nombre	A foreign key has no name
+Una clave no tiene nombre	A key has no name
+Una columna no tiene nombre	A column has no name
+el formato personalizado es solo de PostgreSQL	the custom format is PostgreSQL only
+el nombre de la tabla lleva una comilla simple	the table name contains a single quote
+el servidor SSH rechazó las credenciales	the SSH server rejected the credentials
+fila %s, columna %s: %s	row %s, column %s: %s
+la clave de «%s» tiene frase de paso: quítala con `openssl pkcs8 -topk8 -nocrypt`	the key in “%s” has a passphrase: remove it with `openssl pkcs8 -topk8 -nocrypt`
+la clave del servidor SSH ha cambiado respecto a la guardada: puede ser un ataque; borra su línea de %s si el cambio es legítimo	the SSH server key has changed from the saved one: this may be an attack; delete its line from %s if the change is legitimate
+la clave primaria %s no está entre las columnas	primary key %s is not among the columns
+la columna %s está asignada más de una vez	column %s is assigned more than once
+la tabla no tiene clave primaria	the table has no primary key
+las colecciones, tuplas y tipos de usuario no se pueden editar aquí; usa una sentencia CQL	collections, tuples and user-defined types cannot be edited here; use a CQL statement
+las columnas binarias no se pueden editar	binary columns cannot be edited
+ninguna columna del archivo va a una columna de la tabla	no column in the file maps to a table column
+no hay herramienta de restauración para %s	no restore tool for %s
+no hay herramienta de volcado para %s	no dump tool for %s
+no se confió en la clave del servidor SSH	the SSH server key was not trusted
+tiene parámetros de salida y todavía no se pueden pedir	it has output parameters and they cannot be requested yet
+tipo de clave privada no admitido	unsupported private key type
+un UUID	a UUID
+un booleano (true/false)	a boolean (true/false)
+un entero	an integer
+un número	a number
+una dirección IP	an IP address
+una fecha (aaaa-mm-dd hh:mm:ss)	a date (yyyy-mm-dd hh:mm:ss)
+una fecha (aaaa-mm-dd)	a date (yyyy-mm-dd)
+una fecha y hora (aaaa-mm-dd hh:mm:ss)	a date and time (yyyy-mm-dd hh:mm:ss)
+una fecha y hora con zona (2026-01-31 10:00:00+01:00)	a date and time with time zone (2026-01-31 10:00:00+01:00)
+una hora (hh:mm:ss)	a time (hh:mm:ss)
+valor no válido	invalid value
+«%s» no contiene ningún certificado PEM	“%s” contains no PEM certificate
+«%s» no es %s	“%s” is not %s
+«%s» no es una clave PEM admitida (PKCS#8 o RSA); conviértela con `openssl pkcs8 -topk8 -nocrypt`	“%s” is not a supported PEM key (PKCS#8 or RSA); convert it with `openssl pkcs8 -topk8 -nocrypt`
+«solo esquema» y «solo datos» a la vez no tienen sentido	“schema only” and “data only” together make no sense

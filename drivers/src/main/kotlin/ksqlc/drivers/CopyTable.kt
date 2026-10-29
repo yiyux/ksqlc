@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import ksqlc.core.DbKind
 import ksqlc.core.DbObject
 import ksqlc.core.StatementResult
@@ -14,10 +16,10 @@ class CopyColumns(val from: List<String>, val to: List<String>)
  * otherwise it is created, which only works between tables of the same engine because column types are not translated.
  */
 fun copyProblem(source: DbKind, target: DbKind, targetReadOnly: Boolean, targetExists: Boolean, columns: CopyColumns?): String? = when {
-    setOf(DbKind.CASSANDRA, DbKind.TRINO).any { it in setOf(source, target) } -> "Cassandra y Trino no tienen transacciones: una copia que falle a medias dejaría filas"
-    targetReadOnly -> "La conexión de destino es de solo lectura"
-    !targetExists && !sameEngine(source, target) -> "La tabla de destino no existe y no se crea entre motores distintos: los tipos no se traducen"
-    columns != null && columns.from.isEmpty() -> "Las tablas no tienen ninguna columna con el mismo nombre"
+    setOf(DbKind.CASSANDRA, DbKind.TRINO).any { it in setOf(source, target) } -> tr("Cassandra y Trino no tienen transacciones: una copia que falle a medias dejaría filas")
+    targetReadOnly -> tr("La conexión de destino es de solo lectura")
+    !targetExists && !sameEngine(source, target) -> tr("La tabla de destino no existe y no se crea entre motores distintos: los tipos no se traducen")
+    columns != null && columns.from.isEmpty() -> tr("Las tablas no tienen ninguna columna con el mismo nombre")
     else -> null
 }
 
@@ -58,12 +60,12 @@ fun copyRows(
     val result = runCatching {
         when (val r = from.runScript(listOf(sql), keepRows = 0).single()) {
             is StatementResult.Failed -> error("${source.name}: ${r.message}")
-            is StatementResult.Updated -> error("${source.name}: la consulta no devolvió filas")
+            is StatementResult.Updated -> error(tr("%s: la consulta no devolvió filas", source.name))
             is StatementResult.Rows -> r.cursor.use { c ->
                 var buffer = emptyList<List<Any?>>().iterator()
                 val rows = object : Iterator<List<Any?>> {
                     override fun hasNext(): Boolean {
-                        if (cancelled()) throw CancellationException("Copia cancelada")
+                        if (cancelled()) throw CancellationException(tr("Copia cancelada"))
                         if (!buffer.hasNext() && !c.exhausted) buffer = c.fetch(1000).iterator()
                         return buffer.hasNext()
                     }

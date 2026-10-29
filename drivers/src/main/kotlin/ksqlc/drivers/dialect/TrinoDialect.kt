@@ -26,7 +26,7 @@ object TrinoDialect : MetaDialect() {
             DbObjectKind.TABLE -> "table"
             DbObjectKind.VIEW -> "view"
             DbObjectKind.MATERIALIZED_VIEW -> "materialized view"
-            else -> error("Trino no tiene ${o.name} como objeto con DDL")
+            else -> error(tr("Trino no tiene %s como objeto con DDL", o.name))
         }
         return conn.createStatement().use { st -> st.executeQuery("show create $what ${qualified(o)}").use { rs -> rs.next(); rs.getString(1) } }
     }

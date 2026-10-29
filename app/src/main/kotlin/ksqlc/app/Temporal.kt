@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -74,8 +75,8 @@ fun generators(typeName: String, engine: ksqlc.core.DbKind?): List<Pair<String, 
     val kind = temporalKind(typeName, engine)
     val t = typeName.uppercase()
     return when {
-        kind != null -> listOf((if (kind == TemporalKind.DATE) "Fecha de hoy" else "Fecha y hora actual") to { formatMoment(now(), kind) })
-        t == "UUID" || t == "UNIQUEIDENTIFIER" || t.contains("CHAR") || t == "TEXT" -> listOf("Generar UUID" to { java.util.UUID.randomUUID().toString() })
+        kind != null -> listOf((if (kind == TemporalKind.DATE) tr("Fecha de hoy") else tr("Fecha y hora actual")) to { formatMoment(now(), kind) })
+        t == "UUID" || t == "UNIQUEIDENTIFIER" || t.contains("CHAR") || t == "TEXT" -> listOf(tr("Generar UUID") to { java.util.UUID.randomUUID().toString() })
         else -> emptyList()
     }
 }

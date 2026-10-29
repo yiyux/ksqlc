@@ -22,19 +22,19 @@ interface Dialect {
     fun ddl(conn: Connection, o: DbObject): String
 
     /** `create table` for [o] with the columns, types, not-null flags and primary key of [d]; no defaults, foreign keys or indexes. */
-    fun createTable(o: DbObject, d: TableDetails): String = error("Este motor no puede crear tablas")
+    fun createTable(o: DbObject, d: TableDetails): String = error(tr("Este motor no puede crear tablas"))
 
     /**
      * The statements that call routine [o]. Each input parameter is a `:name` placeholder, so the console asks for the values
      * before running; the parameters it cannot take (OUT ones, where the engine needs a variable to hold them) make this fail.
      */
-    fun call(conn: Connection, o: DbObject): List<String> = error("Este motor no tiene rutinas que ejecutar")
+    fun call(conn: Connection, o: DbObject): List<String> = error(tr("Este motor no tiene rutinas que ejecutar"))
 
     /** An editable copy of table [o], or null when the engine's tables cannot be modified yet. */
     fun tableModel(conn: Connection, o: DbObject): TableModel? = null
 
     /** The statements that turn [before] into [after] on table [o]; empty when nothing changed. */
-    fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = error("Este motor no puede modificar tablas")
+    fun alterTable(o: DbObject, before: TableModel, after: TableModel): List<String> = error(tr("Este motor no puede modificar tablas"))
 
     /** What the Modify dialog offers for this engine. */
     val modifyCaps: ModifyCaps get() = ModifyCaps()

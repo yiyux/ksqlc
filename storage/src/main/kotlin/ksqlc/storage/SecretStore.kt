@@ -1,5 +1,7 @@
 package ksqlc.storage
 
+import ksqlc.core.tr
+
 import com.github.javakeyring.Keyring
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -66,7 +68,7 @@ class EncryptedFileSecretStore(private val file: Path, master: CharArray) : Secr
         key = try { SecretKeySpec(SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded, "AES") } finally { spec.clearPassword() }
         if (old != null) {
             val plain = try { cipher(Cipher.DECRYPT_MODE, Base64.getDecoder().decode(old.iv)).doFinal(Base64.getDecoder().decode(old.data)) }
-            catch (e: AEADBadTagException) { throw IllegalArgumentException("Contraseña maestra incorrecta") }
+            catch (e: AEADBadTagException) { throw IllegalArgumentException(tr("Contraseña maestra incorrecta")) }
             map += json.decodeFromString<Map<String, String>>(String(plain, Charsets.UTF_8))
         } else flush()   // an unwritable path or an empty master shows up now, not on the first save
     }

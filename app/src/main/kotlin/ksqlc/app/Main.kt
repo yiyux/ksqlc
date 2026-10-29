@@ -17,6 +17,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import ksqlc.core.I18n
+import ksqlc.core.Language
 import ksqlc.storage.ConnectionStore
 import ksqlc.storage.HistoryStore
 import ksqlc.storage.PasswordStorage
@@ -30,7 +32,20 @@ fun main() = application {
     val scope = rememberCoroutineScope()
     val dir = remember { Path.of(System.getProperty("user.home"), ".ksqlc") }
     val settingsStore = remember { SettingsStore.default() }
-    val settings = remember { settingsStore.load() }
+    var settings by remember { mutableStateOf(settingsStore.load()) }
+    I18n.language = settings.language ?: Language.ES
+    // first start: ask the language before anything else is built, so no text is composed in the wrong one
+    if (settings.language == null) {
+        Window(
+            onCloseRequest = ::exitApplication,
+            title = "ksqlc",
+            icon = painterResource("icon.png"),
+            state = rememberWindowState(size = DpSize(420.dp, 240.dp)),
+        ) {
+            LanguagePrompt(settings) { l -> settings = settings.copy(language = l).also(settingsStore::save) }
+        }
+        return@application
+    }
     fun open(secrets: ksqlc.storage.SecretStore) = Workspace(scope, ConnectionStore(dir, secrets), settingsStore, HistoryStore.default())
     // with an encrypted file the workspace waits for the master password, so nothing reads secrets before then
     var ws by remember { mutableStateOf(if (settings.passwordStorage == PasswordStorage.FILE) null else open(secretStoreFor(settings, dir, CharArray(0)))) }

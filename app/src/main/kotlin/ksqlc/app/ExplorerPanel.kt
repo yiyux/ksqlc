@@ -2,6 +2,7 @@
 
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -94,28 +95,28 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier, ws: Workspace?
         PanelHeader("Database Explorer")
         Separator()
         Row(Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            ToolButton(IconKind.Plus, "Nuevo data source", { state.dataSourceDialog = true })
-            ToolButton(IconKind.Gear, "Propiedades del data source", { state.dataSourceDialog = true })
+            ToolButton(IconKind.Plus, tr("Nuevo data source"), { state.dataSourceDialog = true })
+            ToolButton(IconKind.Gear, tr("Propiedades del data source"), { state.dataSourceDialog = true })
             VSeparator()
-            ToolButton(IconKind.Refresh, "Refrescar", state::refreshExplorer, enabled = model != null)
-            ToolButton(IconKind.Filter, "Filtrar", { showFilter = !showFilter; if (!showFilter) filter = "" }, enabled = model != null, selected = showFilter)
-            ToolButton(IconKind.Schema, "Mostrar esquemas de sistema", state::toggleSystemSchemas, Modifier.testTag("system-schemas"), enabled = model != null, selected = state.settings.showSystemSchemas)
-            ToolButton(IconKind.Search, "Buscar tabla o vista (⌘⇧O)", { state.objectSearch = true }, Modifier.testTag("object-search-open"), enabled = model != null)
-            ToolButton(IconKind.Stop, "Desconectar", state::requestDisconnect, enabled = model != null)
+            ToolButton(IconKind.Refresh, tr("Refrescar"), state::refreshExplorer, enabled = model != null)
+            ToolButton(IconKind.Filter, tr("Filtrar"), { showFilter = !showFilter; if (!showFilter) filter = "" }, enabled = model != null, selected = showFilter)
+            ToolButton(IconKind.Schema, tr("Mostrar esquemas de sistema"), state::toggleSystemSchemas, Modifier.testTag("system-schemas"), enabled = model != null, selected = state.settings.showSystemSchemas)
+            ToolButton(IconKind.Search, tr("Buscar tabla o vista (⌘⇧O)"), { state.objectSearch = true }, Modifier.testTag("object-search-open"), enabled = model != null)
+            ToolButton(IconKind.Stop, tr("Desconectar"), state::requestDisconnect, enabled = model != null)
         }
         Separator()
         if (showFilter && model != null) {
-            CompactTextField(filter, { filter = it }, Modifier.fillMaxWidth().padding(8.dp), placeholder = "Filtrar", testTag = "explorer-filter")
+            CompactTextField(filter, { filter = it }, Modifier.fillMaxWidth().padding(8.dp), placeholder = tr("Filtrar"), testTag = "explorer-filter")
         }
         if (model == null && state.saved.isEmpty()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    if (state.connecting) "Leyendo el esquema…" else "Sin data sources. Añade uno, o ejecuta SQL en la consola para conectar.",
+                    if (state.connecting) tr("Leyendo el esquema…") else tr("Sin data sources. Añade uno, o ejecuta SQL en la consola para conectar."),
                     fontSize = 12.sp, color = c.textSecondary,
                 )
                 if (!state.connecting) {
-                    TextAction("Conectar", state::connect)
-                    TextAction("Nuevo data source…", { state.dataSourceDialog = true })
+                    TextAction(tr("Conectar"), state::connect)
+                    TextAction(tr("Nuevo data source…"), { state.dataSourceDialog = true })
                 }
             }
             return@Column
@@ -156,7 +157,7 @@ fun ExplorerPanel(state: AppState, modifier: Modifier = Modifier, ws: Workspace?
                         val m = k?.explorer
                         val open = m != null && ds.id !in collapsedIds
                         item(key = "ds:${ds.id}") {
-                            ContextMenuArea(items = { if (ws == null) emptyList() else listOf(ContextMenuItem("Nueva consola SQL") { ws.newConsole(ds) }) }) {
+                            ContextMenuArea(items = { if (ws == null) emptyList() else listOf(ContextMenuItem(tr("Nueva consola SQL")) { ws.newConsole(ds) }) }) {
                             Column(Modifier.testTag("ds-node:${ds.name}").clickable {
                                 when {
                                     m == null && !active -> { collapsedIds -= ds.id; ws?.open(ds) ?: state.selectAndConnect(ds) }
@@ -195,7 +196,7 @@ private fun LazyListScope.nodeItems(
     if (rows.isEmpty()) item(key = "empty:$owner") {
         val c = Ksqlc.colors
         Text(
-            if (filter.isBlank()) "Sin esquemas" else "Nada coincide con «$filter» (solo se filtra lo ya cargado)",
+            if (filter.isBlank()) tr("Sin esquemas") else tr("Nada coincide con «%s» (solo se filtra lo ya cargado)", filter),
             Modifier.padding(start = 30.dp, top = 6.dp), fontSize = 12.sp, color = c.textMuted,
         )
     }
@@ -206,37 +207,37 @@ private fun LazyListScope.nodeItems(
         val selectedId = state.explorerSelectedId
         ContextMenuArea(items = {
             buildList {
-                if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem("Abrir datos") { state.openData(o) })
+                if (o != null && o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem(tr("Abrir datos")) { state.openData(o) })
                 if (o != null) {
-                    if (o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem("Exportar datos…") { state.exportObject(o) })
-                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Importar CSV…") { state.openImport(o) })
-                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Dump con la herramienta del motor…") { state.openNative(false, o) })
-                    if (node.kind == NodeKind.ROUTINE && supportsRoutineCall(state.form.effectiveKind)) add(ContextMenuItem("Ejecutar…") { state.callRoutine(o) })
-                    if (node.kind == NodeKind.TABLE && supportsModifyTable(state.form.effectiveKind) && !state.form.options.readOnly) add(ContextMenuItem("Modificar…") { state.openModify(o) })
-                    add(ContextMenuItem("Comparar esquema con…") { state.openDiff(o.ns, o.name) })
-                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Comparar contenido con…") { state.openContentDiff(o) })
-                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem("Copiar tabla a…") { state.openCopyTable(o) })
-                    add(ContextMenuItem("Ver DDL") { state.showDdl(o) })
-                    add(ContextMenuItem("Copiar nombre") { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
+                    if (o.isReadable && node.kind in setOf(NodeKind.TABLE, NodeKind.VIEW, NodeKind.MATERIALIZED_VIEW)) add(ContextMenuItem(tr("Exportar datos…")) { state.exportObject(o) })
+                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem(tr("Importar CSV…")) { state.openImport(o) })
+                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem(tr("Dump con la herramienta del motor…")) { state.openNative(false, o) })
+                    if (node.kind == NodeKind.ROUTINE && supportsRoutineCall(state.form.effectiveKind)) add(ContextMenuItem(tr("Ejecutar…")) { state.callRoutine(o) })
+                    if (node.kind == NodeKind.TABLE && supportsModifyTable(state.form.effectiveKind) && !state.form.options.readOnly) add(ContextMenuItem(tr("Modificar…")) { state.openModify(o) })
+                    add(ContextMenuItem(tr("Comparar esquema con…")) { state.openDiff(o.ns, o.name) })
+                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem(tr("Comparar contenido con…")) { state.openContentDiff(o) })
+                    if (node.kind == NodeKind.TABLE) add(ContextMenuItem(tr("Copiar tabla a…")) { state.openCopyTable(o) })
+                    add(ContextMenuItem(tr("Ver DDL")) { state.showDdl(o) })
+                    add(ContextMenuItem(tr("Copiar nombre")) { clipboard.setText(AnnotatedString(model.source.dialect.qualified(o))) })
                     if (!state.form.options.readOnly) {
                         val k = state.form.effectiveKind
                         when (node.kind) {
-                            NodeKind.INDEX -> node.dbName?.let { n -> add(ContextMenuItem("Eliminar índice…") { state.alter("Eliminar el índice $n", dropIndexSql(k, o, n)) }) }
-                            NodeKind.FOREIGN_KEY -> node.dbName?.let { n -> dropForeignKeySql(k, o, n)?.let { sql -> add(ContextMenuItem("Eliminar clave foránea…") { state.alter("Eliminar la clave foránea $n", sql) }) } }
+                            NodeKind.INDEX -> node.dbName?.let { n -> add(ContextMenuItem(tr("Eliminar índice…")) { state.alter(tr("Eliminar el índice %s", n), dropIndexSql(k, o, n)) }) }
+                            NodeKind.FOREIGN_KEY -> node.dbName?.let { n -> dropForeignKeySql(k, o, n)?.let { sql -> add(ContextMenuItem(tr("Eliminar clave foránea…")) { state.alter(tr("Eliminar la clave foránea %s", n), sql) }) } }
                             NodeKind.COLUMN -> {}
                             else -> {
-                                truncateSql(k, o)?.let { sql -> add(ContextMenuItem("Vaciar tabla…") { state.alter("Vaciar ${o.name}", sql) }) }
-                                refreshMatViewSql(k, o)?.let { sql -> add(ContextMenuItem("Refrescar vista materializada") { state.alter("Refrescar ${o.name}", sql) }) }
-                                dropSql(k, o)?.let { sql -> add(ContextMenuItem("Eliminar…") { state.alter("Eliminar ${o.name}", sql) }) }
+                                truncateSql(k, o)?.let { sql -> add(ContextMenuItem(tr("Vaciar tabla…")) { state.alter(tr("Vaciar %s", o.name), sql) }) }
+                                refreshMatViewSql(k, o)?.let { sql -> add(ContextMenuItem(tr("Refrescar vista materializada")) { state.alter(tr("Refrescar %s", o.name), sql) }) }
+                                dropSql(k, o)?.let { sql -> add(ContextMenuItem(tr("Eliminar…")) { state.alter(tr("Eliminar %s", o.name), sql) }) }
                             }
                         }
                     }
                 }
                 if (node.kind == NodeKind.NAMESPACE) {
-                    add(ContextMenuItem("Dump con la herramienta del motor…") { state.openNative(false, null, node.ns) })
-                    add(ContextMenuItem("Restaurar con la herramienta del motor…") { state.openNative(true, null, node.ns) })
-                    add(ContextMenuItem("Comparar con…") { state.openDiff(node.ns) })
-                    add(ContextMenuItem("Refrescar") { state.refreshExplorer() })
+                    add(ContextMenuItem(tr("Dump con la herramienta del motor…")) { state.openNative(false, null, node.ns) })
+                    add(ContextMenuItem(tr("Restaurar con la herramienta del motor…")) { state.openNative(true, null, node.ns) })
+                    add(ContextMenuItem(tr("Comparar con…")) { state.openDiff(node.ns) })
+                    add(ContextMenuItem(tr("Refrescar")) { state.refreshExplorer() })
                 }
             }
         }) {
@@ -252,7 +253,7 @@ private fun LazyListScope.nodeItems(
             ) {
                 TreeLine(depth + base, node.expandable, node.expanded, iconOf(node.kind), node.label, node.detail, selectedId == node.id, node.loading)
                 node.error?.let {
-                    Text("Error: $it", Modifier.padding(start = 36.dp + Indent * (depth + base), bottom = 4.dp), fontSize = 12.sp, color = c.error)
+                    Text(tr("Error: %s", it), Modifier.padding(start = 36.dp + Indent * (depth + base), bottom = 4.dp), fontSize = 12.sp, color = c.error)
                 }
             }
         }

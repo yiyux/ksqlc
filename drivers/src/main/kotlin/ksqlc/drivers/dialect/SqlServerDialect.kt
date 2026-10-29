@@ -39,9 +39,9 @@ object SqlServerDialect : MetaDialect() {
     }
 
     override fun call(conn: Connection, o: DbObject): List<String> {
-        val type = conn.query("select o.type from sys.objects o join sys.schemas s on s.schema_id = o.schema_id where s.name = ? and o.name = ?", o.ns.schema, o.name) { it.getString(1).trim() }.firstOrNull() ?: error("${o.name} no existe")
+        val type = conn.query("select o.type from sys.objects o join sys.schemas s on s.schema_id = o.schema_id where s.name = ? and o.name = ?", o.ns.schema, o.name) { it.getString(1).trim() }.firstOrNull() ?: error(tr("%s no existe", o.name))
         val params = conn.query("select name, is_output from sys.parameters where object_id = object_id(?) and parameter_id > 0 order by parameter_id", qualified(o)) { it.getString(1) to it.getBoolean(2) }
-        if (params.any { it.second }) error("tiene parámetros de salida y todavía no se pueden pedir")
+        if (params.any { it.second }) error(tr("tiene parámetros de salida y todavía no se pueden pedir"))
         val holders = placeholders(params.map { it.first })
         val q = qualified(o)
         return listOf(when (type) {
@@ -165,9 +165,9 @@ object SqlServerDialect : MetaDialect() {
                left join sys.extended_properties ep on ep.class = 1 and ep.major_id = t.object_id and ep.minor_id = 0 and ep.name = 'MS_Description'
                where t.object_id = object_id(?)""",
             qualified(o),
-        ) { Triple(it.getInt(1), it.getBoolean(2), it.getString(3)) }.firstOrNull() ?: error("${o.name} no existe")
-        if (temporal != 0) error("${o.name} es una tabla temporal (system-versioned) y todavía no se puede modificar")
-        if (inMemory) error("${o.name} está optimizada para memoria y todavía no se puede modificar")
+        ) { Triple(it.getInt(1), it.getBoolean(2), it.getString(3)) }.firstOrNull() ?: error(tr("%s no existe", o.name))
+        if (temporal != 0) error(tr("%s es una tabla temporal (system-versioned) y todavía no se puede modificar", o.name))
+        if (inMemory) error(tr("%s está optimizada para memoria y todavía no se puede modificar", o.name))
 
         val dbCollation = conn.query("select convert(nvarchar(128), databasepropertyex(db_name(), 'Collation'))") { it.getString(1) }.firstOrNull()
         val comments = conn.query(
@@ -247,7 +247,7 @@ object SqlServerDialect : MetaDialect() {
         DbObjectKind.TABLE -> tableDdl(conn, o)
         DbObjectKind.SEQUENCE -> sequenceDdl(conn, o)
         else -> conn.query("select m.definition from sys.sql_modules m where m.object_id = object_id(?)", qualified(o)) { it.getString(1) }
-            .firstOrNull()?.trim() ?: error("${o.name} no existe o su definición está cifrada")
+            .firstOrNull()?.trim() ?: error(tr("%s no existe o su definición está cifrada", o.name))
     }
 
     private fun tableDdl(conn: Connection, o: DbObject): String {
@@ -298,5 +298,5 @@ object SqlServerDialect : MetaDialect() {
         ) {
             "create sequence ${qualified(o)} as ${it.getString(1)} start with ${it.getString(2)} increment by ${it.getString(3)} " +
                 "minvalue ${it.getString(4)} maxvalue ${it.getString(5)} ${if (it.getBoolean(6)) "cycle" else "no cycle"};"
-        }.firstOrNull() ?: error("${o.name} no existe")
+        }.firstOrNull() ?: error(tr("%s no existe", o.name))
 }

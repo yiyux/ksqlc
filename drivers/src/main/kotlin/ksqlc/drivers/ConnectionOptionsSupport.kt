@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import ksqlc.core.ConnectionOptions
 import ksqlc.core.DbKind
 import ksqlc.sql.splitStatements
@@ -48,7 +50,7 @@ fun readOnlyViolation(sql: String): String? {
     val first = ksqlc.sql.firstKeyword(sql)
     val writes = first == "WITH" && ksqlc.sql.tokenize(sql).any { it.kind == ksqlc.sql.TokenKind.KEYWORD && it.text(sql).uppercase() in WRITES_IN_WITH }
     return if (first in READS && !writes) null
-    else "La conexión es de solo lectura: solo se permiten consultas (SELECT, WITH, SHOW, EXPLAIN…)"
+    else tr("La conexión es de solo lectura: solo se permiten consultas (SELECT, WITH, SHOW, EXPLAIN…)")
 }
 
 /** A query the engine answers trivially, to keep an idle connection alive. */

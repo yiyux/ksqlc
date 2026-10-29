@@ -26,8 +26,8 @@ class ModifyDraft(val obj: DbObject, val before: TableModel, private val dialect
 
     /** What the preview says before the SQL: that applying is not all or nothing, and what the dialog cannot hold and so leaves alone. */
     val notice: String? get() = listOfNotNull(
-        if (caps.atomic) null else "MySQL y MariaDB confirman cada sentencia: si una falla, las anteriores quedan aplicadas.",
-        before.skipped.takeIf { it.isNotEmpty() }?.let { "Fuera de este diálogo y sin tocar: ${it.joinToString(", ")}." },
+        if (caps.atomic) null else tr("MySQL y MariaDB confirman cada sentencia: si una falla, las anteriores quedan aplicadas."),
+        before.skipped.takeIf { it.isNotEmpty() }?.let { tr("Fuera de este diálogo y sin tocar: %s.", it.joinToString(", ")) },
     ).takeIf { it.isNotEmpty() }?.joinToString("\n-- ")
 
     /** The SQL OK would run; empty while there is a [problem] or nothing changed. */

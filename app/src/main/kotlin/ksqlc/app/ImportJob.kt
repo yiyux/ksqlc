@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,7 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /** Field separators the dialog offers, in the order of its segmented control. */
-val DELIMITERS = listOf("," to "Coma", ";" to "Punto y coma", "\t" to "Tabulador")
+val DELIMITERS = listOf("," to tr("Coma"), ";" to tr("Punto y coma"), "\t" to tr("Tabulador"))
 
 private const val PREVIEW_ROWS = 6
 
@@ -49,7 +50,7 @@ class ImportJob(
     val fileColumnCount: Int get() = preview.maxOfOrNull { it.size } ?: 0
 
     /** Name of file column [i]: its header, or "Columna n+1". */
-    fun fileColumnName(i: Int) = (if (header) preview.firstOrNull()?.getOrNull(i) else null) ?: "Columna ${i + 1}"
+    fun fileColumnName(i: Int) = (if (header) preview.firstOrNull()?.getOrNull(i) else null) ?: tr("Columna %d", i + 1)
 
     private fun resolve() = Path.of(path.trim().replaceFirst(Regex("^~"), System.getProperty("user.home")))
 
@@ -69,7 +70,7 @@ class ImportJob(
 
     fun start(onDone: () -> Unit) {
         if (running) return
-        if (preview.isEmpty()) { error = "Elige un archivo CSV que se pueda leer"; return }
+        if (preview.isEmpty()) { error = tr("Elige un archivo CSV que se pueda leer"); return }
         running = true; error = null; progress = 0
         val map = mapping.toList(); val skip = header; val sep = DELIMITERS[delimiter].first[0]; val file = resolve()
         scope.launch {
@@ -85,8 +86,8 @@ class ImportJob(
                 }
             }
             running = false
-            outcome.onSuccess { n -> report("$n filas importadas en ${obj.name}"); onDone() }
-                .onFailure { error = it.message ?: it.toString(); report("Error al importar: $error") }
+            outcome.onSuccess { n -> report(tr("%s filas importadas en %s", n, obj.name)); onDone() }
+                .onFailure { error = it.message ?: it.toString(); report(tr("Error al importar: %s", error)) }
         }
     }
 }

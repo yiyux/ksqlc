@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +59,7 @@ class Workspace(
         val c = consoles.getOrNull(i)?.takeIf { consoles.size > 1 } ?: return
         val prev = active
         activate(i)   // its confirmation is drawn over the active console only
-        c.confirmDiscard(c.hasUnsaved, "Hay cambios sin enviar o transacciones sin confirmar.") {
+        c.confirmDiscard(c.hasUnsaved, tr("Hay cambios sin enviar o transacciones sin confirmar.")) {
             consoles.remove(c)
             c.close()
             activate(consoles.indexOf(prev).takeIf { it >= 0 } ?: (i - 1).coerceAtLeast(0))
@@ -79,7 +80,7 @@ class Workspace(
             activate(i)
             consoles[i].requestExit { next(i + 1) }
         }
-        active.confirmation = Confirmation("Salir de ksqlc", "¿Seguro que quieres cerrar la aplicación?", "Salir") { active.confirmation = null; next(0) }
+        active.confirmation = Confirmation(tr("Salir de ksqlc"), tr("¿Seguro que quieres cerrar la aplicación?"), tr("Salir")) { active.confirmation = null; next(0) }
     }
 
     fun dispose() { consoles.forEach { it.close() }; Tunnels.closeAll() }

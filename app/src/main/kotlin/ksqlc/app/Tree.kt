@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -114,7 +115,7 @@ class TreeModel(val source: SchemaSource, private val io: CoroutineDispatcher = 
             val items = objects.filter { it.kind == kind }
             if (items.isEmpty()) return@mapNotNull null
             val gid = "$parentId/$title"
-            TreeNode(gid, "$title (${items.size})", NodeKind.GROUP, preset = items.map { objectNode(gid, it) })
+            TreeNode(gid, "${tr(title)} (${items.size})", NodeKind.GROUP, preset = items.map { objectNode(gid, it) })
         }
 
     private fun objectNode(parentId: String, o: DbObject): TreeNode {
@@ -133,20 +134,20 @@ class TreeModel(val source: SchemaSource, private val io: CoroutineDispatcher = 
     private fun detailGroups(parentId: String, o: DbObject, d: TableDetails): List<TreeNode> = buildList {
         if (d.columns.isNotEmpty()) {
             val gid = "$parentId/cols"
-            add(TreeNode(gid, "Columnas (${d.columns.size})", NodeKind.GROUP, obj = o, preset = d.columns.map { c ->
+            add(TreeNode(gid, tr("Columnas (%d)", d.columns.size), NodeKind.GROUP, obj = o, preset = d.columns.map { c ->
                 TreeNode("$gid/${c.name}", c.name, NodeKind.COLUMN, obj = o, detail = columnDetail(c, c.name in d.primaryKey))
             }))
         }
         if (d.indexes.isNotEmpty()) {
             val gid = "$parentId/idx"
-            add(TreeNode(gid, "Índices (${d.indexes.size})", NodeKind.GROUP, obj = o, preset = d.indexes.map { ix ->
+            add(TreeNode(gid, tr("Índices (%d)", d.indexes.size), NodeKind.GROUP, obj = o, preset = d.indexes.map { ix ->
                 TreeNode("$gid/${ix.name}", ix.name, NodeKind.INDEX, obj = o, dbName = ix.name,
                     detail = "(${ix.columns.joinToString()})" + if (ix.unique) " unique" else "")
             }))
         }
         if (d.foreignKeys.isNotEmpty()) {
             val gid = "$parentId/fks"
-            add(TreeNode(gid, "Claves foráneas (${d.foreignKeys.size})", NodeKind.GROUP, obj = o, preset = d.foreignKeys.mapIndexed { n, fk ->
+            add(TreeNode(gid, tr("Claves foráneas (%d)", d.foreignKeys.size), NodeKind.GROUP, obj = o, preset = d.foreignKeys.mapIndexed { n, fk ->
                 TreeNode("$gid/${fk.name ?: n}", fk.name ?: fk.columns.joinToString(), NodeKind.FOREIGN_KEY, obj = o, dbName = fk.name,
                     detail = "(${fk.columns.joinToString()}) → ${fk.refTable}(${fk.refColumns.joinToString()})")
             }))

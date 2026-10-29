@@ -1,5 +1,7 @@
 package ksqlc.drivers
 
+import ksqlc.core.tr
+
 import ksqlc.core.DataSource
 import java.sql.DriverManager
 
@@ -70,10 +72,10 @@ internal fun sslFor(ds: DataSource): Pair<String, Map<String, String>> {
 /** With an SSH tunnel on, the same data source aimed at the local end of the tunnel; otherwise [ds] itself. */
 internal fun throughTunnel(ds: DataSource): DataSource {
     if (!ds.ssh.enabled || ds.kind == ksqlc.core.DbKind.SQLITE) return ds
-    val parts = JdbcUrl.parse(ds.url) ?: throw java.sql.SQLException("El túnel SSH necesita una conexión definida con host y puerto, no una URL manual")
+    val parts = JdbcUrl.parse(ds.url) ?: throw java.sql.SQLException(tr("El túnel SSH necesita una conexión definida con host y puerto, no una URL manual"))
     val port = try {
         Tunnels.forward(ds.ssh, ds.sshSecret, parts.host, parts.port ?: JdbcUrl.defaultPort(ds.kind) ?: error("sin puerto"))
-    } catch (e: Exception) { throw java.sql.SQLException("No se pudo abrir el túnel SSH: ${e.message}", e) }
+    } catch (e: Exception) { throw java.sql.SQLException(tr("No se pudo abrir el túnel SSH: %s", e.message), e) }
     return ds.copy(url = JdbcUrl.build(ds.kind, "127.0.0.1", port, parts.database, parts.ssl, parts.trustCert, parts.datacenter))
 }
 

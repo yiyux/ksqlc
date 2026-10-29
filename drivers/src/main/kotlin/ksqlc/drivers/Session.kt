@@ -42,7 +42,7 @@ class Session(private val ds: DataSource, private val password: String?, autoCom
                 sessionStartup(ds.kind, options).forEach { sql -> c.createStatement().use { it.execute(sql) } }
             } catch (e: SQLException) {
                 runCatching { c.close() }
-                throw SQLException("Falló el script de inicio: ${e.message}", e.sqlState, e.errorCode, e)
+                throw SQLException(tr("Falló el script de inicio: %s", e.message), e.sqlState, e.errorCode, e)
             }
             conn = c
         }

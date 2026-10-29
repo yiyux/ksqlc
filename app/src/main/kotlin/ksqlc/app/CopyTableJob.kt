@@ -1,5 +1,6 @@
 package ksqlc.app
 
+import ksqlc.core.tr
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -54,14 +55,14 @@ class CopyTableJob(
     val hint: String? get() {
         if (picker.namespaces.isEmpty() || targetName.isBlank()) return null
         copyProblem(sources[0].kind, targetSource.kind, targetSource.options.readOnly, existing != null, null)?.let { return it }
-        return if (existing != null) "Se añadirán las filas a ${existing!!.name}" else "Se creará la tabla ${targetName.trim()}"
+        return if (existing != null) tr("Se añadirán las filas a %s", existing!!.name) else tr("Se creará la tabla %s", targetName.trim())
     }
     val blocked: Boolean get() = hint == null || copyProblem(sources[0].kind, targetSource.kind, targetSource.options.readOnly, existing != null, null) != null
 
     /** Reads both tables to work out the copy. Blocking. */
     fun plan(): CopyPlan {
-        val rs = picker.source ?: error("Elige la tabla de destino")
-        val ns = picker.namespaces.getOrNull(picker.nsIndex) ?: error("Elige el esquema de destino")
+        val rs = picker.source ?: error(tr("Elige la tabla de destino"))
+        val ns = picker.namespaces.getOrNull(picker.nsIndex) ?: error(tr("Elige el esquema de destino"))
         val found = existing
         val target = found ?: DbObject(ns, targetName.trim(), DbObjectKind.TABLE)
         val details = left.details(sourceObj)
@@ -103,9 +104,9 @@ class CopyTableJob(
                 record(ds.id, listOfNotNull(p.create, p.insertSql).map { HistoryEntry(now, it.trimEnd(';') + ";", 0, true) } +
                     HistoryEntry(now, "-- $rows filas copiadas desde $leftName.${sourceObj.name}", 0, true))
                 picker.chooseNamespace(picker.nsIndex) // reads the tables again, so a table just created counts as existing; it also clears the message
-                message = "Copiadas $rows filas a ${p.target.name} en ${ds.name}"
+                message = tr("Copiadas %s filas a %s en %s", rows, p.target.name, ds.name)
                 afterCopy(ds)
-            }.onFailure { error = if (cancelled) "Copia cancelada: no se aplicó nada" else "No se aplicó nada: ${it.message}" }
+            }.onFailure { error = if (cancelled) tr("Copia cancelada: no se aplicó nada") else tr("No se aplicó nada: %s", it.message) }
         }
     }
 

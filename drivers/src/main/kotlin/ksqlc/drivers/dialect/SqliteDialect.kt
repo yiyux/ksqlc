@@ -48,7 +48,7 @@ object SqliteDialect : MetaDialect() {
     override fun ddl(conn: Connection, o: DbObject): String {
         val master = "${quote(o.ns.schema!!)}.sqlite_master"
         val own = conn.query("select sql from $master where name = ? and type in ('table','view')", o.name) { it.getString(1) }.firstOrNull()
-            ?: error("${o.name} no existe")
+            ?: error(tr("%s no existe", o.name))
         val indexes = conn.query("select sql from $master where tbl_name = ? and type = 'index' and sql is not null order by name", o.name) { it.getString(1) }
         return (listOf(own) + indexes).joinToString(";\n\n", postfix = ";")
     }
